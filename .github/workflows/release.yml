@@ -1,0 +1,86 @@
+# -- actions/checkout v7.0.1 --
+# SHA: 3d3c42e5aac5ba805825da76410c181273ba90b1
+# -- astral-sh/setup-uv v10.0.1 --
+# SHA: 20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+# -- actions/attest v4.2.2 --
+# SHA: 1e69f48acb82d1966a394da916b4c1698aa569d6
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  UV_NO_PROGRESS: "1"
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: "0.12.5"
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Verify tag matches project version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          if not re.fullmatch(r"v\d+\.\d+\.\d+", tag) or tag[1:] != version:
+              raise SystemExit(f"tag {tag!r} does not match project version {version!r}")
+          PY
+
+      - name: Sync release environment
+        run: uv sync --locked --group release
+
+      - name: Run immutable checks
+        run: uv run --no-sync dev check
+
+      - name: Build and verify distributions
+        run: |
+          uv build --no-sources -o .cache/dist
+          uv run --no-sync twine check .cache/dist/*
+          sha256sum .cache/dist/* > .cache/dist/SHA256SUMS
+
+      - name: Attest distributions
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: |
+            .cache/dist/*.whl
+            .cache/dist/*.tar.gz
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          .cache/dist/*.whl .cache/dist/*.tar.gz .cache/dist/SHA256SUMS
+          --generate-notes --verify-tag
