@@ -39,7 +39,7 @@ security = [
   "bandit[toml]>=1.8,<2",
   "pip-audit>=2.9,<3",
 ]
-release = ["twine>=6.2,<7"]
+release = ["twine>=6.2,<8"]
 
 [tool.setuptools]
 include-package-data = false
