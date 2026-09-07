@@ -315,7 +315,9 @@ def display_value(value: Any, *, field: str) -> str:
     return clean_text(value, field=field)
 
 
-def read_application(data: Mapping[str, Any]) -> tuple[str, tuple[tuple[str, str], ...]]:
+def read_application(
+    data: Mapping[str, Any],
+) -> tuple[str, tuple[tuple[str, str], ...]]:
     """Read the optional application-summary heading and fields"""
     raw = data.get("application", {})
     if not isinstance(raw, Mapping):
@@ -526,7 +528,8 @@ def load_event_config(path: Path, cli_logo: Path | None = None) -> EventConfig:
         operations.get("weather_controls"), field="[operations].weather_controls"
     )
     competition_controls = clean_text(
-        operations.get("competition_controls"), field="[operations].competition_controls"
+        operations.get("competition_controls"),
+        field="[operations].competition_controls",
     )
     alcohol_controls = clean_text(
         operations.get("alcohol_controls"), field="[operations].alcohol_controls"
@@ -660,7 +663,12 @@ def weather_controls(cfg: EventConfig) -> tuple[str, str, str, str]:
 def electrical_controls(cfg: EventConfig) -> tuple[str, str, str, str]:
     """Build controls for electrical equipment"""
     if not cfg.electrical_equipment:
-        return "N/A", "No electrically powered equipment is planned for the event.", "N/A", "N/A"
+        return (
+            "N/A",
+            "No electrically powered equipment is planned for the event.",
+            "N/A",
+            "N/A",
+        )
     equipment = cfg.equipment_description
     equipment = equipment[:1].upper() + equipment[1:] if equipment else "Electrical equipment"
     controls = (
@@ -768,7 +776,12 @@ def security_controls(cfg: EventConfig) -> tuple[str, str, str, str]:
 def alcohol_controls(cfg: EventConfig) -> tuple[str, str, str, str]:
     """Build controls for alcohol service"""
     if not cfg.alcohol:
-        return "N/A", "No alcohol will be served or permitted at the event.", "N/A", "N/A"
+        return (
+            "N/A",
+            "No alcohol will be served or permitted at the event.",
+            "N/A",
+            "N/A",
+        )
     controls = cfg.alcohol_controls or (
         "Alcohol service will proceed only with all required UQ and liquor approvals, responsible service controls, age verification, water and food availability, and a plan for intoxicated or unwell patrons."
     )
@@ -778,7 +791,12 @@ def alcohol_controls(cfg: EventConfig) -> tuple[str, str, str, str]:
 def food_controls(cfg: EventConfig) -> tuple[str, str, str, str]:
     """Build controls for food service"""
     if not cfg.food_provided:
-        return "N/A", "No food will be prepared, served or distributed at the event.", "N/A", "N/A"
+        return (
+            "N/A",
+            "No food will be prepared, served or distributed at the event.",
+            "N/A",
+            "N/A",
+        )
     food = cfg.food_description or "light refreshments"
     controls = (
         f"Food service is limited to {food}. Food will be commercially prepared or handled safely, allergens will be identified where possible, "
@@ -914,7 +932,10 @@ RISK_DEFINITIONS: tuple[RiskDefinition, ...] = (
         crowd_controls,
     ),
     RiskDefinition(
-        8, "Waste Management", ("Overflowing waste containers", "Other:"), waste_controls
+        8,
+        "Waste Management",
+        ("Overflowing waste containers", "Other:"),
+        waste_controls,
     ),
     RiskDefinition(
         9,
@@ -931,7 +952,12 @@ RISK_DEFINITIONS: tuple[RiskDefinition, ...] = (
     RiskDefinition(
         10,
         "Patron and Staff (worker) wellness",
-        ("Heat exhaustion", "Dehydration", "Stress, anxiety or other psychosocial risk", "Other:"),
+        (
+            "Heat exhaustion",
+            "Dehydration",
+            "Stress, anxiety or other psychosocial risk",
+            "Other:",
+        ),
         wellness_controls,
     ),
     RiskDefinition(
@@ -978,7 +1004,10 @@ RISK_DEFINITIONS: tuple[RiskDefinition, ...] = (
     RiskDefinition(
         16,
         "Service of Food",
-        ("Food poisoning through inadequate food preparation, handling and control", "Other:"),
+        (
+            "Food poisoning through inadequate food preparation, handling and control",
+            "Other:",
+        ),
         food_controls,
     ),
     RiskDefinition(
@@ -1057,7 +1086,9 @@ def build_risks(cfg: EventConfig) -> list[RiskRow]:
             )
         if "initial_risk" in override:
             initial = expand_text(
-                override["initial_risk"], cfg, field=f"risk {definition.number} initial_risk"
+                override["initial_risk"],
+                cfg,
+                field=f"risk {definition.number} initial_risk",
             )
         if "controls" in override:
             controls = expand_text(
@@ -1065,11 +1096,15 @@ def build_risks(cfg: EventConfig) -> list[RiskRow]:
             )
         if "residual_risk" in override:
             residual = expand_text(
-                override["residual_risk"], cfg, field=f"risk {definition.number} residual_risk"
+                override["residual_risk"],
+                cfg,
+                field=f"risk {definition.number} residual_risk",
             )
         if "responsible" in override:
             responsible = expand_text(
-                override["responsible"], cfg, field=f"risk {definition.number} responsible"
+                override["responsible"],
+                cfg,
+                field=f"risk {definition.number} responsible",
             )
 
         rows.append(
@@ -1134,7 +1169,12 @@ def set_cell_margins(
     if tc_mar is None:
         tc_mar = OxmlElement("w:tcMar")
         tc_pr.append(tc_mar)
-    for edge, value in (("top", top), ("start", start), ("bottom", bottom), ("end", end)):
+    for edge, value in (
+        ("top", top),
+        ("start", start),
+        ("bottom", bottom),
+        ("end", end),
+    ):
         tag = f"w:{edge}"
         element = tc_mar.find(qn(tag))
         if element is None:
@@ -1309,7 +1349,13 @@ def add_page_number(paragraph: Any) -> None:
     display.text = "1"
     fld_char_end = OxmlElement("w:fldChar")
     fld_char_end.set(qn("w:fldCharType"), "end")
-    for element in (fld_char_begin, instr_text, fld_char_separate, display, fld_char_end):
+    for element in (
+        fld_char_begin,
+        instr_text,
+        fld_char_separate,
+        display,
+        fld_char_end,
+    ):
         run._r.append(element)
 
 
@@ -1569,19 +1615,35 @@ def add_risk_page(doc: DocumentType, rows: Sequence[RiskRow]) -> None:
         row.height_rule = WD_ROW_HEIGHT_RULE.AT_LEAST
 
         add_text_to_cell(
-            cells[0], str(risk.number), size=7.2, alignment=WD_ALIGN_PARAGRAPH.CENTER, line=7.8
+            cells[0],
+            str(risk.number),
+            size=7.2,
+            alignment=WD_ALIGN_PARAGRAPH.CENTER,
+            line=7.8,
         )
         add_text_to_cell(cells[1], risk.aspect, size=7.25, bold=True, line=7.9)
         add_text_to_cell(cells[2], "\n".join(risk.hazards), size=7.0, line=7.65)
         add_text_to_cell(
-            cells[3], risk.initial_risk, size=7.2, alignment=WD_ALIGN_PARAGRAPH.CENTER, line=7.8
+            cells[3],
+            risk.initial_risk,
+            size=7.2,
+            alignment=WD_ALIGN_PARAGRAPH.CENTER,
+            line=7.8,
         )
         add_text_to_cell(cells[4], risk.controls, size=7.0, line=7.65)
         add_text_to_cell(
-            cells[5], risk.residual_risk, size=7.2, alignment=WD_ALIGN_PARAGRAPH.CENTER, line=7.8
+            cells[5],
+            risk.residual_risk,
+            size=7.2,
+            alignment=WD_ALIGN_PARAGRAPH.CENTER,
+            line=7.8,
         )
         add_text_to_cell(
-            cells[6], risk.responsible, size=7.0, alignment=WD_ALIGN_PARAGRAPH.CENTER, line=7.65
+            cells[6],
+            risk.responsible,
+            size=7.0,
+            alignment=WD_ALIGN_PARAGRAPH.CENTER,
+            line=7.65,
         )
 
         cells[0].vertical_alignment = WD_ALIGN_VERTICAL.TOP
@@ -1759,7 +1821,9 @@ def add_application_summary_page(doc: DocumentType, cfg: EventConfig) -> None:
     )
     full(5, "Email", cfg.coordinator_email or "Not specified")
     full(
-        6, "Schedule", cfg.schedule.compact_sentence().removeprefix("Schedule: ") or "Not specified"
+        6,
+        "Schedule",
+        cfg.schedule.compact_sentence().removeprefix("Schedule: ") or "Not specified",
     )
     full(7, "Risk scope", cfg.risk_scope or cfg.summary)
     full(8, "Activity", cfg.activity)

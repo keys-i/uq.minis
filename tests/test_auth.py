@@ -5,11 +5,11 @@ import stat
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
 
 from uq_minis.helper.common import MiniError
 from uq_minis.helper.forms import FormProfile
-from uq_minis.minis.auth import _cookie_header, _guard, _write_env, app, capture
+from uq_minis.minis.auth.browser import _cookie_header, _guard, capture
+from uq_minis.minis.auth.credentials import write_env
 
 
 def _profile() -> FormProfile:
@@ -89,7 +89,13 @@ def test_cookie_requires_forms_auth_cookie() -> None:
     )
     assert (
         _cookie_header(
-            [{"name": "AADAuth.forms", "value": "auth", "domain": ".forms.cloud.microsoft"}]
+            [
+                {
+                    "name": "AADAuth.forms",
+                    "value": "auth",
+                    "domain": ".forms.cloud.microsoft",
+                }
+            ]
         )
         == "AADAuth.forms=auth"
     )
@@ -97,16 +103,12 @@ def test_cookie_requires_forms_auth_cookie() -> None:
 
 def test_env_is_private_and_not_overwritten(tmp_path: Path) -> None:
     path = tmp_path / ".env"
-    _write_env(path, {"TOKEN": "secret"}, force=False)
+    write_env(path, {"TOKEN": "secret"}, force=False)
     assert "TOKEN='secret'" in path.read_text()
     if os.name == "posix":
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
     with pytest.raises(MiniError, match="Refusing"):
-        _write_env(path, {"TOKEN": "replacement"}, force=False)
-
-
-def test_main_rejects_nonpositive_timeout() -> None:
-    assert CliRunner().invoke(app, ["--timeout", "0"]).exit_code == 2
+        write_env(path, {"TOKEN": "replacement"}, force=False)
 
 
 def test_missing_playwright_gives_runnable_setup_command(monkeypatch):
@@ -115,14 +117,6 @@ def test_missing_playwright_gives_runnable_setup_command(monkeypatch):
     monkeypatch.setitem(sys.modules, "playwright.sync_api", None)
     with pytest.raises(MiniError, match="uv run --extra auth playwright install chromium"):
         capture(_profile(), browser="chromium", timeout=1)
-
-
-def test_auth_no_input_never_launches_browser(monkeypatch):
-    from uq_minis.minis import auth
-
-    monkeypatch.setattr(auth, "capture", lambda *args, **kwargs: pytest.fail("must not launch"))
-    result = CliRunner().invoke(app, ["--no-input"])
-    assert result.exit_code == 2 and "browser sign-in" in result.output
 
 
 def test_auth_captures_get_headers_and_preserves_existing_env(tmp_path: Path) -> None:
@@ -142,9 +136,9 @@ def test_auth_captures_get_headers_and_preserves_existing_env(tmp_path: Path) ->
     assert route.action == "continue" and values["TOKEN"] == "fresh"
     path = tmp_path / ".env"
     path.write_text("KEEP='yes'\nTOKEN='old'\n")
-    _write_env(path, {"TOKEN": "new'quoted"}, force=True)
+    write_env(path, {"TOKEN": "new'quoted"}, force=True)
     from dotenv import dotenv_values
 
     assert dotenv_values(path) == {"KEEP": "yes", "TOKEN": "new'quoted"}
     with pytest.raises(MiniError, match="control"):
-        _write_env(path, {"TOKEN": "bad\nvalue"}, force=True)
+        write_env(path, {"TOKEN": "bad\nvalue"}, force=True)

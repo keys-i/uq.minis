@@ -80,9 +80,10 @@ def discover_events(input_path: Path) -> list[Path]:
         raise MiniError(f"Input does not exist: {path}")
     found = {
         item.resolve()
-        for pattern in ("event.toml", "events.toml", "*.event.toml")
-        for item in path.rglob(pattern)
-        if item.is_file() and not item.is_symlink()
+        for item in path.rglob("*.toml")
+        if (item.name in {"event.toml", "events.toml"} or item.name.endswith(".event.toml"))
+        and item.is_file()
+        and not item.is_symlink()
     }
     if not found:
         raise MiniError(f"No event.toml, events.toml or *.event.toml files found under {path}")

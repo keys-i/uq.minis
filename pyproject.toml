@@ -21,6 +21,8 @@ dependencies = [
 
 [project.optional-dependencies]
 auth = ["playwright>=1.55,<2"]
+agent = ["msal>=1.31,<2", "playwright>=1.55,<2"]
+agents = ["mcp>=2.1,<3"]
 
 [project.scripts]
 mini = "uq_minis.cli:main"
@@ -39,14 +41,17 @@ security = [
 ]
 release = ["twine>=6.2,<7"]
 
+[tool.setuptools]
+include-package-data = false
+
 [tool.setuptools.package-dir]
 "" = "src"
 uq_minis = "src"
 uq_minis_tools = "tools"
 
 [tool.setuptools.package-data]
-uq_minis = ["py.typed", "helper/*.toml"]
-uq_minis_tools = ["config/*.toml"]
+uq_minis = ["py.typed", "helper/*.toml", "workers/*.helper.py"]
+uq_minis_tools = ["config/*.toml", "agents/*.md"]
 
 [tool.pytest.ini_options]
 cache_dir = ".cache/pytest"

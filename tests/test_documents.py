@@ -3,7 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from zipfile import ZipFile
 
-from uq_minis.helper.risk_docx import build_form_document, build_pack_document, load_event_config
+from uq_minis.helper.risk_docx import (
+    build_form_document,
+    build_pack_document,
+    load_event_config,
+)
 
 
 def page_breaks(path: Path) -> int:

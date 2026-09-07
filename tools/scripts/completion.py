@@ -9,7 +9,7 @@ def zsh_script() -> str:
     """Generate uv completion that delegates external commands to Typer"""
     import shlex
     import shutil
-    import subprocess  # nosec B404
+    import subprocess
     from importlib.metadata import distribution
 
     from typer.completion import get_completion_script
@@ -17,7 +17,7 @@ def zsh_script() -> str:
     uv = shutil.which("uv")
     if uv is None:
         raise typer.BadParameter("uv must be installed to generate completion")
-    script = subprocess.run(  # nosec B603
+    script = subprocess.run(
         [uv, "generate-shell-completion", "zsh"],
         capture_output=True,
         text=True,
@@ -25,18 +25,26 @@ def zsh_script() -> str:
     ).stdout
     # Delegate uv run's external arguments through zsh's command completer
     script = script.replace("external_command:_default", "external_command:_normal")
-    scripts = ["autoload -Uz compinit; (( $+functions[compdef] )) || compinit -D", script]
+    scripts = [
+        "autoload -Uz compinit; (( $+functions[compdef] )) || compinit -D",
+        script,
+    ]
     for entry in distribution("uq-minis").entry_points:
         if entry.group != "console_scripts":
             continue
         name = entry.name
         # The shell argument selects a template; it does not execute a shell
-        native = get_completion_script(  # nosec B604
-            prog_name=name, complete_var=f"_{name.upper().replace('-', '_')}_COMPLETE", shell="zsh"
+        native = get_completion_script(
+            prog_name=name,
+            complete_var=f"_{name.upper().replace('-', '_')}_COMPLETE",
+            shell="zsh",
         )
         native = native.replace(
             '"${words[1,$CURRENT]}"', '"${(j: :)${(@q)words[1,CURRENT]}}"'
-        ).replace(f"complete_zsh {name})", f"complete_zsh uv run --no-sync {shlex.quote(name)})")
+        ).replace(
+            f"complete_zsh {name})",
+            f"complete_zsh uv run --no-sync {shlex.quote(name)})",
+        )
         scripts.append(native)
     return "\n".join(scripts)
 

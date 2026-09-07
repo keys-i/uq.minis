@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shutil
-import subprocess  # nosec B404
+import subprocess
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -28,7 +28,7 @@ def run(argv: list[str]) -> int:
         CONSOLE.print(f"Missing executable: {argv[0]}", style="red", markup=False)
         return 127
     CONSOLE.print(" ".join(argv), style="cyan", markup=False)
-    return subprocess.run([executable, *argv[1:]], cwd=ROOT, check=False).returncode  # nosec B603
+    return subprocess.run([executable, *argv[1:]], cwd=ROOT, check=False).returncode
 
 
 def _checkout() -> None:

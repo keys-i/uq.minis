@@ -14,9 +14,10 @@ def test_mini_lifecycle_and_path_validation(tmp_path, monkeypatch):
     directory = tmp_path / "src/minis"
     directory.mkdir(parents=True)
     assert RUNNER.invoke(mini.app, ["add", "hello-world"]).exit_code == 0
-    source = directory / "hello_world/__init__.py"
-    text = source.read_text()
-    assert "import typer" in text and "def main(" in text
+    source = directory / "hello_world"
+    text = (source / "__init__.py").read_text()
+    assert "def run()" in text and "import typer" not in text
+    assert not (source / "cli.py").exists() and not (source / "__main__.py").exists()
     listed = RUNNER.invoke(mini.app, ["list"])
     assert listed.exit_code == 0 and "hello-world" in listed.output
     for name in ("../outside", "class", "HELLO", "hello-world"):

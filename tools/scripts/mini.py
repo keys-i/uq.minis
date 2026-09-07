@@ -16,29 +16,12 @@ CONSOLE = Console()
 app = typer.Typer(
     rich_markup_mode="rich", pretty_exceptions_show_locals=False, add_completion=False
 )
-TEMPLATE = '''"""{name} mini"""
-
-from __future__ import annotations
-
-import typer
-from rich.console import Console
-
-app = typer.Typer(rich_markup_mode="rich", pretty_exceptions_show_locals=False, add_completion=False)
+TEMPLATE = '''"""{name} mini."""
 
 
-@app.command()
 def run() -> None:
-    """Run the mini"""
-    Console().print("{name}", style="bold cyan")
-
-
-def main(argv: list[str] | None = None) -> None:
-    """Start the command line app"""
-    app(args=argv, prog_name="{name}")
-
-
-if __name__ == "__main__":
-    main()
+    """Run the mini."""
+    print("{name}")
 '''
 
 

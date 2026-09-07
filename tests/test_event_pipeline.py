@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from uq_minis.helper.common import MiniError
-from uq_minis.minis.event import generate
+from uq_minis.minis.event.pipeline import generate
 
 
 def test_form_only_and_risk_only_outputs(event_toml: Path, tmp_path: Path) -> None:
@@ -44,3 +44,11 @@ def test_invalid_jobs_does_not_write_outputs(event_toml: Path, tmp_path: Path) -
     with pytest.raises(MiniError, match="--jobs"):
         generate(event_toml, mode="form", destination=destination, jobs=-1)
     assert not destination.exists()
+
+
+def test_function_calls_do_not_emit_terminal_progress(event_toml, tmp_path, capsys):
+    result = generate(
+        event_toml, mode="form", form_action="preview", destination=tmp_path / "quiet"
+    )
+    assert result.outputs
+    assert capsys.readouterr().out == ""

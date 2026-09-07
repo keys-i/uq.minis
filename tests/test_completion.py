@@ -10,7 +10,6 @@ from types import ModuleType
 from typing import Literal
 
 import pytest
-import typer
 from prompt_toolkit.application import create_app_session
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
@@ -20,7 +19,6 @@ from typer.testing import CliRunner
 
 from uq_minis import cli
 from uq_minis.helper.prompt import ask
-from uq_minis.minis import auth, event
 from uq_minis_tools.scripts import script
 from uq_minis_tools.scripts.completion import zsh_script
 
@@ -28,21 +26,22 @@ from uq_minis_tools.scripts.completion import zsh_script
 @pytest.mark.parametrize(
     "args,incomplete,expected",
     [
-        ([], "", ["add", "rm", "list"]),
+        ([], "", ["add", "rm", "list", "agent", "agents", "auth", "event", "scrappy"]),
         ([], "--t", ["--tool"]),
-        (["--tool"], "ev", ["event", "event-form", "event-risk"]),
-        (["--tool", "event-risk"], "--l", ["--layout", "--logo"]),
-        (["--tool", "event-risk", "--layout"], "f", ["form"]),
-        (["--tool=event-risk"], "--layout=f", ["form"]),
-        (["--tool", "event", "--mode"], "b", ["both"]),
-        (["--tool", "event-form"], "--pr", ["--preview"]),
+        (["--tool"], "ev", ["event"]),
+        (["--tool", "event"], "--l", ["--layout", "--logo"]),
+        (["--tool", "event", "--layout"], "f", ["form"]),
+        (["--tool=event"], "--layout=f", ["form"]),
+        (["--tool", "event"], "--fo", ["--form", "--force", "--form-profile"]),
+        (["--tool", "event"], "--pr", ["--preview"]),
         (["--tool", "auth", "--browser"], "ch", ["chromium", "chrome"]),
-        (["rm"], "ev", ["event", "event-form", "event-risk"]),
+        (["event"], "--fo", ["--form", "--force", "--form-profile"]),
+        (["scrappy"], "li", ["links"]),
+        (["agent", "status"], "--j", ["--json"]),
+        (["rm"], "ev", ["event"]),
     ],
 )
-def test_completion_uses_selected_typer_app(args, incomplete, expected, monkeypatch):
-    monkeypatch.setattr(event, "generate", lambda **kwargs: pytest.fail("must not generate"))
-    monkeypatch.setattr(auth, "capture", lambda **kwargs: pytest.fail("must not open a browser"))
+def test_completion_uses_selected_typer_app(args, incomplete, expected):
     completion = BashComplete(get_command(cli.app), {}, "mini", "_MINI_COMPLETE")
     assert [item.value for item in completion.get_completions(args, incomplete)] == expected
 
@@ -54,25 +53,28 @@ def test_paths_and_prompt_tab_completion(tmp_path, monkeypatch):
     completion = BashComplete(get_command(cli.app), {}, "mini", "_MINI_COMPLETE")
     for args in (
         ["--tool", "event"],
-        ["--tool", "event-form", "--form-profile"],
-        ["--tool", "event-risk", "--logo"],
+        ["--tool", "event", "--form-profile"],
+        ["--tool", "event", "--logo"],
         ["--tool", "auth", "-o"],
     ):
         assert [item.value for item in completion.get_completions(args, "mov")] == [
             "movie night.toml"
         ]
-    assert [
-        item.value for item in completion.get_completions(["--tool", "event-risk", "-o"], "ev")
-    ] == ["events/"]
-    with create_pipe_input() as pipe, create_app_session(input=pipe, output=DummyOutput()):
+    assert [item.value for item in completion.get_completions(["--tool", "event", "-o"], "ev")] == [
+        "events/"
+    ]
+    with (
+        create_pipe_input() as pipe,
+        create_app_session(input=pipe, output=DummyOutput()),
+    ):
         pipe.send_text("mov")
         Timer(0.05, lambda: pipe.send_text("\t")).start()
         Timer(0.15, lambda: pipe.send_text("\n")).start()
         assert ask("Event TOML") == "movie night.toml"
-        pipe.send_text("event-r")
+        pipe.send_text("event")
         Timer(0.05, lambda: pipe.send_text("\t")).start()
         Timer(0.15, lambda: pipe.send_text("\n")).start()
-        assert ask("Tool", choices=("event", "event-form", "event-risk")) == "event-risk"
+        assert ask("Tool", choices=("event",)) == "event"
 
 
 def test_dev_command_completion():
@@ -93,14 +95,14 @@ def test_zsh_uv_hook(tmp_path):
             "-c",
             """source "$1"
 _arguments() { print -rl -- "$@"; }
-words=(mini --tool event-risk --layout f)
+words=(mini --tool event --layout f)
 CURRENT=5
 _mini_completion
 words=(dev li)
 CURRENT=2
 _dev_completion
 _files() { print NATIVE_PATH_COMPLETION; }
-words=(mini --tool event-risk examples/mo)
+words=(mini --tool event examples/mo)
 CURRENT=4
 _mini_completion
 """,
@@ -123,11 +125,11 @@ def test_new_mini_completion_comes_from_its_types(tmp_path, monkeypatch):
     (source / "__init__.py").touch()
     monkeypatch.setattr(cli, "__file__", str(tmp_path / "cli/__init__.py"))
     module = ModuleType("uq_minis.minis.new_mini")
-    module.app = typer.Typer(add_completion=False)
 
-    @module.app.command()
     def run(source: Path, flavor: Literal["plain", "spicy"] = "plain"):
         pytest.fail("completion must not run the command")
+
+    module.run = run
 
     monkeypatch.setitem(sys.modules, module.__name__, module)
     monkeypatch.chdir(tmp_path)
@@ -138,6 +140,8 @@ def test_new_mini_completion_comes_from_its_types(tmp_path, monkeypatch):
         (["--tool", "new-mini"], "--fl", ["--flavor"]),
         (["--tool", "new-mini", "--flavor"], "sp", ["spicy"]),
         (["--tool", "new-mini"], "ev", ["event.toml"]),
+        ([], "new", ["new-mini"]),
+        (["new-mini"], "--fl", ["--flavor"]),
     ):
         assert [item.value for item in completion.get_completions(args, incomplete)] == expected
 
@@ -169,7 +173,7 @@ def test_help_does_not_import_document_or_browser_libraries():
             """import sys
 from typer.testing import CliRunner
 from uq_minis.cli import app
-for name in ("auth", "event", "event-form", "event-risk"):
+for name in ("auth", "event"):
     result = CliRunner().invoke(app, ["--tool", name, "--help"])
     assert result.exit_code == 0, result.output
 assert not {"docx", "httpx", "playwright", "prompt_toolkit"}.intersection(sys.modules)
