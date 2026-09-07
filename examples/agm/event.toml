@@ -1,0 +1,99 @@
+[output]
+mode = "risk"
+risk_layout = "pack"
+
+[document]
+logo = "../../docs/assets/uq-logo.png"
+output_name = "2026-10-07-german-club-agm"
+
+[form]
+action = "preview"
+started_at = "2026-09-04T02:44:03.795Z"
+submitted_at = "2026-09-04T02:50:25.177Z"
+
+[form.values]
+affiliated = "Yes"
+date_flexibility = ""
+under_18 = "0"
+non_uq = "0"
+venue_capacity = "21-50"
+option_28 = "No"
+food = "Pizza + drinks (Sunkist, Solo)"
+option_30 = "No"
+option_31 = "No"
+option_32 = "No"
+terms = "Agree"
+
+[club]
+name = "UQ German Club"
+short_name = "German Club"
+executives = "UQ German Club Executives"
+event_officer = "UQ German Club Events Officer"
+
+[event]
+title = "German Club AGM"
+date = 2026-10-07
+campus = "St Lucia"
+room = "03-309"
+building = "Steele Building"
+category = "Small"
+summary = "A relaxed UQ German Club AGM to wrap up the year, elect the new committee and have a good yarn about what's next."
+risk_scope = "The event is a low-risk indoor general meeting involving seated presentations, committee reports, elections and light social interaction. The scope includes attendee arrival and sign-in, AGM proceedings, voting, refreshment distribution and pack-up. No high-risk physical activities are involved."
+target_audience = "UQ German Club members and UQ students"
+estimated_attendance = "21-30"
+activity = "a seated annual general meeting, committee elections and light social interaction"
+entertainment = "AGM proceedings, committee reports, elections and normal conversation"
+stakeholders = [
+  "UQ German Club Executives",
+  "club members and event attendees",
+  "UQ Union/Student Associations",
+  "venue staff",
+  "UQ Property and Facilities",
+]
+
+[coordinator]
+name = "Coordinator Name"
+role = "Events Officer"
+email = "coordinator@example.com"
+phone = "0400000000"
+
+[schedule]
+setup_start = 16:55:00
+setup_end = 17:00:00
+event_start = 17:00:00
+event_end = 18:30:00
+pack_up_start = 18:30:00
+pack_up_end = 18:35:00
+
+[catering]
+provided = true
+description = "pizza and soft drinks including Sunkist and Solo"
+
+[operations]
+indoor = true
+seated = true
+vehicles = false
+temporary_structures = false
+electrical_equipment = true
+equipment = "existing UQ presentation equipment, a laptop and chargers"
+cash_handling = false
+payment_method = "approved cashless or pre-registration methods"
+alcohol = false
+physical_competitions = false
+off_site_impact = false
+
+[application]
+title = "German Club AGM Event Pack"
+
+[application.fields]
+"Food and drinks" = "Pizza, Sunkist and Solo"
+"Attendees under 18" = 0
+"Non-UQ attendees" = 0
+"Requested room capacity" = "21-50"
+"Terms accepted" = true
+
+[risk_overrides."12"]
+controls = "Activities are limited to {entertainment}. Speaking and presentation volume will remain reasonable, and no loud amplified music or disruptive entertainment is planned."
+
+[risk_overrides."17"]
+controls = "Committee elections are procedural and non-physical. No physical, hazardous or impromptu competitions will be permitted."

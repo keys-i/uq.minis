@@ -1,0 +1,99 @@
+[output]
+# form = Microsoft Forms JSON/submission, risk = DOCX, both = both.
+mode = "both"
+# form = official seven-page form, pack = summary page + form, both = both DOCX files.
+risk_layout = "form"
+
+[document]
+output_name = "2026-01-01-example-event"
+# logo = "../docs/assets/uq-logo.png" # Optional, relative to this TOML file.
+
+[form]
+action = "preview" # Change to "submit" only when the session variables are set.
+# profile = "custom-form-profile.toml"
+# started_at = "2026-01-01T07:55:00+10:00"
+# submitted_at = "2026-01-01T08:00:00+10:00"
+
+[form.values]
+affiliated = "Yes"
+date_flexibility = ""
+under_18 = "0"
+non_uq = "0"
+venue_capacity = "21-50"
+option_28 = "No"
+food = "Pizza + soft drinks"
+option_30 = "No"
+option_31 = "No"
+option_32 = "No"
+terms = "Agree"
+
+# [form.answer_overrides]
+# "r269b9fb3ee6b4200aca94638bffdc547" = "Alternative event title"
+
+[club]
+name = "UQ Example Club"
+short_name = "Example Club"
+executives = "UQ Example Club Executives"
+event_officer = "UQ Example Club Events Officer"
+
+[event]
+title = "Example Event"
+date = 2026-01-01
+campus = "St Lucia"
+room = "01-101"
+building = "Example Building"
+category = "Small"
+summary = "A concise event description used as the Microsoft Forms filler statement and in the document pack."
+risk_scope = "A fuller description of the event context, attendee movement, activities and pack-up."
+target_audience = "UQ students"
+estimated_attendance = "20"
+activity = "a seated club activity"
+entertainment = "normal speaking volume and low-noise activities"
+stakeholders = ["UQ Example Club Executives", "event attendees", "venue staff"]
+additional_notes = "Optional extra information for the risk-assessment cover and pack."
+
+[coordinator]
+name = "Coordinator Name"
+role = "Events Officer"
+email = "coordinator@example.com"
+phone = "0400000000"
+
+[schedule]
+setup_start = 17:45:00
+setup_end = 18:00:00
+event_start = 18:00:00
+event_end = 20:00:00
+pack_up_start = 20:00:00
+pack_up_end = 20:15:00
+
+[catering]
+provided = true
+description = "commercially prepared pizza and soft drinks"
+
+[operations]
+indoor = true
+seated = true
+vehicles = false
+temporary_structures = false
+electrical_equipment = true
+equipment = "existing UQ AV equipment, laptops and chargers"
+cash_handling = false
+payment_method = "approved cashless or pre-registration methods"
+alcohol = false
+physical_competitions = false
+off_site_impact = false
+
+[application]
+title = "Event Application Summary"
+
+[application.fields]
+"Food and drinks" = "Pizza and soft drinks"
+"External attendees" = 0
+"Terms accepted" = true
+
+# Optional per-row override; valid rows are 1-22.
+[risk_overrides."12"]
+controls = "Activities are limited to {entertainment}. Sound will remain at a reasonable level."
+# initial_risk = "Low"
+# residual_risk = "Low"
+# responsible = "{event_officer}"

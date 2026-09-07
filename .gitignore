@@ -1,0 +1,32 @@
+# == Python and build files ==
+[._]*cache*/
+*.py[cod]
+*.egg-info/
+.*venv*/
+build/
+dist/
+
+# == Coverage ==
+.coverage*
+coverage.*
+htmlcov/
+
+# == Generated documents ==
+generated/
+*.form.json
+*.docx
+!docs/assets/*.docx
+_render/
+
+# == Secrets ==
+.env*
+!.env.example
+
+# == OS/editor files ==
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*~
+*.sw[op]
