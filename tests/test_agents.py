@@ -76,6 +76,17 @@ def test_agent_protocol_generates_preview_and_survives_bad_calls(event_toml, tmp
             )
             assert not links.is_error and links.structured_content["count"] == 1
             assert "COMP3400" in Path(links.structured_content["path"]).read_text()
+            listed = await session.call_tool(
+                "scrappy_list",
+                {
+                    "offerings": links.structured_content["path"],
+                    "query": "logic",
+                    "limit": 1,
+                },
+            )
+            assert not listed.is_error and listed.structured_content["total"] == 1
+            assert listed.structured_content["courses"][0]["course_code"] == "COMP3400"
+            assert catalog["scrappy_list"].annotations.read_only_hint is True
 
     event_toml.write_text(event_toml.read_text().replace('action = "preview"', 'action = "submit"'))
     asyncio.run(exercise())

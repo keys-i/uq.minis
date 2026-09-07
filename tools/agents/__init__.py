@@ -11,7 +11,7 @@ def create_server():
 
     from uq_minis.helper.common import MiniError
     from uq_minis_tools.agents.event import event_generate, event_submit
-    from uq_minis_tools.agents.scrappy import scrappy_details, scrappy_links
+    from uq_minis_tools.agents.scrappy import scrappy_details, scrappy_links, scrappy_list
     from uq_minis_tools.agents.worker import (
         watcher_poll,
         watcher_retry,
@@ -51,6 +51,7 @@ def create_server():
     add(event_submit, destructive=True, external=True)
     add(scrappy_links, destructive=True, external=True)
     add(scrappy_details, destructive=True, external=True)
+    add(scrappy_list, read_only=True, idempotent=True)
     add(watcher_watch, external=True)
     add(watcher_status, read_only=True, idempotent=True)
     add(watcher_poll, external=True)
