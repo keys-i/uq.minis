@@ -36,7 +36,7 @@ from uq_minis_tools.scripts.completion import zsh_script
         (["--tool", "event"], "--pr", ["--preview"]),
         (["--tool", "auth", "--browser"], "ch", ["chromium", "chrome"]),
         (["event"], "--fo", ["--form", "--force", "--form-profile"]),
-        (["scrappy"], "li", ["links"]),
+        (["scrappy"], "li", ["list", "links"]),
         (["agent", "status"], "--j", ["--json"]),
         (["rm"], "ev", ["event"]),
     ],
