@@ -32,6 +32,7 @@ No model or API key is configured here; your agent app supplies the AI.
 | `event_generate` | Form JSON and/or risk DOCX paths; never submits |
 | `event_submit` | Form paths and submission HTTP status |
 | `scrappy_links` | Offering CSV path and row count |
+| `scrappy_list` | Search saved offerings by code/name, with pagination |
 | `scrappy_details` | Course CSV path and row count |
 | `watcher_watch` | Persist an event and authorize its automatic risk reply |
 | `watcher_status` | Saved progress; email text omitted unless requested |
@@ -46,7 +47,10 @@ Example `event_generate` arguments:
 ```
 
 Event files are not replaced unless `force` is true. CSV exports replace their
-destination atomically. Review outputs before authorizing submission or watching.
+destination atomically. Scrappy details accepts `course`, `jobs` (1–8, default 4),
+and `fresh`. Failed batches preserve the previous CSV and checkpoint completed
+courses; repeat the call to resume. A completed export clears its checkpoint.
+Review outputs before authorizing submission or watching.
 Never retry a submission after an uncertain response. `watcher_retry` requires
 `confirm_not_sent: true` after checking Sent Items; it does not send immediately.
 
@@ -67,4 +71,5 @@ Keep mini logic in `src/minis/` and command handling in `src/cli/commands.py`.
 ```sh
 uv run --extra agents --extra agent pytest -q
 uv run --extra agents python tests/benchmarks/agents.py
+uv run python tests/benchmarks/scrappy.py
 ```

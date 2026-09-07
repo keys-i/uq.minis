@@ -37,11 +37,16 @@ Credentials are saved to a private `.env`. Sign-in requires a person.
 ## Courses
 
 ```sh
+uv run mini scrappy                              # interactive menu
 uv run mini scrappy links -o courses_offerings.csv
+uv run mini scrappy list courses_offerings.csv --query COMP
+uv run mini scrappy details courses_offerings.csv --course COMP3400 -o COMP3400.csv
 uv run mini scrappy details courses_offerings.csv -o courses.csv
 ```
 
-Use `links --html search.html` to parse a saved search page. CSV exports replace their output file.
+The menu browses/searches courses, refreshes links, and scrapes one course or all courses. Use `links --html search.html` for a saved page. `--jobs 1..8` controls concurrent requests (default 4).
+
+Exports validate course codes and links, remove duplicate URLs, and write one CSV header. The final CSV is replaced only when the whole batch succeeds. Failed or interrupted batches keep completed courses in a hidden SQLite checkpoint beside the output; rerun the same command to resume, or add `--fresh` to start over. Successful exports clear the checkpoint. To rebuild a damaged dataset, regenerate its links and run `details --fresh`.
 
 ## Outlook watcher
 
