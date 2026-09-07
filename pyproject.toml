@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=77,<83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uq-minis"
+version = "0.1.0"
+description = "Fast UQ and UQU event automations driven by TOML"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Radhesh Goel" }]
+dependencies = [
+  "httpx>=0.28.1,<1",
+  "python-docx>=1.2,<2",
+  "python-dotenv>=1.1,<2",
+  "prompt-toolkit>=3.0.52,<4",
+  "rich>=14.2,<16",
+  "typer>=0.27.2,<1",
+]
+
+[project.optional-dependencies]
+auth = ["playwright>=1.55,<2"]
+
+[project.scripts]
+mini = "uq_minis.cli:main"
+dev = "uq_minis_tools.scripts.script:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=9,<10",
+  "pytest-cov>=7,<8",
+  "ruff>=0.16.6,<1",
+  "pyyaml>=6,<7",
+]
+security = [
+  "bandit[toml]>=1.8,<2",
+  "pip-audit>=2.9,<3",
+]
+release = ["twine>=6.2,<7"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+uq_minis = "src"
+uq_minis_tools = "tools"
+
+[tool.setuptools.package-data]
+uq_minis = ["py.typed", "helper/*.toml"]
+uq_minis_tools = ["config/*.toml"]
+
+[tool.pytest.ini_options]
+cache_dir = ".cache/pytest"
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+data_file = ".cache/coverage"
+branch = true
+source = ["uq_minis", "uq_minis_tools"]
+
+[tool.coverage.xml]
+output = ".cache/coverage.xml"
+
+[tool.coverage.html]
+directory = ".cache/htmlcov"
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]
