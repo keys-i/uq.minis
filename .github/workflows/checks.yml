@@ -1,0 +1,56 @@
+# -- actions/checkout v7.0.1 --
+# SHA: 3d3c42e5aac5ba805825da76410c181273ba90b1
+# -- astral-sh/setup-uv v10.0.1 --
+# SHA: 20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_NO_PROGRESS: "1"
+
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, python: "3.12"}
+          - {os: windows-latest, python: "3.13"}
+          - {os: macos-latest, python: "3.14"}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: "0.12.5"
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Sync development environment
+        run: uv sync --locked
+
+      - name: Lint, compile and test
+        run: uv run --no-sync dev check
+
+      - name: Build wheel and source archive
+        if: runner.os == 'Linux'
+        run: uv build --no-sources -o .cache/dist
