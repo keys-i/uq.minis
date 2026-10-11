@@ -4,7 +4,11 @@ Tools for UQ events, course exports, and an Outlook event watcher. Use them from
 
 Requires Python 3.15+ and [uv](https://docs.astral.sh/uv/getting-started/installation/). Use uv 0.13+ to download the stable 3.15 runtime automatically
 
-Run `uv run mini` for the interactive picker. Type to filter choices, use ↑/↓ to browse, Tab to complete and Enter to select; Ctrl+C leaves the current prompt. All minis share the same rose and mint palette, keyboard controls and progress display. `NO_COLOR` keeps the interface monochrome, and redirected input or `TERM=dumb` uses ordinary text prompts
+Run `uv run mini` for the interactive picker. Type to filter choices, use ↑/↓ to browse, Tab to complete and Enter to select; Ctrl+C leaves the current prompt. Six dot sculptures give the tools a shared forest identity: a raccoon and toolbox, fox and keyring, owl and postbox, otter and picnic basket, bee and field notebook, and cat and cassette
+
+Full-bodied animals sit beside the current controls and recent validated answers. The raccoon rummages, the fox plays with its keys, the owl turns and settles, the otter grooms and reaches for its basket, the bee hovers, and the cat curls up or paws at its cassette. They perk up when you type and react to selections and invalid answers. Hover for a hint, then click their ears, body or object for different movements. Shaded movement frames give the dot artwork volume. Artwork clears when the prompt finishes, leaving the answer in the scrollback; animation runs only while a prompt is open
+
+Small terminals show compact prompts, and `MINI_MOTION=0` keeps the artwork still. `NO_COLOR` keeps the interface monochrome and still; redirected input or `TERM=dumb` uses ordinary text prompts. The editable dot artwork, movement frames, depth maps and palettes live in [docs/assets/terminal](docs/assets/terminal/)
 
 ## AI agents
 
@@ -74,7 +78,9 @@ Use `agent status`, `agent stop ID`, and `agent uninstall` to manage it. Check S
 
 ## Timey
 
-Paste a YouTube link or choose a local video, then follow the terminal wizard. Tab completes preset and saved styles, positions, designers, upload choices and local video, font, music, thumbnail and output paths. Free-form style briefs and pasted links still work; blank entries keep the displayed default or skip optional fields
+Paste a YouTube link, choose a local video or enter search words in the wizard. YouTube searches show five results with a thumbnail, title and duration; highlighting previews a result, selecting fills its canonical link, and **back** lets you search again. Music uses the same picker. Search reads metadata and thumbnails before you choose; media downloads begin during preparation
+
+Style, position, colour and bundled font choices show tiny previews made by the actual overlay renderer. Enter a Google Fonts family name, specimen link or local font file to review it before applying it. Custom thumbnail files and the opening video frame also have previews. Small or monochrome terminals show text alternatives. Tab completes choices and paths; free-form style briefs and pasted links still work, and blank entries keep the default or skip optional fields
 
 ```sh
 uv run --extra timey mini timey

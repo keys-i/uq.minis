@@ -19,12 +19,191 @@ from uq_minis.core import cache, terminal
 from uq_minis.core.common import MiniError
 from uq_minis.minis import timey
 from uq_minis.minis.timey import cache as media_cache
-from uq_minis.minis.timey import style, video, youtube
+from uq_minis.minis.timey import preview, style, video, youtube
 
 try:
     from PIL import Image, ImageChops, ImageStat
 except ImportError:
     Image = ImageChops = ImageStat = None
+
+
+class TestSearch:
+    def test_results(self, videos):
+        factory, client = videos
+        client.extract_info.return_value["entries"] += [
+            {"id": "abcdefghijk", "title": "Duplicate"},
+            {"id": "bad/url", "title": "Untrusted ID"},
+            {"id": "zyxwvutsrqp", "is_live": True},
+            {"id": "12345678901", "title": "\x1b[31mForest\nwalk", "duration": float("inf")},
+            None,
+        ]
+        results = video.search(" forest ")
+        assert len(results) == 2 and results[0]["length"] == "01:23"
+        assert results[1]["length"] == "duration unavailable" and "\x1b" not in results[1]["title"]
+        client.extract_info.assert_called_once_with("ytsearch5:forest", download=False)
+        assert factory.call_args.args[0]["extract_flat"]
+        assert all(
+            result["url"].startswith("https://www.youtube.com/watch?v=") for result in results
+        )
+
+    @pytest.mark.parametrize("query", ["", "x" * 201])
+    def test_query(self, videos, query):
+        with pytest.raises(MiniError, match="200"):
+            video.search(query)
+        videos[0].assert_not_called()
+
+    @pytest.mark.parametrize("failure", ["unavailable", "network", "malformed", "empty"])
+    def test_failure(self, videos, monkeypatch, failure):
+        _, client = videos
+        if failure == "unavailable":
+            monkeypatch.setattr(video, "YoutubeDL", None)
+        elif failure == "network":
+            client.extract_info.side_effect = video.DownloadError("Offline")
+        else:
+            client.extract_info.return_value = [] if failure == "malformed" else None
+        if failure == "empty":
+            assert video.search("forest") == []
+        else:
+            with pytest.raises(MiniError):
+                video.search("forest")
+
+    @pytest.mark.parametrize(
+        "answers",
+        [
+            "forest\nhttps://www.youtube.com/watch?v=abcdefghijk\n",
+            "forest\nback\n\nhttps://www.youtube.com/watch?v=abcdefghijk\n",
+        ],
+    )
+    def test_choose(self, videos, thumbnails, runner, answers):
+        app = terminal.application()
+        result = []
+
+        @app.command()
+        def run():
+            result.append(wizard._media("Choose a video"))
+
+        invoked = runner.invoke(app, [], input=answers)
+        assert invoked.exit_code == 0, invoked.output
+        assert result == ["https://www.youtube.com/watch?v=abcdefghijk"]
+        assert "A quiet forest · 01:23" in invoked.output
+
+    def test_path(self, videos, runner):
+        app = terminal.application()
+
+        @app.command()
+        def run():
+            assert wizard._media("Choose a video") == "https://youtu.be/abcdefghijk"
+
+        result = runner.invoke(app, [], input="~/missing-folder\nhttps://youtu.be/abcdefghijk\n")
+        assert result.exit_code == 0, result.output
+        videos[0].assert_not_called()
+
+
+class TestPreview:
+    @pytest.mark.parametrize(
+        "field,answers,expected",
+        [
+            ("position", "top-left\n", "top-left"),
+            ("accent", "#6FE9EF\n", "#6FE9EF"),
+            ("accent", "bad\n#FF0000\nn\n#FFD34D\n", "#FFD34D"),
+        ],
+        ids=["placement", "palette", "review-colour"],
+    )
+    def test_choices(self, field, answers, expected, runner):
+        app = terminal.application()
+        picked = []
+
+        @app.command()
+        def run():
+            studio = wizard._Studio(timey.Timer())
+            choices = (
+                {value: value for value in video.POSITIONS}
+                if field == "position"
+                else {"#6FE9EF": "Blue", "#FFD34D": "Yellow"}
+            )
+            picked.append(studio.choose(field, "Choose", choices, free=field == "accent"))
+            assert getattr(studio.timer, field) == picked[-1]
+
+        result = runner.invoke(app, [], input=answers)
+        assert result.exit_code == 0, result.output
+        assert picked == [expected]
+
+    @pytest.mark.parametrize(
+        "answer,source",
+        [
+            ("Cinzel\ny\n", "https://fonts.google.com/specimen/Cinzel"),
+            ("Press Start 2P\nn\nbungee\n", "https://fonts.google.com/specimen/Press+Start+2P"),
+            (
+                "https://fonts.google.com/specimen/Cinzel\ny\n",
+                "https://fonts.google.com/specimen/Cinzel",
+            ),
+            ("missing.ttf\nbungee\n", None),
+        ],
+        ids=["family", "reject", "link", "missing-file"],
+    )
+    def test_font_review(self, answer, source, runner, monkeypatch):
+        font = str(video.ASSETS / "timey/fonts/bungee.ttf")
+        resolve = []
+        monkeypatch.setattr(
+            wizard, "resolve_font", lambda value, *args, **kwargs: (resolve.append(value), font)[1]
+        )
+        app = terminal.application()
+
+        @app.command()
+        def run():
+            assert wizard._Studio(timey.Timer()).font("") == font
+
+        result = runner.invoke(app, [], input=answer)
+        assert result.exit_code == 0, result.output
+        assert resolve == ([source] if source else [])
+
+    @pytest.mark.parametrize("timer", [None, timey.Timer(start_gap=5)])
+    def test_frame(self, clip, timer, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        source = clip("opening.mp4", "color=c=navy:s=480x270:r=24", seconds=1)
+        result = preview.frame(source, timer)
+        assert "▀" in result.picture.plain
+        assert not list(tmp_path.glob(".timey-preview-*"))
+
+    @pytest.mark.parametrize("state", ["image", "oversized", "broken", "offline"])
+    def test_thumbnail(self, videos, thumbnails, state):
+        if state == "oversized":
+            thumbnails.iter_bytes.return_value = [b"x" * (1024 * 1024 + 1)]
+        elif state == "broken":
+            thumbnails.iter_bytes.return_value = [b"not an image"]
+        elif state == "offline":
+            thumbnails.raise_for_status.side_effect = httpx.ConnectError("Offline")
+        result = preview.thumbnail(video.search("forest")[0])
+        assert "01:23" in result.description
+        assert ("▀" in result.picture.plain) is (state == "image")
+        if state != "image":
+            assert "Thumbnail unavailable" in result.picture.plain
+
+    @pytest.mark.parametrize(
+        "field,values",
+        [
+            ("style", list(video.STYLES)),
+            ("position", video.POSITIONS),
+            ("accent", ["", "#8FDA53", "#6FE9EF"]),
+        ],
+    )
+    def test_samples(self, field, values):
+        samples = wizard._Studio(timey.Timer()).samples(field, values)
+        assert len({sample.picture.spans.__repr__() for sample in samples.values()}) == len(values)
+        assert all(len(sample.picture.plain.splitlines()) <= 12 for sample in samples.values())
+
+    def test_fonts(self, runner):
+        app = terminal.application()
+        paths = []
+
+        @app.command()
+        def run():
+            studio = wizard._Studio(timey.Timer())
+            paths.append(studio.font(""))
+
+        result = runner.invoke(app, [], input="bungee\n")
+        assert result.exit_code == 0, result.output
+        assert Path(paths[0]).is_file() and Path(paths[0]).stem == "bungee"
 
 
 class TestTimer:
@@ -1044,7 +1223,7 @@ class TestWizard:
                 "-o",
                 str(tmp_path / "timer.mp4"),
             ],
-            input="0s\nHollow Knight mask\ncodex\n\n1.6\nn\n0.4\nFocus\n\nhttps://fonts.google.com/specimen/Cinzel\nhttps://youtu.be/abcdefghijk\n0.4\ny\nn\nn\nn\ny\n",
+            input="0s\nHollow Knight mask\ncodex\n\n1.6\nn\n0.4\nFocus\n\nhttps://fonts.google.com/specimen/Cinzel\ny\nhttps://youtu.be/abcdefghijk\n0.4\ny\nn\nn\nn\ny\n",
         )
         assert result.exit_code == 0, result.output
         assert len(downloads) == 2 and downloads[1][1]["audio"]

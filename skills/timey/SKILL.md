@@ -36,6 +36,9 @@ uv run --extra timey mini timey gameplay.mp4 --length 10m --style minecraft --pr
 
 Use the user's actual source, length and style in that command.
 The interactive wizard offers a short motion preview and Tab completion for choices and paths.
+Use its video or music search when the person needs help choosing footage, then inspect the thumbnail, title and duration before selecting the link.
+Review the actual timer style, position, colour and font samples; a typed Google Fonts family name can be tried and rejected before applying it.
+Check custom thumbnails and opening-frame previews against the person's publication brief.
 For a custom theme, use the installed, signed-in designer supported by the workflow and inspect the saved style.
 Saved styles, fonts, media cache and OAuth files live in `.minis/timey/`.
 Bundled artwork and font licences live in `docs/assets/timey/`

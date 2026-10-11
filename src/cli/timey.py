@@ -10,6 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Annotated
+from urllib.parse import quote_plus
 
 import typer
 from rich.panel import Panel
@@ -27,11 +28,13 @@ from uq_minis.core.terminal import (
     number,
     table,
 )
+lazy from uq_minis.minis.timey.preview import frame, overlay, picture, thumbnail
 lazy from uq_minis.minis.timey.style import design
 lazy from uq_minis.minis.timey.style import designer as choose_designer
 lazy from uq_minis.minis.timey.style import font as resolve_font
 lazy from uq_minis.minis.timey.style import read as read_style
 lazy from uq_minis.minis.timey.video import (
+    FONTS,
     POSITIONS,
     STYLES,
     Timer,
@@ -41,6 +44,7 @@ lazy from uq_minis.minis.timey.video import (
     reference,
     render,
     require_ffmpeg,
+    search,
     suggest_style,
     youtube_url,
 )
@@ -48,7 +52,128 @@ lazy from uq_minis.minis.timey.youtube import metadata as generate_metadata
 lazy from uq_minis.minis.timey.youtube import prepare as prepare_upload
 lazy from uq_minis.minis.timey.youtube import read_details, upload, validate
 
-app = application()
+app = application(theme="cat")
+
+
+def _media(message: str, default: str = "", *, optional: bool = False) -> str:
+    """Search on request and fill the canonical link only after a result is chosen"""
+    while True:
+        value = ask(message, default=default, paths=True, required=not optional).strip()
+        if not value or value.lower().startswith(("https://", "http://")):
+            return value
+        if len(value) <= 240 and (
+            Path(value).expanduser().exists()
+            or Path(value).suffix.lower()
+            in {".mp4", ".mov", ".webm", ".mkv", ".wav", ".mp3", ".m4a"}
+        ):
+            return value
+        if value.startswith(("/", "./", "../", "~")):
+            CONSOLE.print(
+                "This local path does not exist; choose a file or enter search words", style="error"
+            )
+            default = value
+            continue
+        try:
+            with activity("Searching YouTube") as update:
+                results = search(value)
+                previews = {}
+                for index, result in enumerate(results):
+                    previews[result["url"]] = thumbnail(result)
+                    update((index + 1) / len(results), "Reading thumbnails")
+        except MiniError as exc:
+            CONSOLE.print(Text(str(exc)), style="error")
+            default = value
+            continue
+        if not results:
+            CONSOLE.print("No videos found; try different search words", style="muted")
+            default = value
+            continue
+        choices = {item["url"]: f"{item['title']} · {item['length']}" for item in results}
+        choices["back"] = "Search again or enter a link"
+        selected = ask("Choose a video", choices=choices, previews=previews)
+        if selected != "back":
+            return selected
+        default = value
+
+
+class _Studio:
+    """Keep the current overlay and its choice previews together"""
+
+    def __init__(self, timer: Timer):
+        self.timer = timer
+
+    def samples(self, field: str, values) -> dict:
+        """Prepare images once so browsing never renders or downloads anything"""
+        return {
+            value: overlay(replace(self.timer, **{field: value}), value or "Theme default")
+            for value in values
+        }
+
+    def choose(self, field: str, message: str, choices: dict, *, free: bool = False) -> str:
+        """Preview listed choices and review a typed colour before applying it"""
+        previews = self.samples(field, choices)
+        while True:
+            value = ask(
+                message,
+                **{"suggestions" if free else "choices": choices},
+                default=getattr(self.timer, field),
+                previews=previews,
+                search=True,
+            )
+            try:
+                candidate = replace(self.timer, **{field: value})
+                if value in previews or confirm(
+                    "Use this colour?", default=True, preview=overlay(candidate, value)
+                ):
+                    self.timer = candidate
+                    return value
+            except MiniError as exc:
+                CONSOLE.print(Text(str(exc)), style="error")
+
+    def font(self, default: str) -> str:
+        """Browse bundled faces or review a named Google font or local file"""
+        from uq_minis.assets import ROOT
+
+        fonts = {name: str(ROOT / "timey/fonts" / f"{name}.ttf") for name in FONTS.values()}
+        previews = {
+            name: overlay(replace(self.timer, font=path), name) for name, path in fonts.items()
+        }
+        while True:
+            value = ask(
+                "Font name, Google Fonts link or file (blank for theme default)",
+                default=default,
+                suggestions=list(fonts),
+                paths=True,
+                previews=previews,
+            )
+            if not value:
+                self.timer = replace(self.timer, font="")
+                return ""
+            if value in fonts:
+                self.timer = replace(self.timer, font=fonts[value])
+                return fonts[value]
+            try:
+                source = value
+                if not Path(value).expanduser().is_file() and (
+                    value.startswith(("/", "./", "../", "~"))
+                    or Path(value).suffix.lower() in {".ttf", ".otf", ".ttc"}
+                ):
+                    raise MiniError(
+                        "This font file does not exist; choose a file or enter a family name"
+                    )
+                if (
+                    not value.lower().startswith(("http://", "https://"))
+                    and not Path(value).expanduser().is_file()
+                ):
+                    source = f"https://fonts.google.com/specimen/{quote_plus(value)}"
+                with activity("Preparing your font sample") as update:
+                    path = resolve_font(source, STATE / "timey/fonts", progress=update)
+                candidate = replace(self.timer, font=path)
+                if confirm("Use this font?", default=True, preview=overlay(candidate, value)):
+                    self.timer = candidate
+                    return path
+            except (MiniError, OSError) as exc:
+                CONSOLE.print(Text(str(exc)), style="error")
 
 
 def _styles() -> list[str]:
@@ -90,6 +215,7 @@ def _upload_details(
     metadata: bool | None = None,
     first_frame: bool | None = None,
     designer: str = "auto",
+    sample=None,
 ) -> None:
     """Ask the YouTube questions and save an editable upload draft"""
     ensure_outputs([path], force=False)
@@ -126,7 +252,16 @@ def _upload_details(
         if first_frame
         else "youtube"
         if first_frame is False
-        else ask("Thumbnail", choices=["first-frame", "custom", "youtube"], default="first-frame")
+        else ask(
+            "Thumbnail",
+            choices={
+                "first-frame": "Use the opening frame",
+                "custom": "Choose a PNG or JPEG",
+                "youtube": "Let YouTube choose",
+            },
+            default="first-frame",
+            previews={"first-frame": sample} if sample else None,
+        )
     )
     thumbnail = (
         "first-frame"
@@ -135,6 +270,14 @@ def _upload_details(
         if choice == "custom"
         else ""
     )
+    while choice == "custom":
+        try:
+            path = Path(thumbnail).expanduser()
+            if confirm("Use this thumbnail?", default=True, preview=picture(path, path.name)):
+                break
+        except MiniError as exc:
+            CONSOLE.print(Text(str(exc)), style="error")
+        thumbnail = ask("Custom thumbnail PNG/JPEG", paths=True, required=True)
     data = {
         "snippet": {
             "title": title,
@@ -243,7 +386,7 @@ def _send(
     ):
         CONSOLE.print(
             "YouTube kept this upload private; check YouTube Studio and your API project's audit status",
-            style="yellow",
+            style="warning",
         )
 
 
@@ -386,11 +529,11 @@ def run(
     """Timey: turn a video into a beautiful countdown, with an optional YouTube upload"""
     interactive = sys.stdin.isatty() and not no_input
     if interactive:
-        intro("Timey", "A little countdown, made your way")
+        intro("Timey", "Turn a video into a countdown")
     if source is None:
         if not interactive:
             raise typer.BadParameter("Pass a YouTube link or local video path")
-        source = ask("YouTube link or local video", paths=True)
+        source = _media("YouTube link, local video or search words")
     if len(metadata_instructions) > 4000:
         raise typer.BadParameter("Metadata instructions must be at most 4000 characters")
     if upload_only:
@@ -409,6 +552,7 @@ def run(
                 metadata=metadata,
                 first_frame=first_frame,
                 designer=designer,
+                sample=frame(video) if video.is_file() else None,
             )
         else:
             data = read_details(details)
@@ -450,23 +594,32 @@ def run(
             video_start = ask("Start background video at (timestamp, e.g. 1:20)", default="0s")
         start_gap = start_gap or ask("Gap before it starts", default="5s")
         end_gap = end_gap or ask("Gap after it finishes", default="5s")
+        studio = _Studio(
+            Timer(
+                seconds=duration(length),
+                start_gap=duration(start_gap),
+                end_gap=duration(end_gap),
+                style=style if style in STYLES else "minimal",
+                position=position,
+                accent=accent,
+                size=size,
+                label=label,
+            )
+        )
         if style is None:
             CONSOLE.rule("Your look", style="accent", align="left")
-            styles = table("Style", "Look")
-            styles.add_row("auto", "Suggest a theme from the video title")
-            for name, values in STYLES.items():
-                styles.add_row(name, values[0])
-            saved = sorted((STATE / "timey/styles").glob("*.json"))
-            for path in saved:
-                styles.add_row(Text(path.stem), "Your saved custom artwork")
-            styles.add_row("custom", "Describe any game or visual style for a coding agent")
-            CONSOLE.print(styles)
+            styles = {"auto": "Suggest a theme from the video title"}
+            styles.update({name: f"{name} · {values[0]}" for name, values in STYLES.items()})
+            styles.update({name: name for name in _styles() if name not in styles})
             style = ask(
                 "Timer style (name, file or describe your own)",
                 default="auto",
-                suggestions=_styles(),
+                suggestions=styles,
+                previews=studio.samples("style", STYLES),
                 paths=True,
             )
+        if style in STYLES:
+            studio.timer = replace(studio.timer, style=style)
         if style == "custom" and not instructions:
             instructions = ask("Describe how the overlay should look")
         if instructions or style not in {None, "auto", *STYLES} and not _saved_style(style):
@@ -474,19 +627,28 @@ def run(
         if customise or confirm(
             "Customise the overlay placement, text, colour or audio?", default=False
         ):
-            position = ask("Position", choices=list(POSITIONS), default=position)
+            position = studio.choose("position", "Position", {name: name for name in POSITIONS})
             size = number("Overlay size (0.5–3)", default=size)
             motion = confirm("Smooth digit changes and subtle animated edges?", default=motion)
             loop_blend = number("Loop crossfade in seconds (0–2)", default=loop_blend)
             label = ask("Timer label (blank for none)", default=label)
-            accent = ask("Accent hex colour (blank for theme default)", default=accent)
-            font = ask(
-                "Font file or Google Fonts link (blank for theme default)", default=font, paths=True
+            studio.timer = replace(studio.timer, size=size, label=label)
+            accent = studio.choose(
+                "accent",
+                "Accent hex colour (blank for theme default)",
+                {
+                    "": "Theme default",
+                    "#8FDA53": "Leaf green",
+                    "#6FE9EF": "Ice blue",
+                    "#FFD34D": "Golden yellow",
+                    "#E8A37E": "Peach",
+                    "#C2ADD4": "Lilac",
+                },
+                free=True,
             )
-            music = ask(
-                "Music video link or audio/video file (blank to keep original)",
-                default=music,
-                paths=True,
+            font = studio.font(font)
+            music = _media(
+                "Music link, file or search words (blank to keep original)", music, optional=True
             )
             if music:
                 music_volume = number("Music volume (0–2)", default=music_volume)
@@ -567,7 +729,7 @@ def run(
     with TemporaryDirectory(
         prefix=".timey-", dir=output.parent if output.parent.exists() else Path.cwd()
     ) as scratch:
-        with activity("Grokking the video · preparing your background") as progress:
+        with activity("Preparing your background") as progress:
             video, title = download(
                 source,
                 Path(scratch),
@@ -631,6 +793,7 @@ def run(
                 metadata=metadata,
                 first_frame=first_frame,
                 designer=designer,
+                sample=frame(video, timer, start=local_start) if video.is_file() else None,
             )
         elif metadata or first_frame is not None and details:
             data = (
@@ -720,7 +883,11 @@ def run(
                 )
                 if confirm("Open the preview?", default=True):
                     typer.launch(str(preview_path))
-                if not confirm("Render the full timer video?", default=True):
+                if not confirm(
+                    "Render the full timer video?",
+                    default=True,
+                    preview=overlay(timer, f"{timer.style} · {timer.position}"),
+                ):
                     CONSOLE.print("Render cancelled")
                     return
 
