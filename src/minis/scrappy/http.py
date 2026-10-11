@@ -54,7 +54,7 @@ def _delay(value: str, attempt: int) -> float:
     except ValueError:
         try:
             seconds = (parsedate_to_datetime(value) - datetime.now(UTC)).total_seconds()
-        except (TypeError, ValueError, OverflowError):
+        except TypeError, ValueError, OverflowError:
             seconds = 0.5 * 2**attempt
     if not seconds <= 60:
         raise CatalogueUnavailable("UQ requested a longer pause; try again later")

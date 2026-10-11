@@ -105,7 +105,7 @@ _mini_completion
         assert rc.read_text().count("source ") == 1
         assert (tmp_path / ".zfunc/uq-minis.zsh").read_text() == shown.output
 
-    @pytest.mark.parametrize("name", ["auth", "event"])
+    @pytest.mark.parametrize("name", ["auth", "event", "scrappy", "timey"])
     def test_imports(self, name):
         subprocess.run(
             [
@@ -116,7 +116,7 @@ from typer.testing import CliRunner
 from uq_minis.cli import app
 result = CliRunner().invoke(app, ["--tool", sys.argv[1], "--help"])
 assert result.exit_code == 0, result.output
-assert not {"docx", "httpx", "playwright", "prompt_toolkit"}.intersection(sys.modules)
+assert not {"docx", "httpx", "playwright", "prompt_toolkit", "PIL", "yt_dlp", "googleapiclient"}.intersection(sys.modules)
 """,
                 name,
             ],

@@ -7,18 +7,21 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich.text import Text
 
 from uq_minis.core.common import MiniError
 from uq_minis.core.terminal import CONSOLE, ERROR, activity, application, ask, intro, table
+lazy from uq_minis.minis.scrappy import (
+    export_details,
+    export_links,
+    list_courses,
+    load_offerings,
+)
 
 app = application(invoke_without_command=True)
 
 
 def _show_courses(offerings: Path, query: str = "", offset: int = 0, limit: int = 20) -> int:
-    from rich.text import Text
-
-    from uq_minis.minis.scrappy import list_courses
-
     page = list_courses(offerings, query=query, offset=offset, limit=limit)
     view = table("Code", "Course", title=f"Courses · {page['total']} matches")
     for row in page["courses"]:
@@ -48,8 +51,6 @@ def _browse(offerings: Path) -> None:
 
 
 def _export(offerings: Path, output: Path, course: str | None, jobs: int, fresh: bool) -> None:
-    from uq_minis.minis.scrappy import export_details
-
     with activity("Gathering your courses") as progress:
 
         def update(done, total, message):
@@ -80,8 +81,6 @@ def menu(
     if no_input or not sys.stdin.isatty():
         typer.echo(ctx.get_help())
         return
-
-    from uq_minis.minis.scrappy import export_links, load_offerings
 
     offerings, output_dir = offerings.expanduser(), output_dir.expanduser()
     html = html.expanduser() if html else None
@@ -121,7 +120,7 @@ def menu(
                 _export(offerings, output_dir / f"{code}.csv", code, jobs, False)
             elif choice == "4":
                 _export(offerings, output_dir / "courses.csv", None, jobs, False)
-        except (EOFError, KeyboardInterrupt):
+        except EOFError, KeyboardInterrupt:
             return
         except (MiniError, OSError, ValueError) as exc:
             ERROR.print(f"scrappy: {exc}", style="error", markup=False)
@@ -146,8 +145,6 @@ def links(
     html: Annotated[Path | None, typer.Option(help="Saved search HTML.")] = None,
 ) -> None:
     """Write course offering links"""
-    from uq_minis.minis.scrappy import export_links
-
     count = export_links(output, html=html)
     typer.echo(f"Wrote {count} offerings to {output}")
 

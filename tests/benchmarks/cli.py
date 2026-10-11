@@ -13,7 +13,7 @@ def main() -> None:
     """Print median timings from five runs of each command"""
     results = {}
     cases = {
-        **{f"{tool} help": ["--tool", tool, "--help"] for tool in ("event", "auth")},
+        **{f"{tool} help": ["--tool", tool, "--help"] for tool in ("event", "auth", "timey")},
         "risk batch": [
             "--tool",
             "event",

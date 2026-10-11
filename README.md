@@ -2,7 +2,7 @@
 
 Tools for UQ events, course exports, and an Outlook event watcher. Use them from an AI agent or the CLI.
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+Requires Python 3.15+ and [uv](https://docs.astral.sh/uv/getting-started/installation/). Use uv 0.13+ to download the stable 3.15 runtime automatically
 
 Run `uv run mini` for the interactive picker. Type to filter choices, use ↑/↓ to browse, Tab to complete and Enter to select; Ctrl+C leaves the current prompt. All minis share the same rose and mint palette, keyboard controls and progress display. `NO_COLOR` keeps the interface monochrome, and redirected input or `TERM=dumb` uses ordinary text prompts
 
@@ -182,3 +182,5 @@ uv run dev check --cov-fail-under=85
 Tests cover every mini, shared infrastructure and the worker. Shared setup lives in `tests/fixtures.py` and test doubles in `tests/fakes.py`. Browser checks use local pages with external requests blocked, and video checks render short generated clips. Optional checks are reported as skipped when their dependencies are missing
 
 Coverage measures lines and branches, including greenlets, worker processes and CLI subprocesses. The Linux CI job runs the complete suite with an 85% minimum; Windows and macOS check the base environment
+
+Python 3.15's native lazy imports keep command help from loading browser, document or media dependencies. Timey's preset maps use `frozendict` to prevent accidental changes. On macOS with Python 3.15, `tests/benchmarks/cli.py` measured Timey help at a median 387 ms before lazy imports and 110 ms after, across five fresh processes for each; the help budget is 200 ms

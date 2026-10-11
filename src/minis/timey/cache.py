@@ -29,7 +29,7 @@ def find(root: Path, key: str, start: int, seconds: int | None, work: Path):
             target = work / f"source{path.suffix}"
             cache.reuse(path, target)
             return target, data["title"]
-        except (OSError, ValueError, KeyError, TypeError):
+        except OSError, ValueError, KeyError, TypeError:
             continue
     return None
 

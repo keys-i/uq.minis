@@ -33,49 +33,53 @@ except ImportError:
     YoutubeDL = None
     DownloadError = MiniError
 
-STYLES = {
-    "temple-run": (
-        "Weathered temple stone, emerald gems and cracked gold numerals",
-        "8EE62C",
-        "171B13",
-        "serif",
-    ),
-    "minecraft": (
-        "Stone hotbar, pixel digits and an emerald XP meter",
-        "8FDA53",
-        "20221F",
-        "mono",
-    ),
-    "subway-surfers": (
-        "Bright blue badge, chunky lettering and a yellow rail",
-        "FFD34D",
-        "123B67",
-        "sans",
-    ),
-    "neon": (
-        "Violet arcade frame and a luminous cyan countdown",
-        "6FE9EF",
-        "19142F",
-        "mono",
-    ),
-    "minimal": (
-        "Quiet charcoal panel with a clean white countdown",
-        "E9EDEA",
-        "161B20",
-        "sans",
-    ),
-    "glass": (
-        "Frosted video glass, clear digits and a soft reflected edge",
-        "E4EDF5",
-        "18212D",
-        "sans",
-    ),
-}
-FONTS = {
-    "temple-run": "skranji",
-    "minecraft": "pressstart2p",
-    "subway-surfers": "bungee",
-}
+STYLES = frozendict(
+    {
+        "temple-run": (
+            "Weathered temple stone, emerald gems and cracked gold numerals",
+            "8EE62C",
+            "171B13",
+            "serif",
+        ),
+        "minecraft": (
+            "Stone hotbar, pixel digits and an emerald XP meter",
+            "8FDA53",
+            "20221F",
+            "mono",
+        ),
+        "subway-surfers": (
+            "Bright blue badge, chunky lettering and a yellow rail",
+            "FFD34D",
+            "123B67",
+            "sans",
+        ),
+        "neon": (
+            "Violet arcade frame and a luminous cyan countdown",
+            "6FE9EF",
+            "19142F",
+            "mono",
+        ),
+        "minimal": (
+            "Quiet charcoal panel with a clean white countdown",
+            "E9EDEA",
+            "161B20",
+            "sans",
+        ),
+        "glass": (
+            "Frosted video glass, clear digits and a soft reflected edge",
+            "E4EDF5",
+            "18212D",
+            "sans",
+        ),
+    }
+)
+FONTS = frozendict(
+    {
+        "temple-run": "skranji",
+        "minecraft": "pressstart2p",
+        "subway-surfers": "bungee",
+    }
+)
 POSITIONS = (
     "top-right",
     "top-left",
@@ -456,7 +460,7 @@ def _inspect(source: Path) -> tuple[int, int, bool, float]:
             width, height = height, width
     try:
         length = float(video.get("duration", metadata.get("format", {}).get("duration", 0)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         length = 0
     return (
         width,

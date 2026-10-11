@@ -1,4 +1,4 @@
-target-version = "py312"
+target-version = "py315"
 line-length = 100
 cache-dir = ".cache/ruff"
 src = ["src", "tools", "tests"]

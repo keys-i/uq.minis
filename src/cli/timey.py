@@ -27,11 +27,11 @@ from uq_minis.core.terminal import (
     number,
     table,
 )
-from uq_minis.minis.timey.style import design
-from uq_minis.minis.timey.style import designer as choose_designer
-from uq_minis.minis.timey.style import font as resolve_font
-from uq_minis.minis.timey.style import read as read_style
-from uq_minis.minis.timey.video import (
+lazy from uq_minis.minis.timey.style import design
+lazy from uq_minis.minis.timey.style import designer as choose_designer
+lazy from uq_minis.minis.timey.style import font as resolve_font
+lazy from uq_minis.minis.timey.style import read as read_style
+lazy from uq_minis.minis.timey.video import (
     POSITIONS,
     STYLES,
     Timer,
@@ -44,9 +44,9 @@ from uq_minis.minis.timey.video import (
     suggest_style,
     youtube_url,
 )
-from uq_minis.minis.timey.youtube import metadata as generate_metadata
-from uq_minis.minis.timey.youtube import prepare as prepare_upload
-from uq_minis.minis.timey.youtube import read_details, upload, validate
+lazy from uq_minis.minis.timey.youtube import metadata as generate_metadata
+lazy from uq_minis.minis.timey.youtube import prepare as prepare_upload
+lazy from uq_minis.minis.timey.youtube import read_details, upload, validate
 
 app = application()
 

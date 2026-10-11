@@ -9,9 +9,11 @@ from typing import Annotated
 import typer
 from rich.panel import Panel
 from rich.text import Text
+lazy import httpx
 
 from uq_minis.core.common import MiniError, RiskLayout
 from uq_minis.core.terminal import CONSOLE, ERROR, application, ask, intro, table
+lazy from uq_minis.minis.event import generate
 
 app = application()
 
@@ -49,10 +51,6 @@ def run(
     ] = None,
 ) -> None:
     """Generate event form JSON, risk documents, or both"""
-    import httpx
-
-    from uq_minis.minis.event import generate
-
     if submit and preview:
         raise typer.BadParameter("--submit and --preview are mutually exclusive")
     interactive = sys.stdin.isatty() and not no_input

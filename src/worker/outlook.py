@@ -82,7 +82,7 @@ def parse_message(raw: bytes, url: str) -> dict:
             if parsed.tzinfo is not None:
                 timestamp = parsed.astimezone(UTC).isoformat()
                 break
-        except (TypeError, ValueError, OverflowError):
+        except TypeError, ValueError, OverflowError:
             continue
     if timestamp is None:
         raise MiniError("Outlook exported a message without a usable timestamp")

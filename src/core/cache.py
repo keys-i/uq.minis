@@ -43,7 +43,7 @@ def entries(root: Path, key: str = "*"):
             ):
                 continue
             yield data, path
-        except (OSError, ValueError, KeyError, TypeError):
+        except OSError, ValueError, KeyError, TypeError:
             continue
 
 

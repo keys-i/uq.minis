@@ -10,6 +10,8 @@ import typer
 from uq_minis.core.common import MiniError
 from uq_minis.core.paths import STATE
 from uq_minis.core.terminal import CONSOLE, ERROR, application, intro
+lazy from uq_minis.core.forms import load_form_profile
+lazy from uq_minis.minis import auth
 
 app = application()
 
@@ -38,9 +40,6 @@ def run(
     ] = False,
 ) -> None:
     """Sign in through a browser and save Forms credentials"""
-    from uq_minis.core.forms import load_form_profile
-    from uq_minis.minis import auth
-
     if no_input:
         raise typer.BadParameter(
             "auth requires browser sign-in; use saved .env credentials for unattended submissions"

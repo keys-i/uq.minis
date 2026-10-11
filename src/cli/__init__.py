@@ -150,7 +150,7 @@ def dispatch(
             return
         try:
             tool = ask("Pick a mini", choices=choices, show_choices=False)
-        except (EOFError, KeyboardInterrupt):
+        except EOFError, KeyboardInterrupt:
             CONSOLE.print("See you next time", style="muted")
             return
     if tool not in names:
