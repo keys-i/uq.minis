@@ -152,6 +152,7 @@ jobs:
           from importlib.resources import files
           from typer.testing import CliRunner
           from uq_minis.cli import app, tool_names
+          from uq_minis.core.art import _habitats, _poses
 
           assert set(tool_names()) == {"agent", "auth", "event", "scrappy", "timey"}
           for name in tool_names():
@@ -162,9 +163,12 @@ jobs:
               "timey/fonts/bungee.ttf",
               "timey/art/plate.png",
               "terminal/forest.toml",
-              *(f"terminal/{name}.toml" for name in ("raccoon", "fox", "owl", "otter", "bee", "cat")),
+              *(f"terminal/{name}.toml" for name in _habitats()),
           ):
               assert files("uq_minis.assets").joinpath(asset).is_file(), asset
+          for name, animal in _habitats().items():
+              for pose in _poses(name):
+                  assert animal.picture(4, pose).plain
           assert files("uq_minis.skills").joinpath("event/SKILL.md").is_file()
           assert files("uq_minis.core").joinpath("uq-event-booking.toml").is_file()
           PY

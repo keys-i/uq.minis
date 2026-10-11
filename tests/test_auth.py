@@ -225,5 +225,5 @@ class TestCommand:
         monkeypatch.setattr(auth, "capture", Mock(side_effect=error("sign-in failed")))
         result = runner.invoke(cli.app, ["auth", "-o", str(target)])
         assert result.exit_code == 2
-        assert "auth: sign-in failed" in result.output and "Traceback" not in result.output
+        assert "› sign-in failed" in result.output and "Traceback" not in result.output
         assert not target.exists()

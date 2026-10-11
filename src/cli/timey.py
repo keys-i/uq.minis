@@ -26,6 +26,7 @@ from uq_minis.core.terminal import (
     confirm,
     intro,
     number,
+    problem,
     table,
 )
 lazy from uq_minis.minis.timey.preview import frame, overlay, picture, thumbnail
@@ -52,7 +53,7 @@ lazy from uq_minis.minis.timey.youtube import metadata as generate_metadata
 lazy from uq_minis.minis.timey.youtube import prepare as prepare_upload
 lazy from uq_minis.minis.timey.youtube import read_details, upload, validate
 
-app = application(theme="cat")
+app = application(theme="quoll")
 
 
 def _media(message: str, default: str = "", *, optional: bool = False) -> str:
@@ -81,7 +82,7 @@ def _media(message: str, default: str = "", *, optional: bool = False) -> str:
                     previews[result["url"]] = thumbnail(result)
                     update((index + 1) / len(results), "Reading thumbnails")
         except MiniError as exc:
-            CONSOLE.print(Text(str(exc)), style="error")
+            problem(exc)
             default = value
             continue
         if not results:
@@ -128,7 +129,7 @@ class _Studio:
                     self.timer = candidate
                     return value
             except MiniError as exc:
-                CONSOLE.print(Text(str(exc)), style="error")
+                problem(exc)
 
     def font(self, default: str) -> str:
         """Browse bundled faces or review a named Google font or local file"""
@@ -173,7 +174,7 @@ class _Studio:
                     self.timer = candidate
                     return path
             except (MiniError, OSError) as exc:
-                CONSOLE.print(Text(str(exc)), style="error")
+                problem(exc)
 
 
 def _styles() -> list[str]:
@@ -276,7 +277,7 @@ def _upload_details(
             if confirm("Use this thumbnail?", default=True, preview=picture(path, path.name)):
                 break
         except MiniError as exc:
-            CONSOLE.print(Text(str(exc)), style="error")
+            problem(exc)
         thumbnail = ask("Custom thumbnail PNG/JPEG", paths=True, required=True)
     data = {
         "snippet": {

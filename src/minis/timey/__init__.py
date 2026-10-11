@@ -1,4 +1,4 @@
-"""Turn a video into a countdown"""
+"""Search videos, preview timer styles and render a countdown with optional YouTube upload"""
 
 from uq_minis.minis.timey.video import (
     POSITIONS,

@@ -7,15 +7,14 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.panel import Panel
 from rich.text import Text
 lazy import httpx
 
 from uq_minis.core.common import MiniError, RiskLayout
-from uq_minis.core.terminal import CONSOLE, ERROR, application, ask, intro, table
+from uq_minis.core.terminal import CONSOLE, application, ask, intro, table
 lazy from uq_minis.minis.event import generate
 
-app = application(theme="otter")
+app = application(theme="mink")
 
 
 @app.command()
@@ -80,8 +79,7 @@ def run(
             rooms=rooms,
         )
     except (MiniError, OSError, ValueError, httpx.HTTPError) as exc:
-        ERROR.print(Panel.fit(Text(str(exc)), title="event", border_style="error"))
-        raise typer.Exit(2) from exc
+        raise MiniError(str(exc)) from exc
     view = table("Made for you", "Saved to", title="Your event pack is ready")
     for kind, path in result.outputs:
         view.add_row(Text(kind), Text(str(path)))

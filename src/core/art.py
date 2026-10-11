@@ -17,12 +17,21 @@ class Preview:
     description: str
 
 
+def blend(first: str, second: str, amount: float) -> str:
+    """Mix trusted RGB theme colours without an extra rendering dependency"""
+    channels = [
+        round(int(first[i : i + 2], 16) * (1 - amount) + int(second[i : i + 2], 16) * amount)
+        for i in (1, 3, 5)
+    ]
+    return "#" + "".join(f"{value:02x}" for value in channels)
+
+
 def image(rows: Sequence[Sequence[tuple[int, int, int]]], description: str) -> Preview:
     """Draw bounded RGB rows with two pixels per terminal cell"""
     if (
         not rows
-        or not 0 < len(rows[0]) <= 26
-        or len(rows) > 18
+        or not 0 < len(rows[0]) <= 40
+        or len(rows) > 32
         or any(len(row) != len(rows[0]) for row in rows)
         or any(
             len(pixel) != 3 or any(type(c) is not int or not 0 <= c <= 255 for c in pixel)
@@ -30,7 +39,7 @@ def image(rows: Sequence[Sequence[tuple[int, int, int]]], description: str) -> P
             for pixel in row
         )
     ):
-        raise ValueError("Terminal previews must fit within 26 × 18 pixels")
+        raise ValueError("Terminal previews must fit within 40 × 32 pixels")
     picture = Text()
     for top in range(0, len(rows), 2):
         for x, colour in enumerate(rows[top]):
@@ -40,7 +49,6 @@ def image(rows: Sequence[Sequence[tuple[int, int, int]]], description: str) -> P
             picture.append("▀", f"{fg} on {bg}")
         picture.append("\n")
     caption = Text(description)
-    caption.truncate(26, overflow="ellipsis")
     picture.append(caption)
     return Preview(picture, description)
 
@@ -50,12 +58,31 @@ class Habitat:
     """A mini's animal, useful object and colours within the shared forest"""
 
     animal: str
+    name: str
+    status: str
+    country: str
+    flag: str
+    place: str
     object: str
     primary: str
     secondary: str
+    fur: str
+    leaf: str
+    water: str
+    ground: str
+    flower: str
     idle: str
     art: str
     shade: str
+    hit: str
+    tone: str
+    head: str
+    body: str
+    quip: str
+    source: str
+    head_moves: str
+    body_moves: str
+    object_moves: str
 
     def styles(self) -> dict[str, str]:
         """Keep headings, choices and progress in the same visual family"""
@@ -66,36 +93,70 @@ class Habitat:
             "bar.pulse": self.primary,
         }
 
+    def seconds(self, pose: str) -> float:
+        """Let each routine finish at the shared eight-frame cadence"""
+        return len(_poses(self.animal)[pose]) / 8
+
+    def region(self, frame: int, pose: str, x: int, y: int) -> str | None:
+        """Keep pointer targets attached to the animal and object as they move"""
+        rows = self.hit.splitlines()
+        if pose != "idle":
+            frames = _poses(self.animal)[pose]
+            rows = frames[min(frame, len(frames) - 1)]["hit"].splitlines()
+        if 0 <= y < len(rows) and 2 <= x < len(rows[y]) + 2:
+            return {"1": "ears", "2": "pet", "3": "object"}.get(rows[y][x - 2])
+        return None
+
+    @cache
+    def colours(self) -> tuple[tuple[str, ...], ...]:
+        """Keep fur, markings, foliage and water distinct under the same light"""
+        palettes = []
+        for colour in (
+            self.fur,
+            "#f8f1e3",
+            "#19212d",
+            self.leaf,
+            self.water,
+            self.flower,
+            self.ground,
+            "#fffaf1",
+        ):
+            light = "#" + "".join(
+                f"{min(255, round(int(colour[i : i + 2], 16) * 1.25 + 16)):02x}" for i in (1, 3, 5)
+            )
+            shadow = blend(colour, "#000000", 0.65)
+            stops = (shadow, colour, light)
+            palette = []
+            for level in range(8):
+                position = level / 7 * 2
+                lower = min(int(position), 1)
+                ratio = position - lower
+                palette.append(blend(stops[lower], stops[lower + 1], ratio))
+            palettes.append(tuple(palette))
+        return tuple(palettes)
+
     @lru_cache(maxsize=144)
     def picture(self, frame: int = 0, pose: str = "idle") -> Text:
         """Draw a shaded movement frame from the mini's bundled sculpture"""
-        stops = ("#53647a", self.primary, "#f1eee9")
-        colours = []
-        for level in range(8):
-            position = level / 7 * 2
-            lower = min(int(position), 1)
-            blend = position - lower
-            channels = [
-                round(
-                    int(stops[lower][i : i + 2], 16) * (1 - blend)
-                    + int(stops[lower + 1][i : i + 2], 16) * blend
-                )
-                for i in (1, 3, 5)
-            ]
-            colours.append("#" + "".join(f"{value:02x}" for value in channels))
+        colours = self.colours()
         picture = Text()
-        drawing = {"art": self.art, "shade": self.shade}
+        drawing = {"art": self.art, "shade": self.shade, "tone": self.tone}
         if pose != "idle":
             sequence = _poses(self.animal)[pose]
             drawing = sequence[min(frame, len(sequence) - 1)]
-        for row, shades in zip(
+        light = (0, 0, 1, 1, 1, 0, 0, -1, -1, -1, 0, 0, 1, 1, 0, 0)[frame % 16]
+        for row, shades, tones in zip(
             drawing["art"].splitlines(),
             drawing["shade"].splitlines(),
+            drawing["tone"].splitlines(),
             strict=True,
         ):
             picture.append("  ")
-            for dot, depth in zip(row.ljust(len(shades)), shades, strict=True):
-                picture.append(dot, colours[int(depth)] if dot != " " else None)
+            for dot, depth, tone in zip(row.ljust(len(shades)), shades, tones, strict=True):
+                level = int(depth) + (light if pose != "idle" and tone in "345" else 0)
+                picture.append(
+                    dot, colours[int(tone)][min(7, max(0, level))] if dot != " " else None
+                )
             picture.append("\n")
         return picture
 

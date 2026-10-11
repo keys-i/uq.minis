@@ -2,26 +2,31 @@
 
 import ast
 import importlib
+import random
 import sys
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.text import Text
+from typer._click.exceptions import ClickException
 from typer.core import TyperCommand
 from typer.main import get_command
 from typer.models import CompletionItem, TyperPath
 
 from uq_minis.cli.core import app as manage
+from uq_minis.core.art import _habitats
 from uq_minis.core.common import MiniError
 from uq_minis.core.terminal import (
     CONSOLE,
-    ERROR,
+    Back,
     application,
     ask,
     complete_path,
     habitat,
     intro,
+    problem,
+    recover,
     table,
 )
 
@@ -144,7 +149,34 @@ def dispatch(
     if help_ and tool is None:
         typer.echo(ctx.get_help())
         return
-    if tool is None:
+    while True:
+        if tool is not None:
+            if tool not in names:
+                raise typer.BadParameter(f"unknown tool: {tool}", param_hint="--tool")
+            try:
+                target = get_app(tool)
+                with habitat(getattr(target, "habitat", "numbat")):
+                    while True:
+                        try:
+                            code = target(
+                                args=[*arguments, *(["--help"] if help_ else [])],
+                                prog_name=f"mini {tool}",
+                                standalone_mode=False,
+                            )
+                            if isinstance(code, int) and code:
+                                raise typer.Exit(code)
+                            break
+                        except (MiniError, OSError, ClickException) as exc:
+                            if not sys.stdin.isatty() or "--no-input" in arguments:
+                                problem(exc)
+                                raise typer.Exit(2) from exc
+                            arguments = recover(exc, arguments)
+                return
+            except Back:
+                tool, arguments, help_ = None, [], False
+            except (MiniError, OSError) as exc:
+                problem(exc)
+                raise typer.Exit(2) from exc
         intro("UQ minis", "Choose a tool")
         choices = {}
         for name in names:
@@ -159,21 +191,16 @@ def dispatch(
             CONSOLE.print("mini NAME --help for options", style="muted")
             return
         try:
-            tool = ask("Pick a mini", choices=choices, show_choices=False)
+            animals = list(_habitats().values())
+            weights = [
+                6 if pet.status == "extinct" else 4 if pet.status.startswith("critically") else 2
+                for pet in animals
+            ]
+            visitor = random.choices(animals, weights=weights)[0]
+            with habitat(visitor.animal, menu=False):
+                tool = ask("Pick a mini", choices=choices, show_choices=False)
         except EOFError, KeyboardInterrupt:
             return
-    if tool not in names:
-        raise typer.BadParameter(f"unknown tool: {tool}", param_hint="--tool")
-    try:
-        target = get_app(tool)
-        with habitat(getattr(target, "habitat", "raccoon")):
-            target(
-                args=[*arguments, *(["--help"] if help_ else [])],
-                prog_name=f"mini {tool}",
-            )
-    except (MiniError, OSError) as exc:
-        ERROR.print(str(exc), style="error", markup=False)
-        raise typer.Exit(2) from exc
 
 
 def main(argv: list[str] | None = None) -> None:

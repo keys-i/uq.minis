@@ -9,11 +9,11 @@ import typer
 
 from uq_minis.core.common import MiniError
 from uq_minis.core.paths import STATE
-from uq_minis.core.terminal import CONSOLE, ERROR, application, intro
+from uq_minis.core.terminal import CONSOLE, application, intro
 lazy from uq_minis.core.forms import load_form_profile
 lazy from uq_minis.minis import auth
 
-app = application(theme="fox")
+app = application(theme="saola")
 
 
 @app.command()
@@ -58,6 +58,5 @@ def run(
             force=force,
         )
     except (MiniError, OSError, ValueError) as exc:
-        ERROR.print(f"auth: {exc}", style="error", markup=False)
-        raise typer.Exit(2) from exc
+        raise MiniError(str(exc)) from exc
     CONSOLE.print(f"Saved Forms credentials to {output}", style="success", markup=False)

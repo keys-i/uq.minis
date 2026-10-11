@@ -1,4 +1,5 @@
 import json
+from unittest.mock import Mock
 
 import pytest
 
@@ -10,6 +11,51 @@ from uq_minis.minis import event as mini_event
 
 
 class TestCLI:
+    @pytest.mark.parametrize("error", [MiniError, OSError, cli.typer.BadParameter])
+    def test_recover(self, module, monkeypatch, runner, tty, pipe, keys, error):
+        from uq_minis.core import terminal
+
+        answers, approvals = [], []
+
+        def run():
+            answers.append(terminal.ask("Name", default="guest"))
+            approvals.append(terminal.confirm("Approve", default=False))
+            if len(answers) == 1:
+                raise error("Something needs correcting")
+
+        module("new_mini", run)
+        monkeypatch.setattr(cli, "sys", tty)
+        keys("Mina\n", "y\n", "edit\n", "\n", "\n")
+        result = runner.invoke(cli.app, ["new-mini"])
+        assert result.exit_code == 0, result.output
+        assert answers == ["Mina", "Mina"] and approvals == [True, False]
+        assert "Something needs correcting" in result.output
+        assert terminal._DRAFT.get() is None and not terminal._RESTORE.get()
+
+    @pytest.mark.parametrize("action", ["menu\n", "\x1b[1;3D"])
+    def test_failed_back(self, module, monkeypatch, runner, tty, pipe, keys, action):
+        calls = []
+
+        def run():
+            calls.append(True)
+            raise MiniError("Try another file")
+
+        module("new_mini", run)
+        monkeypatch.setattr(cli, "sys", tty)
+        keys(action, "\x03")
+        result = runner.invoke(cli.app, ["new-mini"])
+        assert result.exit_code == 0, result.output
+        assert calls == [True] and "Choose a tool" in result.output
+
+    def test_no_input(self, module, monkeypatch, runner, tty):
+        def run(no_input: bool = False):
+            raise MiniError("Needs a different source")
+
+        module("new_mini", run)
+        monkeypatch.setattr(cli, "sys", tty)
+        result = runner.invoke(cli.app, ["new-mini", "--no-input"])
+        assert result.exit_code == 2 and "What next" not in result.output
+
     @pytest.mark.parametrize(
         "tool,option",
         [
@@ -72,11 +118,42 @@ class TestCLI:
         terminal = tty
         monkeypatch.setattr(cli, "sys", terminal)
         monkeypatch.setattr(event, "sys", terminal)
+        visitor = Mock(return_value=[cli._habitats()["huia"]])
+        monkeypatch.setattr(cli.random, "choices", visitor)
         event_toml.write_text(event_toml.read_text().replace('mode = "both"\n', ""))
         pipe.send_text(f"event\n{event_toml}\nform\n")
         result = runner.invoke(cli.app, [])
         assert result.exit_code == 0, result.output
         assert (event_toml.parent / "generated/sample-event.form.json").exists()
+        animals = visitor.call_args.args[0]
+        weights = visitor.call_args.kwargs["weights"]
+        assert {
+            pet.status.partition(" · ")[0]: weight
+            for pet, weight in zip(animals, weights, strict=True)
+        } == {
+            "endangered": 2,
+            "critically endangered": 4,
+            "extinct": 6,
+        }
+
+    @pytest.mark.parametrize("args", [[], ["new-mini"]], ids=["menu", "direct"])
+    def test_back(self, module, monkeypatch, runner, tty, pipe, keys, args):
+        from uq_minis.core import terminal
+
+        reached = []
+
+        def run():
+            terminal.ask("Name", required=True)
+            reached.append(True)
+
+        module("new_mini", run)
+        monkeypatch.setattr(cli, "sys", tty)
+        keys(*([] if args else ["new-mini\n"]), "\x1b[1;3D", "\x03")
+        result = runner.invoke(cli.app, args)
+        assert result.exit_code == 0, result.output
+        assert "Choose a tool" in result.output
+        assert reached == []
+        assert terminal._HABITAT.get() is None
 
     @pytest.mark.parametrize(
         "args,error",
@@ -86,13 +163,20 @@ class TestCLI:
             (["event", "--jobs", "-1"], "--jobs"),
             (["agent", "login", "--client-id", "id"], "Missing option"),
         ],
-        ids=["missing-input", "conflicting-actions", "invalid-jobs", "missing-login-options"],
+        ids=[
+            "missing-input",
+            "conflicting-actions",
+            "invalid-jobs",
+            "missing-login-options",
+        ],
     )
     def test_invalid(self, event_toml, monkeypatch, args, error, runner, tty):
         monkeypatch.chdir(event_toml.parent)
         monkeypatch.setattr(event, "sys", tty)
         monkeypatch.setattr(
-            mini_event, "generate", lambda *args, **kwargs: pytest.fail("must not generate")
+            mini_event,
+            "generate",
+            lambda *args, **kwargs: pytest.fail("must not generate"),
         )
         result = runner.invoke(cli.app, args)
         assert result.exit_code == 2, result.output

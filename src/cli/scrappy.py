@@ -10,7 +10,7 @@ import typer
 from rich.text import Text
 
 from uq_minis.core.common import MiniError
-from uq_minis.core.terminal import CONSOLE, ERROR, activity, application, ask, intro, table
+from uq_minis.core.terminal import CONSOLE, activity, application, ask, intro, recover, table
 lazy from uq_minis.minis.scrappy import (
     export_details,
     export_links,
@@ -103,7 +103,7 @@ def menu(
             if choice == "5":
                 return
             if choice == "2" or not offerings.exists():
-                with CONSOLE.status("Reading course links…"):
+                with activity("Reading course links"):
                     count = export_links(offerings, html=html)
                 CONSOLE.print(f"Wrote {count} offerings to {offerings}", markup=False)
             if choice == "1":
@@ -119,7 +119,7 @@ def menu(
         except EOFError, KeyboardInterrupt:
             return
         except (MiniError, OSError, ValueError) as exc:
-            ERROR.print(f"scrappy: {exc}", style="error", markup=False)
+            recover(exc, ())
 
 
 @app.command("list")
@@ -141,8 +141,9 @@ def links(
     html: Annotated[Path | None, typer.Option(help="Saved search HTML.")] = None,
 ) -> None:
     """Write course offering links"""
-    count = export_links(output, html=html)
-    typer.echo(f"Wrote {count} offerings to {output}")
+    with activity("Reading course links"):
+        count = export_links(output, html=html)
+    CONSOLE.print(f"Wrote {count} offerings to {output}", style="success", markup=False)
 
 
 @app.command()

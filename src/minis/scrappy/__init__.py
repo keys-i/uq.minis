@@ -1,4 +1,4 @@
-"""Browse UQ courses and export details"""
+"""Explore course offerings, requirements and assessment, then export a shortlist"""
 
 from uq_minis.minis.scrappy.scraper import (
     export_details,

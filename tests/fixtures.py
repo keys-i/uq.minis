@@ -17,7 +17,7 @@ import pytest
 from prompt_toolkit.application import create_app_session, get_app, get_app_session
 from prompt_toolkit.data_structures import Size
 from prompt_toolkit.input import create_pipe_input
-from prompt_toolkit.layout import Layout, Window
+from prompt_toolkit.layout import Layout, Window, menus
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.output import DummyOutput
 from rich.console import Console
@@ -43,7 +43,12 @@ def runner():
 @pytest.fixture
 def pipe(monkeypatch):
     monkeypatch.setenv("TERM", "xterm-256color")
-    with create_pipe_input() as input, create_app_session(input=input, output=DummyOutput()):
+    monkeypatch.setattr(terminal, "_POKES", {})
+    monkeypatch.setattr(terminal, "_STILL", False)
+    with (
+        create_pipe_input() as input,
+        create_app_session(input=input, output=DummyOutput()),
+    ):
         token = terminal._RECENT.set(())
         try:
             yield input
@@ -61,16 +66,24 @@ def entry(monkeypatch):
 @pytest.fixture
 def cursor(monkeypatch):
     buffer = SimpleNamespace(
-        text="", complete_state=SimpleNamespace(current_completion=None), start_completion=Mock()
+        text="",
+        complete_state=SimpleNamespace(
+            current_completion=None, completions=["first"], complete_index=0
+        ),
+        start_completion=Mock(),
     )
     app = SimpleNamespace(
-        current_buffer=buffer, layout=Layout(Window(FormattedTextControl())), invalidate=Mock()
+        current_buffer=buffer,
+        layout=Layout(Window(FormattedTextControl())),
+        invalidate=Mock(),
+        exit=Mock(),
     )
     clock = Mock(return_value=0)
     monkeypatch.setattr(terminal.time, "monotonic", clock)
     monkeypatch.setattr(prompt_toolkit.application, "get_app", lambda: app)
+    monkeypatch.setattr(menus, "get_app", lambda: app)
     monkeypatch.setattr(terminal.random, "uniform", lambda *args: 3)
-    monkeypatch.setattr(terminal.random, "choice", lambda choices: "play")
+    monkeypatch.setattr(terminal.random, "choice", lambda choices: choices[0])
     return buffer, clock, app
 
 
@@ -155,9 +168,9 @@ def canvas(pipe, screen, monkeypatch):
 def keys(pipe):
     timers = []
 
-    def send(*texts):
+    def send(*texts, interval=0.1):
         for index, text in enumerate(texts):
-            timer = Timer(0.05 + index * 0.1, pipe.send_text, args=(text,))
+            timer = Timer(0.05 + index * interval, pipe.send_text, args=(text,))
             timers.append(timer)
             timer.start()
 
@@ -189,7 +202,8 @@ def tab(pipe, monkeypatch):
             handles.append(app.current_buffer)
             handles.append(
                 app.loop.call_later(
-                    5, lambda: app.exit(exception=TimeoutError("No completions appeared"))
+                    5,
+                    lambda: app.exit(exception=TimeoutError("No completions appeared")),
                 )
             )
             if before:
@@ -367,7 +381,11 @@ def browser(monkeypatch):
     context = Mock(pages=[page])
     context.new_page.return_value = page
     context.cookies.return_value = [
-        {"name": "AADAuth.forms", "value": "signed-in", "domain": ".forms.cloud.microsoft"}
+        {
+            "name": "AADAuth.forms",
+            "value": "signed-in",
+            "domain": ".forms.cloud.microsoft",
+        }
     ]
     instance = Mock()
     instance.new_context.return_value = context
@@ -540,7 +558,11 @@ def art():
                 "outline": "#101830",
                 "stroke": 1,
             }
-            for key, top, size in (("label", 30, 20), ("timer", 80, 60), ("caption", 155, 16))
+            for key, top, size in (
+                ("label", 30, 20),
+                ("timer", 80, 60),
+                ("caption", 155, 16),
+            )
         },
         "bar": {
             "points": [[35, 190], [505, 200]],
@@ -556,7 +578,10 @@ def designer(monkeypatch, art):
     result = SimpleNamespace(
         calls=[],
         status=0,
-        output={"codex": json.dumps(art), "claude": json.dumps({"structured_output": art})},
+        output={
+            "codex": json.dumps(art),
+            "claude": json.dumps({"structured_output": art}),
+        },
     )
     monkeypatch.setattr(style.shutil, "which", lambda name: f"/bin/{name}")
 
