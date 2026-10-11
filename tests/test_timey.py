@@ -241,7 +241,14 @@ class TestPreview:
         assert all(len(sample.picture.plain.splitlines()) <= 14 for sample in samples.values())
 
     @pytest.mark.parametrize("name", ["bungee", "Bungee", "Press Start 2P", "Skranji"])
-    def test_fonts(self, runner, name, monkeypatch, fontlist):
+    @pytest.mark.parametrize("offline", [False, True])
+    def test_fonts(self, runner, name, monkeypatch, fontlist, offline):
+        if offline:
+
+            def fail(directory):
+                raise MiniError("Google Fonts is offline")
+
+            monkeypatch.setattr(wizard, "catalogue", fail)
         monkeypatch.setattr(
             wizard, "resolve_font", lambda *args, **kwargs: pytest.fail("Downloaded")
         )
@@ -255,6 +262,7 @@ class TestPreview:
 
         result = runner.invoke(app, [], input=f"{name}\n")
         assert result.exit_code == 0, result.output
+        assert ("offline font shelf" in result.output) is offline
         assert Path(paths[0]).is_file() and Path(paths[0]).stem == name.casefold().replace(" ", "")
 
 
