@@ -56,6 +56,13 @@ jobs:
           version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
           if not re.fullmatch(r"v\d+\.\d+\.\d+", tag) or tag[1:] != version:
               raise SystemExit(f"tag {tag!r} does not match project version {version!r}")
+          changelog = Path("CHANGELOG.md").read_text()
+          heading = f"\n## {tag}\n"
+          if heading not in changelog:
+              raise SystemExit(f"changelog has no entry for {tag}")
+          notes = changelog.split(heading, 1)[1].split("\n## ", 1)[0].strip()
+          Path(".cache").mkdir(exist_ok=True)
+          Path(".cache/release.md").write_text(notes + "\n")
           PY
 
       - name: Sync release environment
@@ -88,4 +95,4 @@ jobs:
         run: >-
           gh release create "$GITHUB_REF_NAME"
           .cache/dist/*.whl .cache/dist/*.tar.gz .cache/dist/SHA256SUMS
-          --generate-notes --verify-tag
+          --notes-file .cache/release.md --verify-tag

@@ -1,4 +1,7 @@
 import re
+import subprocess
+import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -15,6 +18,35 @@ def test_runtime(name):
         for step in job.get("steps", []):
             if step.get("uses", "").startswith("astral-sh/setup-uv@"):
                 assert step["with"]["python-version"] == version
+
+
+@pytest.mark.parametrize("case", ["valid", "wrong-tag", "missing-notes"])
+def test_release(tmp_path, monkeypatch, case):
+    project = (ROOT / "pyproject.toml").read_text()
+    version = tomllib.loads(project)["project"]["version"]
+    tag = f"v{version}"
+    (tmp_path / "pyproject.toml").write_text(project)
+    heading = tag if case != "missing-notes" else "v0.0.0"
+    (tmp_path / "CHANGELOG.md").write_text(
+        f"# Changelog\n\n## {heading}\n\nCurrent changes\n\n## v0.0.1\n\nOlder changes\n"
+    )
+    monkeypatch.setenv("RELEASE_TAG", tag if case != "wrong-tag" else "v999.0.0")
+    workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+    step = next(
+        step
+        for step in workflow["jobs"]["release"]["steps"]
+        if "RELEASE_TAG" in step.get("env", {})
+    )
+    source = step["run"].split("\n", 1)[1].rsplit("\nPY", 1)[0]
+    result = subprocess.run(
+        [sys.executable, "-c", source], cwd=tmp_path, capture_output=True, text=True, check=False
+    )
+    assert result.returncode == (0 if case == "valid" else 1), result.stderr
+    notes = tmp_path / ".cache/release.md"
+    if case == "valid":
+        assert notes.read_text() == "Current changes\n"
+    else:
+        assert not notes.exists()
 
 
 def test_actions():
