@@ -9,7 +9,7 @@ description = "Fast UQ and UQU event automations driven by TOML"
 readme = "README.md"
 requires-python = ">=3.15"
 license = "MIT"
-authors = [{ name = "Radhesh Goel" }]
+authors = [{ name = "keys-i" }]
 dependencies = [
   "httpx>=0.28.1,<1",
   "python-docx>=1.2,<2",
