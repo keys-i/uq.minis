@@ -8,7 +8,7 @@ from prompt_toolkit.output import DummyOutput
 from typer.testing import CliRunner
 
 from uq_minis import cli
-from uq_minis.cli import commands
+from uq_minis.cli import event as commands
 from uq_minis.core.common import MiniError
 from uq_minis.minis import agent
 from uq_minis.minis.event import pipeline

@@ -4,6 +4,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from uq_minis.core import mini
+from uq_minis.cli.core import app
 from uq_minis_tools.scripts import script
 
 RUNNER = CliRunner()
@@ -14,19 +15,19 @@ def test_mini_lifecycle_and_path_validation(tmp_path, monkeypatch):
     (tmp_path / "pyproject.toml").touch()
     directory = tmp_path / "src/minis"
     directory.mkdir(parents=True)
-    assert RUNNER.invoke(mini.app, ["add", "hello-world"]).exit_code == 0
+    assert RUNNER.invoke(app, ["add", "hello-world"]).exit_code == 0
     source = directory / "hello_world"
     text = (source / "__init__.py").read_text()
     assert "def run()" in text and "import typer" not in text
     assert not (source / "cli.py").exists() and not (source / "__main__.py").exists()
-    listed = RUNNER.invoke(mini.app, ["list"])
+    listed = RUNNER.invoke(app, ["list"])
     assert listed.exit_code == 0 and "hello-world" in listed.output
     for name in ("../outside", "class", "HELLO", "hello-world"):
-        assert RUNNER.invoke(mini.app, ["add", name]).exit_code != 0
-    assert RUNNER.invoke(mini.app, ["add"]).exit_code != 0
-    assert RUNNER.invoke(mini.app, ["rm", "hello-world"]).exit_code == 0
+        assert RUNNER.invoke(app, ["add", name]).exit_code != 0
+    assert RUNNER.invoke(app, ["add"]).exit_code != 0
+    assert RUNNER.invoke(app, ["rm", "hello-world"]).exit_code == 0
     assert not source.exists()
-    assert RUNNER.invoke(mini.app, ["rm", "hello-world"]).exit_code != 0
+    assert RUNNER.invoke(app, ["rm", "hello-world"]).exit_code != 0
 
 
 def test_dev_tasks_fix_check_coverage_and_exit_status(monkeypatch):

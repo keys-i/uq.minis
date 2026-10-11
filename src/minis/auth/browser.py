@@ -7,16 +7,14 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlsplit
 
-from rich.console import Console
-
 from uq_minis.core.common import MiniError
+from uq_minis.core.terminal import CONSOLE
 
 if TYPE_CHECKING:
     from uq_minis.core.forms import FormProfile
 
 _HOST = "forms.cloud.microsoft"
 _AUTH_COOKIES = {"AADAuth.forms", "OIDCAuth.forms"}
-CONSOLE = Console()
 
 
 def _same_target(url: str, profile: FormProfile) -> bool:

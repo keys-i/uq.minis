@@ -6,7 +6,7 @@ from prompt_toolkit.output import DummyOutput
 from typer.testing import CliRunner
 
 from uq_minis import cli
-from uq_minis.cli import commands
+from uq_minis.cli import scrappy as commands
 from uq_minis.minis.scrappy import scraper
 
 LISTING = '<h2 class="trigger"><a class="code">COMP3400</a><a class="title">Logic</a></h2><a href="/course.html?course_code=COMP3400">View all previous offerings</a>'

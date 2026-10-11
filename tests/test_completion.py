@@ -26,7 +26,7 @@ from uq_minis.cli.completion import zsh_script
 @pytest.mark.parametrize(
     "args,incomplete,expected",
     [
-        ([], "", ["add", "rm", "list", "agent", "agents", "auth", "event", "scrappy"]),
+        ([], "", ["add", "rm", "list", "agent", "auth", "event", "scrappy", "timey"]),
         ([], "--t", ["--tool"]),
         (["--tool"], "ev", ["event"]),
         (["--tool", "event"], "--l", ["--layout", "--logo"]),

@@ -1,23 +1,39 @@
 """Run a tool with --tool NAME, or manage minis with add, rm and list"""
 
+import ast
+import importlib
 import sys
 from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
-from rich.table import Table
+from rich.text import Text
 from typer.core import TyperCommand
 from typer.main import get_command
 from typer.models import CompletionItem, TyperPath
 
-from uq_minis.cli.commands import get_app
+from uq_minis.cli.core import app as manage
 from uq_minis.core.common import MiniError
-from uq_minis.core.terminal import ask, complete_path
+from uq_minis.core.terminal import CONSOLE, ERROR, application, ask, complete_path, intro, table
 
-CONSOLE = Console()
-ERROR = Console(stderr=True)
-app = typer.Typer(rich_markup_mode="rich", pretty_exceptions_show_locals=False)
+app = application(add_completion=True)
+
+
+def get_app(name: str) -> typer.Typer:
+    """Load a mini's registered commands or wrap its plain run function"""
+    module_name = name.replace("-", "_")
+    if (
+        module_name not in {"core", "completion", "__init__", "__main__"}
+        and Path(__file__).with_name(f"{module_name}.py").is_file()
+    ):
+        return importlib.import_module(f"uq_minis.cli.{module_name}").app
+    module = importlib.import_module(f"uq_minis.minis.{module_name}")
+    run = getattr(module, "run", None)
+    if not callable(run):
+        raise MiniError(f"{name} must export a run function")
+    target = application()
+    target.command()(run)
+    return target
 
 
 def tool_names(incomplete: str = "") -> list[str]:
@@ -33,8 +49,6 @@ def tool_names(incomplete: str = "") -> list[str]:
 
 def command_names(incomplete: str = "") -> list[str]:
     """Complete management commands and direct mini names"""
-    from uq_minis.core.mini import app as manage
-
     names = [*get_command(manage).commands, *tool_names()]
     return [name for name in names if name.startswith(incomplete)]
 
@@ -56,17 +70,18 @@ class MiniCommand(TyperCommand):
         """Parse normally and expose the selected app during shell completion"""
         ctx = super().make_context(info_name, args, parent=parent, **extra)
         if ctx.resilient_parsing:
+            names = tool_names()
             tool = ctx.params.get("tool")
             forwarded = list(ctx.params.get("arguments") or [])
-            if tool in tool_names():
+            if tool in names:
                 target = get_app(tool)
-            elif tool is None and forwarded and forwarded[0] in get_command_names():
-                from uq_minis.core.mini import app as target
-            elif tool is None and forwarded and forwarded[0] in tool_names():
+            elif tool is None and forwarded and forwarded[0] in get_command(manage).commands:
+                target = manage
+            elif tool is None and forwarded and forwarded[0] in names:
                 target = get_app(forwarded.pop(0))
             else:
                 return ctx
-            # Let Typer complete the selected command without executing its callback.
+            # Let Typer complete the selected command without executing its callback
             command = get_command(target)
             for param in command.params:
                 if isinstance(param.type, TyperPath) and param._custom_shell_complete is None:
@@ -113,35 +128,31 @@ def dispatch(
     names = tool_names()
     if tool is None and arguments:
         command, *forwarded = arguments
-        if command in get_command_names():
-            from uq_minis.core.mini import main as manage
-
-            manage(arguments)
+        if command in get_command(manage).commands or command not in names:
+            manage(args=arguments, prog_name="mini")
             return
-        if command in names:
-            tool, arguments = command, forwarded
-        else:
-            from uq_minis.core.mini import main as manage
-
-            manage(arguments)
-            return
+        tool, arguments = command, forwarded
     if help_ and tool is None:
         typer.echo(ctx.get_help())
         return
     if tool is None:
-        view = Table(
-            "Tool",
-            "Run",
-            title="UQ minis",
-            header_style="bold magenta",
-            border_style="bright_black",
-        )
+        intro("UQ minis", "A little help for your uni day")
+        view = table("Mini", "What shall we do?")
+        choices = {}
         for name in names:
-            view.add_row(name, f"uv run mini {name} --help", style="cyan")
+            source = Path(__file__).resolve().parents[1] / "minis" / name.replace("-", "_")
+            about = ast.get_docstring(ast.parse((source / "__init__.py").read_text()))
+            choices[name] = (about or "Open this mini").splitlines()[0]
+            view.add_row(Text(name), Text(choices[name]))
         CONSOLE.print(view)
+        CONSOLE.print("mini NAME --help for options · ctrl+c to leave", style="muted")
         if not names or not sys.stdin.isatty():
             return
-        tool = ask("Choose a tool", choices=names)
+        try:
+            tool = ask("Pick a mini", choices=choices, show_choices=False)
+        except (EOFError, KeyboardInterrupt):
+            CONSOLE.print("See you next time", style="muted")
+            return
     if tool not in names:
         raise typer.BadParameter(f"unknown tool: {tool}", param_hint="--tool")
     try:
@@ -150,15 +161,8 @@ def dispatch(
             prog_name=f"mini {tool}",
         )
     except (MiniError, OSError) as exc:
-        ERROR.print(str(exc), style="red")
+        ERROR.print(str(exc), style="error", markup=False)
         raise typer.Exit(2) from exc
-
-
-def get_command_names() -> set[str]:
-    """Return management commands without direct mini names"""
-    from uq_minis.core.mini import app as manage
-
-    return set(get_command(manage).commands)
 
 
 def main(argv: list[str] | None = None) -> None:
