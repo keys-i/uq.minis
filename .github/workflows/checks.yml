@@ -157,7 +157,13 @@ jobs:
           for name in tool_names():
               result = CliRunner().invoke(app, [name, "--help"])
               assert result.exit_code == 0, result.output
-          for asset in ("event/rooms.csv", "timey/fonts/bungee.ttf", "timey/art/plate.png"):
+          for asset in (
+              "event/rooms.csv",
+              "timey/fonts/bungee.ttf",
+              "timey/art/plate.png",
+              "terminal/forest.toml",
+              *(f"terminal/{name}.toml" for name in ("raccoon", "fox", "owl", "otter", "bee", "cat")),
+          ):
               assert files("uq_minis.assets").joinpath(asset).is_file(), asset
           assert files("uq_minis.skills").joinpath("event/SKILL.md").is_file()
           assert files("uq_minis.core").joinpath("uq-event-booking.toml").is_file()
