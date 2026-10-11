@@ -13,7 +13,7 @@ from uq_minis.core.terminal import CONSOLE, ERROR, application, intro
 lazy from uq_minis.core.forms import load_form_profile
 lazy from uq_minis.minis import auth
 
-app = application()
+app = application(theme="fox")
 
 
 @app.command()
@@ -51,7 +51,7 @@ def run(
         )
     try:
         if CONSOLE.is_terminal:
-            intro("Auth", "Let’s get you signed in · finish the sign-in in your browser")
+            intro("Auth", "Finish signing in through your browser")
         auth.write_env(
             output,
             auth.capture(load_form_profile(form_profile), browser=browser, timeout=timeout),

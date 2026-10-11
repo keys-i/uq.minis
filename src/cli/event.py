@@ -15,7 +15,7 @@ from uq_minis.core.common import MiniError, RiskLayout
 from uq_minis.core.terminal import CONSOLE, ERROR, application, ask, intro, table
 lazy from uq_minis.minis.event import generate
 
-app = application()
+app = application(theme="otter")
 
 
 @app.command()
@@ -55,7 +55,7 @@ def run(
         raise typer.BadParameter("--submit and --preview are mutually exclusive")
     interactive = sys.stdin.isatty() and not no_input
     if interactive:
-        intro("Event", "Good plans start here · forms, rooms and your risk assessment")
+        intro("Event", "Choose a room and build your event pack")
     if input is None:
         if not interactive:
             raise typer.BadParameter("input is required; pass event.toml or a directory")

@@ -1,4 +1,4 @@
-"""Find a course that sparks your curiosity"""
+"""Browse UQ courses and export details"""
 
 from uq_minis.minis.scrappy.scraper import (
     export_details,

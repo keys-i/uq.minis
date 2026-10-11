@@ -18,7 +18,7 @@ lazy from uq_minis.minis.scrappy import (
     load_offerings,
 )
 
-app = application(invoke_without_command=True)
+app = application(theme="bee", invoke_without_command=True)
 
 
 def _show_courses(offerings: Path, query: str = "", offset: int = 0, limit: int = 20) -> int:
@@ -84,7 +84,7 @@ def menu(
 
     offerings, output_dir = offerings.expanduser(), output_dir.expanduser()
     html = html.expanduser() if html else None
-    intro("Scrappy", "Find something interesting · browse, search or save your courses")
+    intro("Scrappy", "Browse courses and save a shortlist")
     actions = {
         "1": "Browse / search courses",
         "2": "Refresh course links",
@@ -93,10 +93,6 @@ def menu(
         "5": "All done",
     }
     while True:
-        menu_view = table("Pick", "Your next little adventure")
-        for number, label in actions.items():
-            menu_view.add_row(number, label)
-        CONSOLE.print(menu_view)
         try:
             choice = ask(
                 "What’s next?",

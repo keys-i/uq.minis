@@ -191,6 +191,58 @@ def youtube_url(value: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
+def search(query: str) -> list[dict]:
+    """Read five video results without downloading media or following result links"""
+    if not query.strip() or len(query) > 200:
+        raise MiniError("Search with between 1 and 200 characters")
+    if YoutubeDL is None:
+        raise MiniError("Use uv run --extra timey mini timey to enable YouTube search")
+    try:
+        with YoutubeDL(
+            {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+                "skip_download": True,
+                "socket_timeout": 10,
+                "retries": 1,
+                "extractor_retries": 1,
+                "playlistend": 5,
+            }
+        ) as client:
+            data = client.extract_info(f"ytsearch5:{query.strip()}", download=False)
+    except DownloadError as exc:
+        raise MiniError(f"YouTube search failed: {exc}") from exc
+    if data is not None and not isinstance(data, dict):
+        raise MiniError("YouTube returned malformed search results; try again")
+    results = []
+    seen = set()
+    for entry in islice((data or {}).get("entries", []) or [], 10):
+        if not isinstance(entry, dict):
+            continue
+        id = entry.get("id", "")
+        if not isinstance(id, str) or not re.fullmatch(r"[\w-]{11}", id, flags=re.ASCII):
+            continue
+        if id in seen or entry.get("is_live") or entry.get("live_status") == "is_live":
+            continue
+        seen.add(id)
+        title = entry.get("title")
+        title = " ".join((title if isinstance(title, str) else id)[:400].split())
+        title = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", title)[:200]
+        seconds = entry.get("duration")
+        length = (
+            clock(round(seconds))
+            if type(seconds) in {int, float} and 0 < seconds < 10**8
+            else "duration unavailable"
+        )
+        results.append(
+            {"url": youtube_url(f"https://youtu.be/{id}"), "title": title, "length": length}
+        )
+        if len(results) == 5:
+            break
+    return results
+
+
 def download(
     source: str,
     directory: Path,

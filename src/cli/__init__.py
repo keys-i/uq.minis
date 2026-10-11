@@ -14,7 +14,16 @@ from typer.models import CompletionItem, TyperPath
 
 from uq_minis.cli.core import app as manage
 from uq_minis.core.common import MiniError
-from uq_minis.core.terminal import CONSOLE, ERROR, application, ask, complete_path, intro, table
+from uq_minis.core.terminal import (
+    CONSOLE,
+    ERROR,
+    application,
+    ask,
+    complete_path,
+    habitat,
+    intro,
+    table,
+)
 
 app = application(add_completion=True)
 
@@ -136,30 +145,32 @@ def dispatch(
         typer.echo(ctx.get_help())
         return
     if tool is None:
-        intro("UQ minis", "A little help for your uni day")
-        view = table("Mini", "What shall we do?")
+        intro("UQ minis", "Choose a tool")
         choices = {}
         for name in names:
             source = Path(__file__).resolve().parents[1] / "minis" / name.replace("-", "_")
             about = ast.get_docstring(ast.parse((source / "__init__.py").read_text()))
             choices[name] = (about or "Open this mini").splitlines()[0]
-            view.add_row(Text(name), Text(choices[name]))
-        CONSOLE.print(view)
-        CONSOLE.print("mini NAME --help for options · ctrl+c to leave", style="muted")
         if not names or not sys.stdin.isatty():
+            view = table("Mini", "What it does")
+            for name, about in choices.items():
+                view.add_row(Text(name), Text(about))
+            CONSOLE.print(view)
+            CONSOLE.print("mini NAME --help for options", style="muted")
             return
         try:
             tool = ask("Pick a mini", choices=choices, show_choices=False)
         except EOFError, KeyboardInterrupt:
-            CONSOLE.print("See you next time", style="muted")
             return
     if tool not in names:
         raise typer.BadParameter(f"unknown tool: {tool}", param_hint="--tool")
     try:
-        get_app(tool)(
-            args=[*arguments, *(["--help"] if help_ else [])],
-            prog_name=f"mini {tool}",
-        )
+        target = get_app(tool)
+        with habitat(getattr(target, "habitat", "raccoon")):
+            target(
+                args=[*arguments, *(["--help"] if help_ else [])],
+                prog_name=f"mini {tool}",
+            )
     except (MiniError, OSError) as exc:
         ERROR.print(str(exc), style="error", markup=False)
         raise typer.Exit(2) from exc

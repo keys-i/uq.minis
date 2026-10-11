@@ -1,4 +1,4 @@
-"""Get your Forms sign-in sorted"""
+"""Sign in to Microsoft Forms"""
 
 from .browser import capture
 from .credentials import write_env

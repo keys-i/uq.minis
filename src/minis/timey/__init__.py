@@ -1,4 +1,4 @@
-"""Make a cosy countdown with your favourite video"""
+"""Turn a video into a countdown"""
 
 from uq_minis.minis.timey.video import (
     POSITIONS,

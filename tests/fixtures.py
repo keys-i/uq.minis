@@ -14,8 +14,11 @@ from unittest.mock import MagicMock, Mock
 
 import prompt_toolkit
 import pytest
-from prompt_toolkit.application import create_app_session, get_app
+from prompt_toolkit.application import create_app_session, get_app, get_app_session
+from prompt_toolkit.data_structures import Size
 from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.layout import Layout, Window
+from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.output import DummyOutput
 from rich.console import Console
 from typer.testing import CliRunner
@@ -26,7 +29,7 @@ from uq_minis import cli
 from uq_minis.core import cache, mini, terminal
 from uq_minis.core.forms import FormProfile
 from uq_minis.minis.scrappy import scraper
-from uq_minis.minis.timey import style
+from uq_minis.minis.timey import preview, style, video
 from uq_minis.worker import event as worker
 from uq_minis.worker import mail, outlook, service
 from uq_minis_tools.scripts import script
@@ -41,7 +44,111 @@ def runner():
 def pipe(monkeypatch):
     monkeypatch.setenv("TERM", "xterm-256color")
     with create_pipe_input() as input, create_app_session(input=input, output=DummyOutput()):
-        yield input
+        token = terminal._RECENT.set(())
+        try:
+            yield input
+        finally:
+            terminal._RECENT.reset(token)
+
+
+@pytest.fixture
+def entry(monkeypatch):
+    prompt = Mock(return_value="first")
+    monkeypatch.setattr(prompt_toolkit, "prompt", prompt)
+    return prompt
+
+
+@pytest.fixture
+def cursor(monkeypatch):
+    buffer = SimpleNamespace(
+        text="", complete_state=SimpleNamespace(current_completion=None), start_completion=Mock()
+    )
+    app = SimpleNamespace(
+        current_buffer=buffer, layout=Layout(Window(FormattedTextControl())), invalidate=Mock()
+    )
+    clock = Mock(return_value=0)
+    monkeypatch.setattr(terminal.time, "monotonic", clock)
+    monkeypatch.setattr(prompt_toolkit.application, "get_app", lambda: app)
+    monkeypatch.setattr(terminal.random, "uniform", lambda *args: 3)
+    monkeypatch.setattr(terminal.random, "choice", lambda choices: "play")
+    return buffer, clock, app
+
+
+@pytest.fixture
+def videos(monkeypatch):
+    client = MagicMock()
+    client.__enter__.return_value = client
+    client.extract_info.return_value = {
+        "entries": [{"id": "abcdefghijk", "title": "A quiet forest", "duration": 83}]
+    }
+    factory = Mock(return_value=client)
+    monkeypatch.setattr(video, "YoutubeDL", factory)
+    return factory, client
+
+
+@pytest.fixture
+def thumbnails(monkeypatch):
+    from io import BytesIO
+
+    with BytesIO() as buffer:
+        video.Image.new("RGB", (48, 36), "#e8a37e").save(buffer, format="PNG")
+        payload = buffer.getvalue()
+    reply = MagicMock()
+    reply.__enter__.return_value = reply
+    reply.iter_bytes.return_value = [payload]
+    monkeypatch.setattr(preview.httpx, "stream", Mock(return_value=reply))
+    return reply
+
+
+@pytest.fixture
+def canvas(pipe, screen, monkeypatch):
+    frames = []
+    native = prompt_toolkit.prompt
+
+    def draw(*args, **kwargs):
+        app = None
+
+        def sample(app):
+            view = app.renderer.last_rendered_screen
+            if view:
+                frames.append(
+                    [
+                        "".join(
+                            view.data_buffer[y][x].char
+                            for x in range(get_app_session().output.get_size().columns)
+                        )
+                        for y in range(view.height)
+                    ]
+                )
+
+        def ready():
+            nonlocal app
+            app = get_app()
+            kwargs["pre_run"]()
+            app.after_render += sample
+            app.loop.set_exception_handler(
+                lambda loop, context: app.exit(exception=context["exception"])
+            )
+
+        try:
+            return native(*args, **{**kwargs, "pre_run": ready})
+        finally:
+            if app:
+                app.after_render -= sample
+
+    monkeypatch.setattr(prompt_toolkit, "prompt", draw)
+
+    def setup(width=80, rows=24, no_color=False):
+        screen(width=width, live=True, no_color=no_color)
+        monkeypatch.setattr(
+            get_app_session().output, "get_size", lambda: Size(rows=rows, columns=width)
+        )
+        monkeypatch.setattr(
+            get_app_session().output, "get_rows_below_cursor_position", lambda: rows
+        )
+        return frames
+
+    return setup
 
 
 @pytest.fixture

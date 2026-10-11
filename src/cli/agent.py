@@ -12,7 +12,7 @@ from rich.text import Text
 from uq_minis.core.terminal import CONSOLE, application, intro, table
 from uq_minis.worker.event import DEFAULT_STATE
 
-app = application()
+app = application(theme="owl")
 
 
 @app.command()
