@@ -8,6 +8,26 @@ from uq_minis.core.common import MiniError
 
 
 class TestCache:
+    @pytest.mark.parametrize("state", ["fresh", "stale", "missing", "large", "symlink"])
+    def test_snapshot(self, tmp_path, state):
+        path = tmp_path / "snapshot.json"
+        path.write_bytes(b"valid")
+        if state == "stale":
+            cache.os.utime(path, (1, 1))
+        elif state == "missing":
+            path.unlink()
+        elif state == "large":
+            path.write_bytes(b"x" * (cache.SNAPSHOT + 1))
+        elif state == "symlink":
+            target = tmp_path / "outside"
+            path.replace(target)
+            path.symlink_to(target)
+            with pytest.raises(MiniError, match="symlink"):
+                cache.read(path)
+            return
+        assert cache.read(path) == (b"valid" if state == "fresh" else None)
+        assert cache.read(path, fresh=False) == (b"valid" if state in {"fresh", "stale"} else None)
+
     @pytest.mark.parametrize("budget", ["entries", "bytes"])
     def test_evict(self, cached, monkeypatch, budget):
         root, source, entry = cached

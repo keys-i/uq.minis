@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, unquote_plus, urlencode, urlsplit
 
 import httpx
 
+from uq_minis.core import cache
 from uq_minis.core.cache import writing
 from uq_minis.core.common import MiniError, atomic_json
 
@@ -49,14 +50,71 @@ _FAMILIES = {
 }
 
 
-def fonts(query: str = "") -> dict[str, str]:
-    """Match a small font shelf by mood, partial name or forgiving spelling"""
+def catalogue(directory: Path) -> dict[str, str]:
+    """Load Google Fonts' complete family list, with a cached offline fallback"""
+
+    def parse(data: bytes) -> dict[str, str]:
+        try:
+            families = json.loads(data)["familyMetadataList"]
+            if not isinstance(families, list) or not 1 <= len(families) <= 10000:
+                raise ValueError("invalid family list")
+            result = {}
+            for item in families:
+                name, category = item["family"], item["category"]
+                if any(
+                    not isinstance(value, str)
+                    or not value.strip()
+                    or not value.isprintable()
+                    or len(value) > limit
+                    for value, limit in ((name, 200), (category, 40))
+                ):
+                    raise ValueError("invalid family name")
+                result[name] = category
+            return result
+        except (ValueError, KeyError, TypeError, RecursionError) as exc:
+            raise MiniError("Google Fonts returned an unreadable catalogue") from exc
+
+    path = directory / "catalogue.json"
+    stored = cache.read(path)
+    if stored is not None:
+        try:
+            return parse(stored)
+        except MiniError:
+            pass
+    try:
+        with httpx.stream("GET", "https://fonts.google.com/metadata/fonts", timeout=15) as reply:
+            reply.raise_for_status()
+            data = bytearray()
+            for chunk in reply.iter_bytes():
+                data.extend(chunk)
+                if len(data) > cache.SNAPSHOT:
+                    raise MiniError("Google Fonts catalogue exceeds the download limit")
+        families = parse(data)
+        with writing(path) as temporary:
+            temporary.write_bytes(data)
+        return families
+    except (httpx.HTTPError, OSError, MiniError) as exc:
+        stored = cache.read(path, fresh=False)
+        if stored is not None:
+            try:
+                return parse(stored)
+            except MiniError:
+                pass
+        raise MiniError(f"Could not load the Google Fonts catalogue: {exc}") from exc
+
+
+def fonts(query: str = "", families: dict[str, str] | None = None) -> dict[str, str]:
+    """Match full family names, mood words and forgiving spelling"""
     if len(query) > 200:
         raise MiniError("Describe your font in at most 200 characters")
     needle = re.sub(r"[^a-z0-9]", "", query.casefold())
+    descriptions = {
+        name: _FAMILIES.get(name, category)
+        for name, category in (_FAMILIES | (families or {})).items()
+    }
     return {
         name: f"{name} · {description}"
-        for name, description in _FAMILIES.items()
+        for name, description in descriptions.items()
         if needle in re.sub(r"[^a-z0-9]", "", (name + description).casefold())
         or get_close_matches(
             needle,

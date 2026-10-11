@@ -26,6 +26,7 @@ from typer.testing import CliRunner
 from tests import fakes
 from tests.fakes import Mailbox
 from uq_minis import cli
+from uq_minis.cli import timey as wizard
 from uq_minis.core import cache, mini, terminal
 from uq_minis.core.forms import FormProfile
 from uq_minis.minis.scrappy import scraper
@@ -33,6 +34,13 @@ from uq_minis.minis.timey import preview, style, video
 from uq_minis.worker import event as worker
 from uq_minis.worker import mail, outlook, service
 from uq_minis_tools.scripts import script
+
+
+@pytest.fixture
+def fontlist(monkeypatch):
+    families = {"Open Sans": "Sans Serif", "Noto Sans Devanagari": "Sans Serif"}
+    monkeypatch.setattr(wizard, "catalogue", lambda directory: families)
+    return families
 
 
 @pytest.fixture

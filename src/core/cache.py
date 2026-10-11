@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,6 +16,23 @@ from uq_minis.core.common import MiniError, atomic_json
 LIMIT = 2 * 1024**3
 ENTRIES = 32
 NAME = re.compile(r"[a-f0-9]{16}-[a-f0-9]{16}")
+SNAPSHOT = 4 * 1024**2
+AGE = 7 * 24 * 60 * 60
+
+
+def read(path: Path, *, fresh: bool = True) -> bytes | None:
+    """Read a bounded snapshot, retaining stale data for offline recovery"""
+    if path.is_symlink() or path.parent.is_symlink():
+        raise MiniError("A cached snapshot must not be a symlink")
+    try:
+        info = path.stat()
+        if info.st_size > SNAPSHOT or fresh and time.time() - info.st_mtime > AGE:
+            return None
+        with path.open("rb") as stream:
+            data = stream.read(SNAPSHOT + 1)
+        return data if len(data) <= SNAPSHOT else None
+    except OSError:
+        return None
 
 
 def entries(root: Path, key: str = "*"):

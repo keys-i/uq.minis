@@ -143,10 +143,23 @@ class TestPreview:
             ("ariel\nArimo\ny\n", "https://fonts.google.com/specimen/Arimo"),
             ("Ciznel\nCinzel\ny\n", "https://fonts.google.com/specimen/Cinzel"),
             ("random nonsense\nback\nbungee\n", None),
+            ("open sans\ny\n", "https://fonts.google.com/specimen/Open+Sans"),
+            ("noto sans devanagari\ny\n", "https://fonts.google.com/specimen/Noto+Sans+Devanagari"),
         ],
-        ids=["family", "reject", "link", "missing-file", "mood", "ariel", "typo", "refine"],
+        ids=[
+            "family",
+            "reject",
+            "link",
+            "missing-file",
+            "mood",
+            "ariel",
+            "typo",
+            "refine",
+            "open-sans",
+            "full-list",
+        ],
     )
-    def test_font_review(self, answer, source, runner, monkeypatch):
+    def test_font_review(self, answer, source, runner, monkeypatch, fontlist):
         font = str(video.ASSETS / "timey/fonts/bungee.ttf")
         resolve = []
         monkeypatch.setattr(
@@ -162,7 +175,7 @@ class TestPreview:
         assert result.exit_code == 0, result.output
         assert resolve == ([source] if source else [])
 
-    def test_font_failure(self, runner, monkeypatch):
+    def test_font_failure(self, runner, monkeypatch, fontlist):
         requests = []
 
         def fail(value, *args, **kwargs):
@@ -228,7 +241,7 @@ class TestPreview:
         assert all(len(sample.picture.plain.splitlines()) <= 14 for sample in samples.values())
 
     @pytest.mark.parametrize("name", ["bungee", "Bungee", "Press Start 2P", "Skranji"])
-    def test_fonts(self, runner, name, monkeypatch):
+    def test_fonts(self, runner, name, monkeypatch, fontlist):
         monkeypatch.setattr(
             wizard, "resolve_font", lambda *args, **kwargs: pytest.fail("Downloaded")
         )
@@ -520,6 +533,51 @@ class TestVideo:
 
 
 class TestStyle:
+    @pytest.mark.parametrize(
+        "state", ["fresh", "cached", "stale", "broken", "large", "offline", "malformed"]
+    )
+    def test_catalogue(self, tmp_path, monkeypatch, state):
+        payload = json.dumps(
+            {
+                "familyMetadataList": [
+                    {"family": "Open Sans", "category": "Sans Serif"},
+                    {"family": "Noto Sans Devanagari", "category": "Sans Serif"},
+                ]
+            }
+        ).encode()
+        path = tmp_path / "catalogue.json"
+        if state in {"cached", "stale", "broken"}:
+            path.write_bytes(b"bad" if state == "broken" else payload)
+            if state == "stale":
+                os.utime(path, (1, 1))
+        requests = []
+
+        def reply(request):
+            requests.append(request.url)
+            if state in {"offline", "stale"}:
+                raise httpx.ConnectError("Offline")
+            data = payload
+            if state == "large":
+                data = b"x" * (cache.SNAPSHOT + 1)
+            elif state == "malformed":
+                data = b'{"familyMetadataList":[{"family":"bad\\u001b","category":"Serif"}]}'
+            return httpx.Response(200, content=data)
+
+        with httpx.Client(transport=httpx.MockTransport(reply)) as client:
+            monkeypatch.setattr(style.httpx, "stream", client.stream)
+            if state in {"offline", "large", "malformed"}:
+                with pytest.raises(MiniError, match="catalogue"):
+                    style.catalogue(tmp_path)
+                assert not path.exists()
+            else:
+                families = style.catalogue(tmp_path)
+                assert "Open Sans" in style.fonts("open sans", families)
+                assert "Noto Sans Devanagari" in style.fonts("devanagari", families)
+                assert "Creepster" in style.fonts("spook", families)
+                assert path.read_bytes() == payload
+        assert len(requests) == (0 if state == "cached" else 1)
+        assert not list(tmp_path.glob(".cache-*"))
+
     @pytest.mark.parametrize(
         "query,family",
         [("spook", "Creepster"), ("ariel", "Arimo"), ("Ciznel", "Cinzel"), ("sci fi", "Orbitron")],

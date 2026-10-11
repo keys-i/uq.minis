@@ -1,7 +1,7 @@
 """Search videos, preview timer styles and render a countdown with optional YouTube upload"""
 
 lazy from .preview import frame, overlay, picture, thumbnail
-lazy from .style import design, designer, font, fonts
+lazy from .style import catalogue, design, designer, font, fonts
 lazy from .style import read as read_style
 lazy from .video import (
     FONTS,
@@ -27,6 +27,7 @@ __all__ = [
     "POSITIONS",
     "STYLES",
     "Timer",
+    "catalogue",
     "clock",
     "design",
     "designer",

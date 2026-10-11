@@ -35,6 +35,7 @@ lazy from uq_minis.minis.timey import (
     POSITIONS,
     STYLES,
     Timer,
+    catalogue,
     clock,
     design,
     download,
@@ -150,7 +151,16 @@ class _Studio:
         previews = {
             name: overlay(replace(self.timer, font=path), name) for name, path in fonts.items()
         }
-        families = find_fonts()
+        try:
+            with activity("Opening the Google Fonts catalogue"):
+                available = catalogue(STATE / "timey/fonts")
+        except MiniError as exc:
+            problem(exc)
+            CONSOLE.print(
+                "Using the small offline font shelf; specimen links still work", style="muted"
+            )
+            available = None
+        families = find_fonts(families=available)
         previews.update(
             {
                 name: previews[name.casefold().replace(" ", "")]
@@ -183,7 +193,7 @@ class _Studio:
                     not value.lower().startswith(("http://", "https://"))
                     and not Path(value).expanduser().is_file()
                 ):
-                    matches = find_fonts(value)
+                    matches = find_fonts(value, available)
                     family = next(
                         (name for name in matches if name.casefold() == value.casefold()), None
                     )
