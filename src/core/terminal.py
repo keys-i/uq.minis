@@ -296,6 +296,7 @@ class _Input:
             return super().get_input(console, question, password, stream=stream)
         look = _look()
         status = {
+            "vulnerable": ("#9ee59a", "#77d7e3"),
             "endangered": ("#ffae77", "#f4d66b"),
             "critically endangered": ("#ff879a", "#ffc18a"),
             "extinct": ("#c6adff", "#8dbefa"),

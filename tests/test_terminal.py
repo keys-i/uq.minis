@@ -189,6 +189,7 @@ def test_pokes(pipe, entry, cursor, monkeypatch, name, moving):
 @pytest.mark.parametrize("name", list(art._habitats()))
 def test_regions(name):
     look = art._habitats()[name]
+    assert "7" in look.tone
     for pose, frames in art._poses(name).items():
         for index in (0, len(frames) // 2):
             rows = frames[index]["hit"].splitlines()
@@ -391,7 +392,7 @@ def test_habitat(screen, name):
                 picture = look.picture(4, pose)
                 assert len(picture.plain.splitlines()) == 16
                 assert {cell_len(row) for row in picture.plain.splitlines()} == {42}
-                assert picture != frames[0]
+                assert picture != frames[0], f"{name}: {pose}"
             raise KeyboardInterrupt
         assert terminal._look() is original
         assert terminal.rich_utils.STYLE_OPTION == option

@@ -192,11 +192,7 @@ def dispatch(
             return
         try:
             animals = list(_habitats().values())
-            weights = [
-                6 if pet.status == "extinct" else 4 if pet.status.startswith("critically") else 2
-                for pet in animals
-            ]
-            visitor = random.choices(animals, weights=weights)[0]
+            visitor = random.choice(animals)
             with habitat(visitor.animal, menu=False):
                 tool = ask("Pick a mini", choices=choices, show_choices=False)
         except EOFError, KeyboardInterrupt:

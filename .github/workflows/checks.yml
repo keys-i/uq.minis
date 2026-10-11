@@ -156,6 +156,7 @@ jobs:
           from uq_minis.minis.event.rooms import read
 
           assert set(tool_names()) == {"agent", "auth", "event", "scrappy", "timey"}
+          assert len(_habitats()) == 50
           for name in tool_names():
               result = CliRunner().invoke(app, [name, "--help"])
               assert result.exit_code == 0, result.output

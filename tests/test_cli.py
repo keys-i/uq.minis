@@ -118,23 +118,18 @@ class TestCLI:
         terminal = tty
         monkeypatch.setattr(cli, "sys", terminal)
         monkeypatch.setattr(event, "sys", terminal)
-        visitor = Mock(return_value=[cli._habitats()["huia"]])
-        monkeypatch.setattr(cli.random, "choices", visitor)
+        visitor = Mock(return_value=cli._habitats()["huia"])
+        monkeypatch.setattr(cli.random, "choice", visitor)
         event_toml.write_text(event_toml.read_text().replace('mode = "both"\n', ""))
         pipe.send_text(f"event\n{event_toml}\nform\n")
         result = runner.invoke(cli.app, [])
         assert result.exit_code == 0, result.output
         assert (event_toml.parent / "generated/sample-event.form.json").exists()
         animals = visitor.call_args.args[0]
-        weights = visitor.call_args.kwargs["weights"]
-        assert {
-            pet.status.partition(" · ")[0]: weight
-            for pet, weight in zip(animals, weights, strict=True)
-        } == {
-            "endangered": 2,
-            "critically endangered": 4,
-            "extinct": 6,
-        }
+        assert len(animals) == 50
+        assert len({pet.animal for pet in animals}) == 50
+        assert set(animals) == set(cli._habitats().values())
+        assert not visitor.call_args.kwargs
 
     @pytest.mark.parametrize("args", [[], ["new-mini"]], ids=["menu", "direct"])
     def test_back(self, module, monkeypatch, runner, tty, pipe, keys, args):
