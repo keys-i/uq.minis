@@ -47,10 +47,12 @@ include-package-data = false
 "" = "src"
 uq_minis = "src"
 uq_minis_tools = "tools"
+"uq_minis.assets" = "docs/assets"
 
 [tool.setuptools.package-data]
 uq_minis = ["py.typed", "core/*.toml"]
-uq_minis_tools = ["config/*.toml", "agents/*.md"]
+uq_minis_tools = ["config/*.toml"]
+"uq_minis.assets" = ["*.png", "event/*.csv"]
 
 [tool.pytest.ini_options]
 cache_dir = ".cache/pytest"

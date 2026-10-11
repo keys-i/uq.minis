@@ -3,19 +3,9 @@
 from __future__ import annotations
 
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-
-from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-)
 
 from uq_minis.core.common import (
     FORM_ACTIONS,
@@ -35,13 +25,11 @@ from uq_minis.core.common import (
     table,
     text,
 )
-from uq_minis.core.terminal import ask
+from uq_minis.core.terminal import activity, ask
 
 if TYPE_CHECKING:
     from uq_minis.core.forms import FormProfile
     from uq_minis.core.risk_docx import EventConfig
-
-CONSOLE = Console()
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,6 +189,8 @@ def make_plans(
     form_profile: Path | None,
     form_action: FormAction | None,
     interactive: bool,
+    choose_room: bool = False,
+    rooms: Path | None = None,
 ) -> list[Plan]:
     """Validate event data and collect outputs before writing files"""
     from uq_minis.core.risk_docx import load_event_config
@@ -217,7 +207,15 @@ def make_plans(
     for source, raw, selected_mode, layout, action in zip(
         sources, raws, modes, layouts, actions, strict=True
     ):
-        config = load_event_config(source, logo)
+        venue = table(raw, "event")
+        missing_room = not venue.get("room") and (
+            selected_mode in {"form", "both"} or not venue.get("location")
+        )
+        if choose_room or interactive and missing_room:
+            from uq_minis.minis.event.rooms import choose as choose_venue
+
+            choose_venue(raw, rooms, form=selected_mode in {"form", "both"})
+        config = load_event_config(source, logo, data=raw)
         risk_outputs = () if layout is None else risk_paths(config, target, layout)
         payload = None
         profile = None
@@ -278,10 +276,14 @@ def generate(
     jobs: int = 0,
     interactive: bool = False,
     show_progress: bool = False,
+    choose_room: bool = False,
+    rooms: Path | None = None,
 ) -> RunResult:
     """Write event outputs and submit forms when requested"""
     if jobs < 0:
         raise MiniError("--jobs must be zero or positive")
+    if (choose_room or rooms is not None) and not interactive:
+        raise MiniError("--choose-room and --rooms require interactive event setup")
     plans = make_plans(
         input_path,
         mode=mode,
@@ -291,6 +293,8 @@ def generate(
         form_profile=form_profile,
         form_action=form_action,
         interactive=interactive,
+        choose_room=choose_room or rooms is not None,
+        rooms=rooms,
     )
     outputs = [
         path
@@ -306,29 +310,22 @@ def generate(
     risk_jobs = [
         (plan.config, layout, output) for plan in plans for layout, output in plan.risk_outputs
     ]
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold cyan]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        console=CONSOLE,
-        transient=CONSOLE.is_terminal,
-        disable=not show_progress,
-    ) as progress:
-        task = progress.add_task("Generating", total=len(outputs))
+    with activity("Making your event pack", show=show_progress) as progress:
         for plan in plans:
             if plan.form_output is not None and plan.form_payload is not None:
                 atomic_json(plan.form_output, plan.form_payload, private=True)
                 completed.append(("form", plan.form_output))
-                progress.advance(task)
+                progress(len(completed) / len(outputs), "Writing your form preview")
 
         worker_count = _workers(jobs, len(risk_jobs))
         if worker_count == 1:
             for config, layout, output in risk_jobs:
                 _write_risk(config, layout, output)
                 completed.append((f"risk-{layout}", output))
-                progress.advance(task)
+                progress(len(completed) / len(outputs), "Writing your risk assessment")
         elif worker_count > 1:
+            from concurrent.futures import ProcessPoolExecutor, as_completed
+
             with ProcessPoolExecutor(max_workers=worker_count) as pool:
                 futures = {
                     pool.submit(_write_risk, config, layout, output): (layout, output)
@@ -338,29 +335,20 @@ def generate(
                     layout, output = futures[future]
                     future.result()
                     completed.append((f"risk-{layout}", output))
-                    progress.advance(task)
+                    progress(len(completed) / len(outputs), "Writing your risk assessment")
 
     submissions: list[tuple[Path, int]] = []
     submit_plans = [plan for plan in plans if plan.form_action == "submit"]
     if submit_plans:
         from uq_minis.core.forms import submit_payload
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold magenta]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            console=CONSOLE,
-            transient=CONSOLE.is_terminal,
-            disable=not show_progress,
-        ) as progress:
-            task = progress.add_task("Submitting", total=len(submit_plans))
+        with activity("Submitting your event", show=show_progress) as progress:
             for plan in submit_plans:
                 status = submit_payload(
                     cast("FormProfile", plan.form_profile),
                     cast(dict[str, Any], plan.form_payload),
                 )
                 submissions.append((plan.source, status))
-                progress.advance(task)
+                progress(len(submissions) / len(submit_plans), "Submitting your event")
 
     return RunResult(tuple(sorted(completed, key=lambda item: str(item[1]))), tuple(submissions))
