@@ -22,7 +22,6 @@ dependencies = [
 [project.optional-dependencies]
 auth = ["playwright>=1.55,<2"]
 agent = ["msal>=1.31,<2", "playwright>=1.55,<2"]
-agents = ["mcp>=2.1,<3"]
 
 [project.scripts]
 mini = "uq_minis.cli:main"

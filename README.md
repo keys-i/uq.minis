@@ -6,11 +6,12 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/getting-started/install
 
 ## AI agents
 
-```sh
-uv run --extra agents --extra agent mini agents
-```
+Use the CLI from an agent with terminal access
 
-This starts an MCP server. [Connect your agent app](tools/agents/README.md) to generate documents, export courses, submit forms, and manage the watcher. Tools return structured results and reuse the same mini functions as the CLI. Generation never submits; submission is a separate tool.
+```sh
+uv run mini list
+uv run mini event --help
+```
 
 ## Events
 
