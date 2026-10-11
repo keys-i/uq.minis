@@ -9,6 +9,7 @@ from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import PropertyMock
 
 import httpx
 import pytest
@@ -165,9 +166,11 @@ class TestPreview:
         assert "▀" in result.picture.plain
         assert not list(tmp_path.glob(".timey-preview-*"))
 
-    @pytest.mark.parametrize("state", ["image", "oversized", "broken", "offline"])
+    @pytest.mark.parametrize("state", ["image", "fallback", "oversized", "broken", "offline"])
     def test_thumbnail(self, videos, thumbnails, state):
-        if state == "oversized":
+        if state == "fallback":
+            type(thumbnails).status_code = PropertyMock(side_effect=[404, 200])
+        elif state == "oversized":
             thumbnails.iter_bytes.return_value = [b"x" * (1024 * 1024 + 1)]
         elif state == "broken":
             thumbnails.iter_bytes.return_value = [b"not an image"]
@@ -175,8 +178,15 @@ class TestPreview:
             thumbnails.raise_for_status.side_effect = httpx.ConnectError("Offline")
         result = preview.thumbnail(video.search("forest")[0])
         assert "01:23" in result.description
-        assert ("▀" in result.picture.plain) is (state == "image")
-        if state != "image":
+        assert ("▀" in result.picture.plain) is (state in {"image", "fallback"})
+        if state in {"image", "fallback"}:
+            assert len(result.picture.plain.splitlines()[0]) == 40
+            assert (
+                preview.httpx.stream.call_args_list[-1]
+                .args[1]
+                .endswith("hqdefault.jpg" if state == "fallback" else "sddefault.jpg")
+            )
+        else:
             assert "Thumbnail unavailable" in result.picture.plain
 
     @pytest.mark.parametrize(
@@ -190,7 +200,7 @@ class TestPreview:
     def test_samples(self, field, values):
         samples = wizard._Studio(timey.Timer()).samples(field, values)
         assert len({sample.picture.spans.__repr__() for sample in samples.values()}) == len(values)
-        assert all(len(sample.picture.plain.splitlines()) <= 12 for sample in samples.values())
+        assert all(len(sample.picture.plain.splitlines()) <= 14 for sample in samples.values())
 
     def test_fonts(self, runner):
         app = terminal.application()

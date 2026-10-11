@@ -24,7 +24,7 @@ def picture(source: Path | bytes, description: str) -> Preview:
         with Image.open(BytesIO(source) if isinstance(source, bytes) else source) as original:
             if original.width * original.height > 16_000_000:
                 raise MiniError("Preview images must be at most 16 megapixels")
-            original.thumbnail((26, 18))
+            original.thumbnail((40, 32), Image.Resampling.LANCZOS)
             sample = original.convert("RGB")
             rows = [
                 [sample.getpixel((x, y)) for x in range(sample.width)] for y in range(sample.height)
@@ -39,13 +39,17 @@ def thumbnail(result: dict) -> Preview:
     description = f"{result['title']} · {result['length']}"
     id = youtube_url(result["url"]).partition("v=")[2]
     try:
-        with httpx.stream("GET", f"https://i.ytimg.com/vi/{id}/hqdefault.jpg", timeout=5) as reply:
-            reply.raise_for_status()
-            data = bytearray()
-            for chunk in reply.iter_bytes():
-                data.extend(chunk)
-                if len(data) > 1024 * 1024:
-                    raise MiniError("The YouTube thumbnail exceeded 1 MiB")
+        for size in ("sddefault", "hqdefault"):
+            with httpx.stream("GET", f"https://i.ytimg.com/vi/{id}/{size}.jpg", timeout=5) as reply:
+                if reply.status_code == 404 and size == "sddefault":
+                    continue
+                reply.raise_for_status()
+                data = bytearray()
+                for chunk in reply.iter_bytes():
+                    data.extend(chunk)
+                    if len(data) > 1024 * 1024:
+                        raise MiniError("The YouTube thumbnail exceeded 1 MiB")
+            break
         preview = picture(bytes(data), description)
     except (httpx.HTTPError, MiniError) as exc:
         return Preview(Text(f"Thumbnail unavailable\n{description}"), f"{description} ({exc})")
