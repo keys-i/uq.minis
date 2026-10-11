@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import time
 from collections.abc import Callable
+from difflib import get_close_matches
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import parse_qs, unquote_plus, urlencode, urlsplit
@@ -25,6 +26,48 @@ except ImportError:
     ImageFont = None
 
 Progress = Callable[[float | None, str], None]
+
+_FAMILIES = {
+    "Creepster": "Spooky Halloween lettering",
+    "Nosifer": "Spooky dripping horror letters",
+    "Rubik Wet Paint": "Messy spooky painted letters",
+    "Arimo": "Familiar Arial-style sans serif",
+    "Inter": "Clean modern sans serif",
+    "Roboto": "Readable everyday sans serif",
+    "Orbitron": "Sci-fi futuristic square letters",
+    "Space Mono": "Monospaced retro computer letters",
+    "Cinzel": "Elegant classical serif capitals",
+    "Pacifico": "Flowing handwritten script",
+    "Patrick Hand": "Casual handwritten notebook letters",
+    "Baloo 2": "Cute soft round playful letters",
+    "Fredoka": "Friendly round cartoon letters",
+    "Bebas Neue": "Tall bold condensed capitals",
+    "Merriweather": "Traditional readable book serif",
+    "Bungee": "Bold arcade letters · bundled",
+    "Press Start 2P": "Retro pixel 8-bit game letters · bundled",
+    "Skranji": "Playful carved adventure letters · bundled",
+}
+
+
+def fonts(query: str = "") -> dict[str, str]:
+    """Match a small font shelf by mood, partial name or forgiving spelling"""
+    if len(query) > 200:
+        raise MiniError("Describe your font in at most 200 characters")
+    needle = re.sub(r"[^a-z0-9]", "", query.casefold())
+    return {
+        name: f"{name} · {description}"
+        for name, description in _FAMILIES.items()
+        if needle in re.sub(r"[^a-z0-9]", "", (name + description).casefold())
+        or get_close_matches(
+            needle,
+            [
+                re.sub(r"[^a-z0-9]", "", name.casefold()),
+                *re.findall(r"[a-z0-9]+", description.casefold()),
+            ],
+            n=1,
+            cutoff=0.75,
+        )
+    }
 
 
 def _object(properties: dict) -> dict:
@@ -437,8 +480,11 @@ def font(value: str, directory: Path, *, progress: Progress | None = None) -> st
                 value = candidates[-1]
             data = fetch(value, 8 * 1024 * 1024)
     except (httpx.HTTPError, UnicodeError, ValueError) as exc:
-        if isinstance(exc, MiniError):
-            raise
+        if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 400:
+            raise MiniError(
+                "Google Fonts did not recognise that family or link; choose a named font "
+                "from the picker or paste its individual specimen link"
+            ) from exc
         raise MiniError(f"Could not download your Google font: {exc}") from exc
     with writing(target) as temporary:
         temporary.write_bytes(data)

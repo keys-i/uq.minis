@@ -133,14 +133,18 @@ class TestPreview:
         "answer,source",
         [
             ("Cinzel\ny\n", "https://fonts.google.com/specimen/Cinzel"),
-            ("Press Start 2P\nn\nbungee\n", "https://fonts.google.com/specimen/Press+Start+2P"),
+            ("Space Mono\nn\nbungee\n", "https://fonts.google.com/specimen/Space+Mono"),
             (
                 "https://fonts.google.com/specimen/Cinzel\ny\n",
                 "https://fonts.google.com/specimen/Cinzel",
             ),
             ("missing.ttf\nbungee\n", None),
+            ("spook\nCreepster\ny\n", "https://fonts.google.com/specimen/Creepster"),
+            ("ariel\nArimo\ny\n", "https://fonts.google.com/specimen/Arimo"),
+            ("Ciznel\nCinzel\ny\n", "https://fonts.google.com/specimen/Cinzel"),
+            ("random nonsense\nback\nbungee\n", None),
         ],
-        ids=["family", "reject", "link", "missing-file"],
+        ids=["family", "reject", "link", "missing-file", "mood", "ariel", "typo", "refine"],
     )
     def test_font_review(self, answer, source, runner, monkeypatch):
         font = str(video.ASSETS / "timey/fonts/bungee.ttf")
@@ -157,6 +161,27 @@ class TestPreview:
         result = runner.invoke(app, [], input=answer)
         assert result.exit_code == 0, result.output
         assert resolve == ([source] if source else [])
+
+    def test_font_failure(self, runner, monkeypatch):
+        requests = []
+
+        def fail(value, *args, **kwargs):
+            requests.append(value)
+            raise MiniError("Google Fonts is offline")
+
+        monkeypatch.setattr(wizard, "resolve_font", fail)
+        app = terminal.application()
+
+        @app.command()
+        def run():
+            studio = wizard._Studio(timey.Timer())
+            assert studio.font("") == ""
+            assert studio.timer.font == ""
+
+        result = runner.invoke(app, [], input="spook\nCreepster\nrandom words\ntheme\n")
+        assert result.exit_code == 0, result.output
+        assert "Google Fonts is offline" in result.output
+        assert requests == ["https://fonts.google.com/specimen/Creepster"]
 
     @pytest.mark.parametrize("timer", [None, timey.Timer(start_gap=5)])
     def test_frame(self, clip, timer, tmp_path, monkeypatch):
@@ -202,7 +227,11 @@ class TestPreview:
         assert len({sample.picture.spans.__repr__() for sample in samples.values()}) == len(values)
         assert all(len(sample.picture.plain.splitlines()) <= 14 for sample in samples.values())
 
-    def test_fonts(self, runner):
+    @pytest.mark.parametrize("name", ["bungee", "Bungee", "Press Start 2P", "Skranji"])
+    def test_fonts(self, runner, name, monkeypatch):
+        monkeypatch.setattr(
+            wizard, "resolve_font", lambda *args, **kwargs: pytest.fail("Downloaded")
+        )
         app = terminal.application()
         paths = []
 
@@ -211,9 +240,9 @@ class TestPreview:
             studio = wizard._Studio(timey.Timer())
             paths.append(studio.font(""))
 
-        result = runner.invoke(app, [], input="bungee\n")
+        result = runner.invoke(app, [], input=f"{name}\n")
         assert result.exit_code == 0, result.output
-        assert Path(paths[0]).is_file() and Path(paths[0]).stem == "bungee"
+        assert Path(paths[0]).is_file() and Path(paths[0]).stem == name.casefold().replace(" ", "")
 
 
 class TestTimer:
@@ -491,6 +520,35 @@ class TestVideo:
 
 
 class TestStyle:
+    @pytest.mark.parametrize(
+        "query,family",
+        [("spook", "Creepster"), ("ariel", "Arimo"), ("Ciznel", "Cinzel"), ("sci fi", "Orbitron")],
+    )
+    def test_fonts(self, query, family):
+        assert family in style.fonts(query)
+        assert family in style.fonts(query)[family]
+        assert not style.fonts("random nonsense")
+        with pytest.raises(MiniError, match="200"):
+            style.fonts("x" * 201)
+
+    @pytest.mark.parametrize(
+        "status,message", [(400, "did not recognise"), (503, "Could not download")]
+    )
+    def test_font_error(self, tmp_path, monkeypatch, status, message):
+        if style.ImageFont is None:
+            pytest.skip("Pillow is an optional Timey dependency")
+        client = httpx.Client
+        monkeypatch.setattr(
+            style.httpx,
+            "Client",
+            lambda **kwargs: client(
+                transport=httpx.MockTransport(lambda request: httpx.Response(status)), **kwargs
+            ),
+        )
+        with pytest.raises(MiniError, match=message):
+            style.font("https://fonts.google.com/specimen/spook", tmp_path)
+        assert not list(tmp_path.iterdir())
+
     @pytest.mark.parametrize(
         "path,value",
         [

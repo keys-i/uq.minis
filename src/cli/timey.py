@@ -16,10 +16,10 @@ import typer
 from rich.panel import Panel
 from rich.text import Text
 
-from uq_minis.core.common import MiniError, atomic_json, ensure_outputs
-from uq_minis.core.paths import STATE
-from uq_minis.core.terminal import (
+from uq_minis.core import (
     CONSOLE,
+    STATE,
+    MiniError,
     activity,
     application,
     ask,
@@ -29,25 +29,36 @@ from uq_minis.core.terminal import (
     problem,
     table,
 )
-lazy from uq_minis.minis.timey.preview import frame, overlay, picture, thumbnail
-lazy from uq_minis.minis.timey.style import design
-lazy from uq_minis.minis.timey.style import designer as choose_designer
-lazy from uq_minis.minis.timey.style import font as resolve_font
-lazy from uq_minis.minis.timey.style import read as read_style
-lazy from uq_minis.minis.timey.video import (
+from uq_minis.core.common import atomic_json, ensure_outputs
+lazy from uq_minis.minis.timey import (
     FONTS,
     POSITIONS,
     STYLES,
     Timer,
     clock,
+    design,
     download,
     duration,
+    frame,
+    overlay,
+    picture,
+    read_style,
     reference,
     render,
     require_ffmpeg,
     search,
     suggest_style,
+    thumbnail,
     youtube_url,
+)
+lazy from uq_minis.minis.timey import (
+    designer as choose_designer,
+)
+lazy from uq_minis.minis.timey import (
+    font as resolve_font,
+)
+lazy from uq_minis.minis.timey import (
+    fonts as find_fonts,
 )
 lazy from uq_minis.minis.timey.youtube import metadata as generate_metadata
 lazy from uq_minis.minis.timey.youtube import prepare as prepare_upload
@@ -132,27 +143,33 @@ class _Studio:
                 problem(exc)
 
     def font(self, default: str) -> str:
-        """Browse bundled faces or review a named Google font or local file"""
+        """Turn mood words and misspellings into named choices before downloading"""
         from uq_minis.assets import ROOT
 
         fonts = {name: str(ROOT / "timey/fonts" / f"{name}.ttf") for name in FONTS.values()}
         previews = {
             name: overlay(replace(self.timer, font=path), name) for name, path in fonts.items()
         }
+        families = find_fonts()
+        previews.update(
+            {
+                name: previews[name.casefold().replace(" ", "")]
+                for name in families
+                if name.casefold().replace(" ", "") in fonts
+            }
+        )
         while True:
             value = ask(
-                "Font name, Google Fonts link or file (blank for theme default)",
+                "Font mood or name, Google Fonts link or file (blank for theme default)",
                 default=default,
-                suggestions=list(fonts),
+                suggestions=families,
+                ignore_case=True,
                 paths=True,
                 previews=previews,
-            )
+            ).strip()
             if not value:
                 self.timer = replace(self.timer, font="")
                 return ""
-            if value in fonts:
-                self.timer = replace(self.timer, font=fonts[value])
-                return fonts[value]
             try:
                 source = value
                 if not Path(value).expanduser().is_file() and (
@@ -166,6 +183,34 @@ class _Studio:
                     not value.lower().startswith(("http://", "https://"))
                     and not Path(value).expanduser().is_file()
                 ):
+                    matches = find_fonts(value)
+                    family = next(
+                        (name for name in matches if name.casefold() == value.casefold()), None
+                    )
+                    if family is None:
+                        if not matches:
+                            CONSOLE.print(
+                                "No close match on the font shelf yet; browse these or change your words",
+                                style="muted",
+                            )
+                        choices = dict(matches or families)
+                        choices.update(
+                            {"theme": "Use the theme font", "back": "Change your search words"}
+                        )
+                        family = ask(
+                            "Choose a font", choices=choices, previews=previews, ignore_case=True
+                        )
+                        if family == "back":
+                            default = value
+                            continue
+                        if family == "theme":
+                            self.timer = replace(self.timer, font="")
+                            return ""
+                    value = family
+                    key = value.casefold().replace(" ", "")
+                    if key in fonts:
+                        self.timer = replace(self.timer, font=fonts[key])
+                        return fonts[key]
                     source = f"https://fonts.google.com/specimen/{quote_plus(value)}"
                 with activity("Preparing your font sample") as update:
                     path = resolve_font(source, STATE / "timey/fonts", progress=update)

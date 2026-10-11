@@ -1,10 +1,33 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from uq_minis.core.common import MiniError, discover_events, ensure_outputs
+
+
+@pytest.mark.parametrize("package", ["uq_minis.core", "uq_minis.minis.timey"])
+def test_exports(package):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            f"""import importlib, sys
+module = importlib.import_module({package!r})
+assert 'uq_minis.core.terminal' not in sys.modules
+assert 'uq_minis.minis.timey.video' not in sys.modules
+for name in module.__all__:
+    assert getattr(module, name) is not None, name
+""",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 class TestFiles:
