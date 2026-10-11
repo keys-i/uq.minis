@@ -37,7 +37,7 @@ def zsh_script() -> str:
         native = get_completion_script(
             prog_name=name,
             complete_var=f"_{name.upper().replace('-', '_')}_COMPLETE",
-            shell="zsh",
+            shell="zsh",  # nosec B604
         )
         native = native.replace(
             '"${words[1,$CURRENT]}"', '"${(j: :)${(@q)words[1,CURRENT]}}"'

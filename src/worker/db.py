@@ -61,6 +61,6 @@ def update(db, table: str, key: str, identity: str, **values) -> None:
     if not all(name.isidentifier() for name in (table, key, *values)):
         raise MiniError("Invalid database identifier")
     columns = ", ".join(f"{name} = ?" for name in values)
-    # Identifiers are validated above; all values use placeholders.
-    query = f"UPDATE {table} SET {columns} WHERE {key} = ?"
+    # Identifiers are validated above and values use placeholders
+    query = f"UPDATE {table} SET {columns} WHERE {key} = ?"  # nosec B608
     db.execute(query, (*values.values(), identity))

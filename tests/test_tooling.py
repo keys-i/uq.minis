@@ -46,6 +46,45 @@ class TestMini:
 
 
 class TestDev:
+    @pytest.mark.parametrize("binary", [None, "/tools with spaces/ruff"])
+    def test_run(self, monkeypatch, process, binary):
+        monkeypatch.setattr(script.shutil, "which", lambda _: binary)
+        process.return_value.returncode = 7
+        assert script.run(["ruff", "check", "."]) == (7 if binary else 127)
+        if binary:
+            process.assert_called_once_with([binary, "check", "."], cwd=script.ROOT, check=False)
+        else:
+            process.assert_not_called()
+
+    @pytest.mark.parametrize("missing", ["pyproject.toml", "src"])
+    def test_checkout(self, tmp_path, monkeypatch, commands, runner, missing):
+        if missing == "src":
+            (tmp_path / "pyproject.toml").touch()
+        else:
+            (tmp_path / "src").mkdir()
+        monkeypatch.setattr(script, "ROOT", tmp_path)
+        result = runner.invoke(script.app, ["check"])
+        assert result.exit_code == 2 and "requires an editable checkout" in result.output
+        commands.assert_not_called()
+
+    @pytest.mark.parametrize("failure", [None, "bandit", "uv", "pip-audit"])
+    def test_security(self, commands, runner, failure):
+        commands.side_effect = lambda argv: 7 if argv[0] == failure else 0
+        result = runner.invoke(script.app, ["security"])
+        assert result.exit_code == (7 if failure else 0), result.output
+        calls = [call.args[0] for call in commands.call_args_list]
+        expected = ["bandit", "uv", "pip-audit"]
+        if failure:
+            expected = expected[: expected.index(failure) + 1]
+        assert [call[0] for call in calls] == expected
+        assert calls[0][2:4] == ["--severity-level", "medium"]
+        if len(calls) > 1:
+            assert "--locked" in calls[1] and "--no-emit-project" in calls[1]
+            assert "--no-hashes" not in calls[1]
+        if len(calls) > 2:
+            assert "--strict" in calls[2] and "--disable-pip" in calls[2]
+            assert "--require-hashes" in calls[2]
+
     @pytest.mark.parametrize(
         "args,expected",
         [

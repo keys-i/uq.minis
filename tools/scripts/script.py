@@ -48,7 +48,19 @@ def _task(task: str, extra: list[str]) -> int:
     if task == "test":
         return run([*tests, *extra])
     if task == "security":
-        if status := run(["bandit", "-q", "-c", "tools/config/bandit.toml", "-r", "src", "tools"]):
+        if status := run(
+            [
+                "bandit",
+                "-q",
+                "--severity-level",
+                "medium",
+                "-c",
+                "tools/config/bandit.toml",
+                "-r",
+                "src",
+                "tools",
+            ]
+        ):
             return status
         with TemporaryDirectory(prefix="uq-minis-audit-") as directory:
             requirements = str(Path(directory) / "requirements.txt")
@@ -60,7 +72,6 @@ def _task(task: str, extra: list[str]) -> int:
                     "--all-groups",
                     "--all-extras",
                     "--no-emit-project",
-                    "--no-hashes",
                     "--no-header",
                     "--no-annotate",
                     "-q",
@@ -71,7 +82,7 @@ def _task(task: str, extra: list[str]) -> int:
                 [
                     "pip-audit",
                     "--strict",
-                    "--no-deps",
+                    "--require-hashes",
                     "--disable-pip",
                     "--progress-spinner",
                     "off",

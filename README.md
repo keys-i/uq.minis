@@ -183,4 +183,6 @@ Tests cover every mini, shared infrastructure and the worker. Shared setup lives
 
 Coverage measures lines and branches, including greenlets, worker processes and CLI subprocesses. The Linux CI job runs the complete suite with an 85% minimum; Windows and macOS check the base environment
 
+Security CI audits the locked dependencies and gates medium/high Bandit findings. Typer's completion-language option and the worker's validated SQL identifiers have specific false-positive annotations; subprocess calls pass argument lists without a shell
+
 Python 3.15's native lazy imports keep command help from loading browser, document or media dependencies. Timey's preset maps use `frozendict` to prevent accidental changes. On macOS with Python 3.15, `tests/benchmarks/cli.py` measured Timey help at a median 387 ms before lazy imports and 110 ms after, across five fresh processes for each; the help budget is 200 ms
