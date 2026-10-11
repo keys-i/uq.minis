@@ -49,7 +49,7 @@ uq_minis = "src"
 uq_minis_tools = "tools"
 
 [tool.setuptools.package-data]
-uq_minis = ["py.typed", "core/*.toml", "workers/*.helper.py"]
+uq_minis = ["py.typed", "core/*.toml"]
 uq_minis_tools = ["config/*.toml", "agents/*.md"]
 
 [tool.pytest.ini_options]

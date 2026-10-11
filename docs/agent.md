@@ -52,7 +52,7 @@ uv run --extra agent mini agent stop EVENT_ID
 uv run --extra agent mini agent uninstall
 ```
 
-The default state directory is `~/Library/Application Support/UQ minis/agent`. It holds the browser profile, matching mail, form snapshots and any Graph tokens. Keep it private. The macOS user launch agent resumes after login and while the Mac is awake. Sleeping, offline, or powered-off Macs do not process mail, but saved events remain for the next poll.
+The default state directory is `.minis/agent`. It holds the browser profile, matching mail, form snapshots and any Graph tokens. Keep it private. The macOS user launch agent resumes after login and while the Mac is awake. Sleeping, offline, or powered-off Macs do not process mail, but saved events remain for the next poll.
 
 Before sending, the worker records its draft identity and send intent. Graph reconciles using the immutable message ID. The browser checks Sent Items for a reply to the original request with the exact recipient, subject, body and attachment bytes. It never infers delivery from a missing draft. A crash during browser preparation can leave an unsent draft in Outlook; the worker does not send that draft later.
 

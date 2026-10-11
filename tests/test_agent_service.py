@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from uq_minis.core.common import MiniError
-from uq_minis.workers import service
+from uq_minis.worker import service
 
 
 @pytest.fixture(autouse=True)

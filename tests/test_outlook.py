@@ -12,9 +12,8 @@ from types import SimpleNamespace
 import pytest
 
 from uq_minis.core.common import MiniError
-from uq_minis.workers import event, helper, outlook, service
+from uq_minis.worker import event, mail, outlook, service
 
-mail = helper("mail")
 
 
 def _eml(*, message_id: str, sender: str, subject: str, body: str, to: str = "") -> bytes:

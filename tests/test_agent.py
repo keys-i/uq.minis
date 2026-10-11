@@ -8,10 +8,10 @@ import httpx
 import pytest
 
 from uq_minis.core.common import MiniError
-from uq_minis.workers import event as worker
-from uq_minis.workers import helper, service
+from uq_minis.worker import event as worker
+from uq_minis.worker import db as storage
+from uq_minis.worker import mail, service
 
-mail = helper("mail")
 
 
 def message(
@@ -237,7 +237,7 @@ def test_state_lock_and_registration_validation(setup_agent, event_toml):
             worker.status(state_dir=state)
     with worker.database(state) as db:
         with pytest.raises(MiniError, match="Invalid database identifier"):
-            helper("db").update(db, "events; DROP TABLE events", "event_id", "42", state="stopped")
+            storage.update(db, "events; DROP TABLE events", "event_id", "42", state="stopped")
     with pytest.raises(MiniError, match="already registered"):
         worker.watch(event_toml, event_id="42", state_dir=state)
     with pytest.raises(MiniError, match="Event ID"):

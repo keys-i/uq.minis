@@ -16,9 +16,8 @@ from uuid import uuid4
 
 from uq_minis.core.common import MiniError
 
-from . import helper
+from . import mail
 
-mail = helper("mail")
 HOME = "https://outlook.office.com/mail/"
 _MESSAGE_IDS = re.compile(r"<[^<>\s]+>")
 
@@ -142,7 +141,7 @@ def _url(value: str) -> str:
     parsed = urlsplit(value)
     if (
         parsed.scheme != "https"
-        or parsed.netloc != "outlook.office.com"
+        or parsed.netloc not in {"outlook.office.com", "outlook.cloud.microsoft"}
         or not parsed.path.startswith("/mail/")
     ):
         raise MiniError("Outlook did not provide a mailbox link; sign in again")
@@ -213,13 +212,7 @@ class Outlook:
                 state="visible", timeout=300000 if self.interactive else 30000
             )
             _url(self.page.url)
-            self.page.get_by_role(
-                "button", name=re.compile(r"Account manager|Your account", re.I)
-            ).click()
-            self.page.get_by_text(re.compile(rf"^{re.escape(self.username)}$", re.I)).wait_for(
-                state="visible"
-            )
-            self.page.keyboard.press("Escape")
+            self._verify_account()
             return self
         except BaseException as exc:
             self.__exit__(type(exc), exc, exc.__traceback__)
@@ -240,16 +233,31 @@ class Outlook:
                 "uv run --extra agent playwright install chromium"
             ) from None
 
+    def _verify_account(self) -> None:
+        """Verify the registered username before reading or composing mail"""
+        self.stage = "verifying your Outlook account"
+        self.page.get_by_role("button", name=re.compile(r"Account manager|Your account", re.I)).or_(
+            self.page.locator("#owa-me-control-container").get_by_role("button")
+        ).click()
+        self.page.get_by_text(re.compile(rf"^{re.escape(self.username)}$", re.I)).wait_for(
+            state="visible"
+        )
+        self.page.keyboard.press("Escape")
+
     def _search_box(self):
         return (
             self.page.get_by_role("searchbox", name="Search", exact=True)
             .or_(self.page.get_by_role("textbox", name="Search", exact=True))
             .or_(self.page.get_by_role("combobox", name="Search", exact=True))
+            .or_(
+                self.page.get_by_role(
+                    "combobox", name="Search for email, meetings, files and more.", exact=True
+                )
+            )
         ).filter(visible=True)
 
     def _search(self, query: str, folder: str | None = None) -> None:
         self.stage = "searching mail"
-        self.page.goto(HOME, wait_until="domcontentloaded")
         _url(self.page.url)
         if folder:
             self.page.get_by_role(
@@ -258,6 +266,9 @@ class Outlook:
         search = self._search_box()
         search.fill(query)
         search.press("Enter")
+        self.page.get_by_role(
+            "button", name=re.compile(r"^(All folders|Current folder)$")
+        ).wait_for(state="visible")
         scope = "Current folder" if folder else "All folders"
         selected = self.page.get_by_role("button", name=scope, exact=True)
         if not selected.is_visible():
@@ -277,11 +288,18 @@ class Outlook:
         url = _url(self.page.url)
         if not re.search(r"/id/[^/?#]+", urlsplit(url).path):
             raise MiniError("Outlook did not expose a link to the selected message")
-        self.page.get_by_role("button", name="More actions", exact=True).click()
+        self.page.get_by_role("toolbar").get_by_role(
+            "button", name=re.compile(r"^(More actions|More items)$", re.I)
+        ).click()
+        export = self.page.get_by_role(
+            "menuitem", name=re.compile(r"^(Save as|Download|Download as EML)$", re.I)
+        )
+        submenu = self.page.get_by_role("button", name="Download", exact=True)
+        export.or_(submenu).first.wait_for(state="visible")
+        if submenu.is_visible():
+            submenu.click()
         with self.page.expect_download() as pending:
-            self.page.get_by_role(
-                "menuitem", name=re.compile(r"^(Save as|Download)$", re.I)
-            ).click()
+            export.click()
         download = pending.value
         try:
             path = download.path()
@@ -306,7 +324,9 @@ class Outlook:
         seen, messages = set(), {}
         # ponytail: bounded UI scan; narrow --since if a sender has more than 50 screens of results.
         for _ in range(50):
-            rows = listing.get_by_role("option")
+            rows = listing.locator(
+                "xpath=.//*[@role='option' and not(ancestor::*[@role='listbox'][2])]"
+            )
             keys = [
                 rows.nth(i).get_attribute("aria-label") or rows.nth(i).inner_text()
                 for i in range(rows.count())
@@ -429,7 +449,13 @@ class Outlook:
             if name == "To":
                 field.fill(mail.RETURN_TO)
                 field.press("Enter")
-        self.page.get_by_role("textbox", name=re.compile(r"^Message body", re.I)).fill(mail.BODY)
+        body = self.page.get_by_role("textbox", name=re.compile(r"^Message body", re.I))
+        body.fill("")
+        # Soft line breaks avoid the extra blank paragraphs produced by fill
+        for index, line in enumerate(mail.BODY.splitlines()):
+            if index:
+                body.press("Shift+Enter")
+            self.page.keyboard.insert_text(line)
         self.page.get_by_role("button", name=re.compile(r"^(Attach file|Attach)$", re.I)).click()
         with self.page.expect_file_chooser() as chooser:
             self.page.get_by_role(

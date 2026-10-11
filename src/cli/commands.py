@@ -18,7 +18,7 @@ from uq_minis.core.terminal import ask
 
 CONSOLE = Console()
 ERROR = Console(stderr=True)
-DEFAULT_AGENT_STATE = Path("~/Library/Application Support/UQ minis/agent").expanduser()
+DEFAULT_AGENT_STATE = Path(".minis/agent")
 
 
 def _event() -> typer.Typer:
@@ -463,13 +463,13 @@ def _agent() -> typer.Typer:
         ] = DEFAULT_AGENT_STATE,
         interval: Annotated[int, typer.Option(min=1, help="Seconds between mailbox polls.")] = 60,
     ) -> None:
-        from uq_minis.workers.service import install as install_service
+        from uq_minis.worker.service import install as install_service
 
         typer.echo(str(install_service(state_dir, interval)))
 
     @app.command()
     def uninstall() -> None:
-        from uq_minis.workers.service import uninstall as uninstall_service
+        from uq_minis.worker.service import uninstall as uninstall_service
 
         uninstall_service()
 

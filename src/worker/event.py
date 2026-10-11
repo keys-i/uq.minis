@@ -11,12 +11,13 @@ from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
 from uq_minis.core.common import MiniError
+from uq_minis.core.paths import STATE
 
-from . import helper, run
+from . import db as _db
+from . import mail
+from .run import run
 
-mail = helper("mail")
-
-DEFAULT_STATE = Path.home() / "Library/Application Support/UQ minis/agent"
+DEFAULT_STATE = STATE / "agent"
 _ID = r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}"
 _SUBJECT = re.compile(
     rf"^Event Application Update(?P<request> Risk Assessment Request)?\s+"
@@ -38,10 +39,6 @@ def _time(value: str) -> datetime:
         return parsed
     except (TypeError, ValueError) as exc:
         raise MiniError("Microsoft returned an invalid message timestamp") from exc
-
-
-_db = helper("db")
-_setting = _db.setting
 
 
 @contextmanager
@@ -99,11 +96,11 @@ def login(
     else:
         raise MiniError("Backend must be browser or graph")
     with database(state_dir) as db:
-        previous = _setting(db, "account")
+        previous = _db.setting(db, "account")
         if previous and json.loads(previous) != config:
             if db.execute("SELECT 1 FROM events WHERE state != 'waiting_request'").fetchone():
                 raise MiniError("Mail has already been processed; use a separate state directory")
-            if _setting(db, "tokens") or json.loads(previous).get("backend") == "browser":
+            if _db.setting(db, "tokens") or json.loads(previous).get("backend") == "browser":
                 raise MiniError(
                     "This state belongs to another account; use a separate state directory"
                 )
@@ -112,12 +109,12 @@ def login(
 
             with Outlook(db, config["mailbox"], username=config["username"], interactive=True):
                 pass
-            _setting(db, "account", json.dumps(config))
+            _db.setting(db, "account", json.dumps(config))
         else:
-            _setting(db, "account", json.dumps(config))
+            _db.setting(db, "account", json.dumps(config))
             mail.token(db, interactive=True)
-        _setting(db, "error", "")
-        _setting(db, "retry_at", "")
+        _db.setting(db, "error", "")
+        _db.setting(db, "retry_at", "")
 
 
 def watch(
@@ -194,7 +191,7 @@ def status(*, state_dir: Path = DEFAULT_STATE) -> list[dict]:
             )
         ]
         for row in rows:
-            row["error"] = row["error"] or _setting(db, "error") or ""
+            row["error"] = row["error"] or _db.setting(db, "error") or ""
         return rows
 
 
@@ -491,4 +488,4 @@ def process(db) -> None:
 
 def poll(*, state_dir: Path = DEFAULT_STATE) -> None:
     """Run one recoverable mailbox pass; launchd schedules the next pass"""
-    run(process, state_dir=state_dir, storage=database)
+    run(process, state_dir=state_dir, database=database)
