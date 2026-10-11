@@ -22,6 +22,12 @@ dependencies = [
 [project.optional-dependencies]
 auth = ["playwright>=1.55,<2"]
 agent = ["msal>=1.31,<2", "playwright>=1.55,<2"]
+timey = [
+  "pillow>=12.1,<13",
+  "yt-dlp[default]>=2026.3.17",
+  "google-api-python-client>=2.190,<3",
+  "google-auth-oauthlib>=1.2,<2",
+]
 
 [project.scripts]
 mini = "uq_minis.cli:main"
@@ -31,6 +37,7 @@ dev = "uq_minis_tools.scripts.script:main"
 dev = [
   "pytest>=9,<10",
   "pytest-cov>=7,<8",
+  "greenlet>=3.1,<4",
   "ruff>=0.16.6,<1",
   "pyyaml>=6,<7",
 ]
@@ -52,7 +59,7 @@ uq_minis_tools = "tools"
 [tool.setuptools.package-data]
 uq_minis = ["py.typed", "core/*.toml"]
 uq_minis_tools = ["config/*.toml"]
-"uq_minis.assets" = ["*.png", "event/*.csv"]
+"uq_minis.assets" = ["*.png", "event/*.csv", "timey/fonts/*.ttf", "timey/fonts/*.txt", "timey/art/*.png", "timey/art/*.md"]
 
 [tool.pytest.ini_options]
 cache_dir = ".cache/pytest"
