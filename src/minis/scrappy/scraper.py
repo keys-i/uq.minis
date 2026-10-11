@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 
 import httpx
 
-from uq_minis.core.common import MiniError
+from uq_minis.core import MiniError, locked
 from uq_minis.core.paths import STATE
 from uq_minis.minis.scrappy.http import BASE_URL, CODE, CatalogueUnavailable, catalogue_url, fetch
 
@@ -395,9 +395,7 @@ def export_details(
     fresh: bool = False,
     progress: Callable[[int, int, str], None] | None = None,
 ) -> int:
-    """Export selected courses, checkpointing successes until the whole CSV is ready."""
-    import fcntl
-
+    """Export selected courses, checkpointing successes until the whole CSV is ready"""
     selected = load_offerings(offerings)
     if course:
         selected = [row for row in selected if row["course_code"] == course.strip().upper()]
@@ -420,11 +418,7 @@ def export_details(
         raise MiniError("Scrappy checkpoint must not be a symlink")
     urls = [row["offering_link"] for row in selected]
     active_urls = set(urls)
-    with lock_path.open("a+b") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise MiniError("Another Scrappy export is using this output") from exc
+    with locked(lock_path):
         with closing(sqlite3.connect(checkpoint)) as db:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS courses (url TEXT PRIMARY KEY, data TEXT NOT NULL)"

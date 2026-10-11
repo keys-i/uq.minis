@@ -145,7 +145,7 @@ assert not {"docx", "httpx", "playwright", "prompt_toolkit", "PIL", "yt_dlp", "g
             (cli.app, ["--tool", "event", "--form-profile"], "mov", ["movie night.toml"]),
             (cli.app, ["--tool", "event", "--logo"], "mov", ["movie night.toml"]),
             (cli.app, ["--tool", "auth", "-o"], "mov", ["movie night.toml"]),
-            (cli.app, ["--tool", "event", "-o"], "ev", ["events/"]),
+            (cli.app, ["--tool", "event", "-o"], "ev", [f"events{os.sep}"]),
             (script.app, [], "li", ["lint"]),
         ],
         ids=[

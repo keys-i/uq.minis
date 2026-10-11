@@ -1,12 +1,22 @@
 # Changelog
 
+## v0.31.0
+
+- Use shared nonblocking locks on Windows, macOS and Linux so Scrappy exports retain collision protection and checkpoint recovery
+- Verify CLI help with and without ANSI colours, and use native directory separators in completion tests
+- Publish matching SemVer package metadata and curated changelogs, including the changelog in source distributions
+
+Requires Python 3.15+; mini-owned state remains in `.minis/<mini>/`
+
+[Development changes](https://github.com/keys-i/uq.minis/compare/v0.30.0...v0.31.0)
+
 ## v0.30.0
 
 - Expand the forest to 50 species with an equal chance for every menu visitor
 - Give new species distinct anatomy, habitats, routines and pointer reactions; keep eye glints visible on the braille grid
 - Retain bounded animation caches, with measured new-frame rendering below 0.4 ms and retained memory near 10 MiB
 
-Current release, incorporating all 29 development iterations
+Historical source release, incorporating all 29 development iterations
 
 Requires Python 3.15+; keep mini-owned state in `.minis/<mini>/`. CLI and skills replace MCP; existing dotfiles are not migrated automatically
 

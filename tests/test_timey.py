@@ -13,6 +13,7 @@ from unittest.mock import PropertyMock
 
 import httpx
 import pytest
+from rich.text import Text
 
 from uq_minis import cli
 from uq_minis.cli import timey as wizard
@@ -1215,7 +1216,10 @@ class TestWizard:
         assert result.exit_code == 2 and "Traceback" not in result.output
 
     def test_preview(self, tmp_path, monkeypatch, runner, tty):
-        assert "--start-gap" in runner.invoke(cli.app, ["timey", "--help"]).output
+        assert (
+            "--start-gap"
+            in Text.from_ansi(runner.invoke(cli.app, ["timey", "--help"]).output).plain
+        )
         monkeypatch.setattr(wizard, "sys", tty)
         monkeypatch.setattr(wizard, "require_ffmpeg", lambda: None)
         monkeypatch.setattr(

@@ -1,10 +1,51 @@
 import json
+import sys
+from contextlib import nullcontext
+from errno import EACCES, EIO
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
 from uq_minis.core import cache
 from uq_minis.core.common import MiniError
+
+
+class TestLock:
+    @pytest.mark.parametrize("failed", [False, True], ids=["success", "failure"])
+    def test_release(self, tmp_path, failed):
+        path = tmp_path / "state.lock"
+        with pytest.raises(ValueError) if failed else nullcontext():
+            with cache.locked(path):
+                with pytest.raises(MiniError, match="Another"):
+                    with cache.locked(path):
+                        pytest.fail("concurrent writer acquired the lock")
+                if failed:
+                    raise ValueError("cancelled")
+        with cache.locked(path):
+            assert path.is_file()
+
+    @pytest.mark.parametrize("error", [None, EACCES, EIO], ids=["release", "busy", "io"])
+    def test_windows(self, tmp_path, monkeypatch, error):
+        locking = Mock(side_effect=OSError(error, "lock failed") if error else None)
+        monkeypatch.setattr(cache, "os", SimpleNamespace(name="nt"))
+        monkeypatch.setitem(
+            sys.modules, "msvcrt", SimpleNamespace(LK_NBLCK=1, LK_UNLCK=2, locking=locking)
+        )
+        expected = MiniError if error == EACCES else OSError
+        with pytest.raises(expected) if error else nullcontext():
+            with cache.locked(tmp_path / "state.lock"):
+                assert not error
+        assert [call.args[1:] for call in locking.call_args_list] == (
+            [(1, 1)] if error else [(1, 1), (2, 1)]
+        )
+
+    def test_symlink(self, tmp_path):
+        path = tmp_path / "state.lock"
+        path.symlink_to(tmp_path / "outside")
+        with pytest.raises(MiniError, match="symlink"):
+            with cache.locked(path):
+                pytest.fail("must not lock through a symlink")
 
 
 class TestCache:

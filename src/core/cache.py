@@ -8,6 +8,7 @@ import re
 import shutil
 import time
 from contextlib import contextmanager
+from errno import EACCES, EAGAIN, EDEADLK
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -18,6 +19,34 @@ ENTRIES = 32
 NAME = re.compile(r"[a-f0-9]{16}-[a-f0-9]{16}")
 SNAPSHOT = 4 * 1024**2
 AGE = 7 * 24 * 60 * 60
+
+
+@contextmanager
+def locked(path: Path):
+    """Hold a nonblocking state-file lock until the operation exits"""
+    if path.is_symlink():
+        raise MiniError("A state lock must not be a symlink")
+    with path.open("a+b") as stream:
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            if exc.errno not in {EACCES, EAGAIN, EDEADLK}:
+                raise
+            raise MiniError("Another operation is using this state file") from exc
+        try:
+            yield
+        finally:
+            if os.name == "nt":
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def read(path: Path, *, fresh: bool = True) -> bytes | None:

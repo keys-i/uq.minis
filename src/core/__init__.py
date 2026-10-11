@@ -1,6 +1,7 @@
 """Shared mini management, event, document and terminal operations"""
 
 lazy from .art import Preview
+lazy from .cache import locked
 lazy from .common import MiniError
 lazy from .paths import STATE
 lazy from .terminal import (
@@ -25,6 +26,7 @@ __all__ = [
     "ask",
     "confirm",
     "intro",
+    "locked",
     "number",
     "problem",
     "table",

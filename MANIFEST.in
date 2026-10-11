@@ -1,4 +1,4 @@
-include .python-version uv.lock examples/.env.example AGENTS.md
+include .python-version uv.lock examples/.env.example AGENTS.md CHANGELOG.md
 recursive-include tools *.py *.toml *.md
 recursive-include tests *.py
 recursive-include examples *.toml

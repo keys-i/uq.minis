@@ -2,6 +2,8 @@ import json
 from unittest.mock import Mock
 
 import pytest
+from rich.text import Text
+from typer import rich_utils
 
 from uq_minis import cli
 from uq_minis.cli import event
@@ -67,10 +69,15 @@ class TestCLI:
         ],
     )
     @pytest.mark.parametrize("selector", [[], ["--tool"]], ids=["direct", "option"])
-    def test_help(self, tool, option, selector, runner):
-        result = runner.invoke(cli.app, [*selector, tool, "--help"])
+    @pytest.mark.parametrize("coloured", [False, True], ids=["plain", "colour"])
+    def test_help(self, tool, option, selector, runner, monkeypatch, coloured):
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setenv("TERM", "xterm-256color")
+        monkeypatch.setattr(rich_utils, "FORCE_TERMINAL", coloured)
+        result = runner.invoke(cli.app, [*selector, tool, "--help"], color=coloured)
         assert result.exit_code == 0, result.output
-        assert option in result.output
+        assert option in Text.from_ansi(result.output).plain
+        assert ("\x1b[" in result.output) == coloured
         assert "Choose a tool" not in result.output
 
     @pytest.mark.parametrize("tool", ["not-a-mini", "agents"])
