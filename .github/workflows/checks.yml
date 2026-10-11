@@ -26,9 +26,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-24.04, python: "3.12"}
-          - {os: windows-latest, python: "3.13"}
-          - {os: macos-latest, python: "3.14"}
+          - {os: ubuntu-24.04, python: "3.12", extras: "--all-extras", coverage: "--cov-fail-under=85"}
+          - {os: windows-latest, python: "3.13", extras: "", coverage: ""}
+          - {os: macos-latest, python: "3.14", extras: "", coverage: ""}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -46,10 +46,16 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Sync development environment
-        run: uv sync --locked
+        run: uv sync --locked ${{ matrix.extras }}
+
+      - name: Install browser and video test tools
+        if: runner.os == 'Linux'
+        run: |
+          uv run --no-sync playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg
 
       - name: Lint, compile and test
-        run: uv run --no-sync dev check
+        run: uv run --no-sync dev check ${{ matrix.coverage }}
 
       - name: Build wheel and source archive
         if: runner.os == 'Linux'
