@@ -2,6 +2,8 @@
 # SHA: 3d3c42e5aac5ba805825da76410c181273ba90b1
 # -- astral-sh/setup-uv v10.0.1 --
 # SHA: 20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+# -- actions/upload-artifact v7.0.2 --
+# SHA: cf430e030ddbb5b0abf93d22962f4752f3646cd9
 name: checks
 
 on:
@@ -21,15 +23,107 @@ env:
   UV_NO_PROGRESS: "1"
 
 jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: "0.13.0"
+          python-version: "3.15"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Sync development tools
+        run: uv sync --locked
+
+      - name: Lint, format and compile
+        run: |
+          uv run --no-sync ruff --config tools/config/ruff.toml check .
+          uv run --no-sync ruff --config tools/config/ruff.toml format --check .
+          uv run --no-sync python -m compileall -q src tools tests
+
   python:
+    needs: quality
     strategy:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-24.04, python: "3.15", extras: "--all-extras", coverage: "--cov-fail-under=85"}
-          - {os: windows-latest, python: "3.15", extras: "", coverage: ""}
-          - {os: macos-latest, python: "3.15", extras: "", coverage: ""}
+          - {os: ubuntu-24.04, coverage: "--cov-fail-under=85"}
+          - {os: windows-latest, coverage: ""}
+          - {os: macos-latest, coverage: ""}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: "0.13.0"
+          python-version: "3.15"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Sync every mini
+        run: uv sync --locked --all-extras
+
+      - name: Install Chromium and Linux libraries
+        if: runner.os == 'Linux'
+        run: uv run --no-sync playwright install --with-deps chromium
+
+      - name: Install Chromium
+        if: runner.os != 'Linux'
+        run: uv run --no-sync playwright install chromium
+
+      - name: Install FFmpeg on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install FFmpeg on macOS
+        if: runner.os == 'macOS'
+        run: command -v ffmpeg >/dev/null || brew install ffmpeg
+
+      - name: Install FFmpeg on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Test with coverage
+        run: >-
+          uv run --no-sync dev test -q --tb=short
+          --junitxml=.cache/results.xml --cov-report=html
+          ${{ matrix.coverage }}
+
+      - name: Keep test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: tests-${{ runner.os }}
+          path: |
+            .cache/results.xml
+            .cache/coverage.xml
+            .cache/htmlcov/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    needs: python
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out source
@@ -41,22 +135,39 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         with:
           version: "0.13.0"
-          python-version: ${{ matrix.python }}
+          python-version: "3.15"
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
-      - name: Sync development environment
-        run: uv sync --locked ${{ matrix.extras }}
-
-      - name: Install browser and video test tools
-        if: runner.os == 'Linux'
+      - name: Build and verify distributions
         run: |
-          uv run --no-sync playwright install --with-deps chromium
-          sudo apt-get install -y ffmpeg
+          uv sync --locked --no-default-groups --group release
+          uv build --no-sources -o .cache/dist
+          uv run --no-sync twine check .cache/dist/*
+          uv build .cache/dist/*.tar.gz --wheel --no-sources -o .cache/rebuilt
 
-      - name: Lint, compile and test
-        run: uv run --no-sync dev check ${{ matrix.coverage }}
+      - name: Check the installed wheel away from source
+        run: |
+          uv run --no-project --with .cache/rebuilt/*.whl python -I - <<'PY'
+          from importlib.resources import files
+          from typer.testing import CliRunner
+          from uq_minis.cli import app, tool_names
 
-      - name: Build wheel and source archive
-        if: runner.os == 'Linux'
-        run: uv build --no-sources -o .cache/dist
+          assert set(tool_names()) == {"agent", "auth", "event", "scrappy", "timey"}
+          for name in tool_names():
+              result = CliRunner().invoke(app, [name, "--help"])
+              assert result.exit_code == 0, result.output
+          for asset in ("event/rooms.csv", "timey/fonts/bungee.ttf", "timey/art/plate.png"):
+              assert files("uq_minis.assets").joinpath(asset).is_file(), asset
+          assert files("uq_minis.skills").joinpath("event/SKILL.md").is_file()
+          assert files("uq_minis.core").joinpath("uq-event-booking.toml").is_file()
+          PY
+
+      - name: Keep distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: distributions
+          path: .cache/dist/*
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7

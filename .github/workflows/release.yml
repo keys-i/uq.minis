@@ -59,10 +59,15 @@ jobs:
           PY
 
       - name: Sync release environment
-        run: uv sync --locked --group release
+        run: uv sync --locked --all-extras --group release
+
+      - name: Install browser and video test tools
+        run: |
+          uv run --no-sync playwright install --with-deps chromium
+          sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Run immutable checks
-        run: uv run --no-sync dev check
+        run: uv run --no-sync dev check -q --tb=short --cov-fail-under=85
 
       - name: Build and verify distributions
         run: |

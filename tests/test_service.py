@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import plistlib
 import subprocess
 
@@ -27,7 +28,6 @@ class TestService:
     def test_install(self, tmp_path, monkeypatch, job, process):
         state_dir = tmp_path / "state with spaces"
         monkeypatch.setattr(service.sys, "executable", "/python with spaces/bin/python")
-        monkeypatch.setattr(service.os, "getuid", lambda: 501)
         path = service.install(state_dir, interval=2)
         assert path == job
         data = plistlib.loads(path.read_bytes())
@@ -46,7 +46,8 @@ class TestService:
         assert data["WorkingDirectory"] == resolved_state
         assert data["StandardOutPath"] == str(state_dir.resolve() / "agent.stdout.log")
         assert data["Umask"] == 0o077
-        assert state_dir.stat().st_mode & 0o777 == 0o700
+        if os.name == "posix":
+            assert state_dir.stat().st_mode & 0o777 == 0o700
         assert [(call.args[0], call.kwargs["check"]) for call in process.call_args_list] == [
             (["/bin/launchctl", "bootout", "gui/501", str(path)], False),
             (["/bin/launchctl", "bootstrap", "gui/501", str(path)], True),

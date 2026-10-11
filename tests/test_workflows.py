@@ -1,9 +1,20 @@
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("name", ["checks", "security", "release"])
+def test_runtime(name):
+    version = (ROOT / ".python-version").read_text().strip()
+    workflow = yaml.safe_load((ROOT / f".github/workflows/{name}.yml").read_text())
+    for job in workflow["jobs"].values():
+        for step in job.get("steps", []):
+            if step.get("uses", "").startswith("astral-sh/setup-uv@"):
+                assert step["with"]["python-version"] == version
 
 
 def test_actions():

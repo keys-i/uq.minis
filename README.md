@@ -181,7 +181,9 @@ uv run dev check --cov-fail-under=85
 
 Tests cover every mini, shared infrastructure and the worker. Shared setup lives in `tests/fixtures.py` and test doubles in `tests/fakes.py`. Browser checks use local pages with external requests blocked, and video checks render short generated clips. Optional checks are reported as skipped when their dependencies are missing
 
-Coverage measures lines and branches, including greenlets, worker processes and CLI subprocesses. The Linux CI job runs the complete suite with an 85% minimum; Windows and macOS check the base environment
+Coverage measures lines and branches, including greenlets, worker processes and CLI subprocesses. CI runs all extras, Chromium and FFmpeg on Linux, Windows and macOS, with an 85% minimum on Linux. Test results and HTML coverage are kept for seven days, including failed runs
+
+Lint, formatting and compilation run once before the test matrix. Packaging rebuilds the wheel from its source archive and checks installed commands, skills and assets away from the checkout. Release checks run the complete suite before publishing
 
 Security CI audits the locked dependencies and gates medium/high Bandit findings. Typer's completion-language option and the worker's validated SQL identifiers have specific false-positive annotations; subprocess calls pass argument lists without a shell
 

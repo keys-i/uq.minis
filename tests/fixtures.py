@@ -338,6 +338,7 @@ def cached(tmp_path):
 @pytest.fixture
 def macos(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(service.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(service.os, "getuid", lambda: 501, raising=False)
 
 
 @pytest.fixture

@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import subprocess
 import threading
 from array import array
@@ -749,7 +750,8 @@ class TestUpload:
                 progress=lambda done, stage: progress.append(done),
             )
         assert [done for done in progress if done is not None] == [0.5] and closed == [True]
-        assert token.stat().st_mode & 0o777 == 0o600
+        if os.name == "posix":
+            assert token.stat().st_mode & 0o777 == 0o600
         assert called[0]["media_body"].resumable()
         assert called[0]["media_body"].chunksize() == 8 * 1024 * 1024
         assert not called[0]["notifySubscribers"]
