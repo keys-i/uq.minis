@@ -153,19 +153,22 @@ jobs:
           from typer.testing import CliRunner
           from uq_minis.cli import app, tool_names
           from uq_minis.core.art import _habitats, _poses
+          from uq_minis.minis.event.rooms import read
 
           assert set(tool_names()) == {"agent", "auth", "event", "scrappy", "timey"}
           for name in tool_names():
               result = CliRunner().invoke(app, [name, "--help"])
               assert result.exit_code == 0, result.output
           for asset in (
-              "event/rooms.csv",
+              "event/rooms.csv.gz",
               "timey/fonts/bungee.ttf",
               "timey/art/plate.png",
               "terminal/forest.toml",
               *(f"terminal/{name}.toml" for name in _habitats()),
           ):
               assert files("uq_minis.assets").joinpath(asset).is_file(), asset
+          assert not files("uq_minis.assets").joinpath("event/rooms.csv").is_file()
+          assert read()
           for name, animal in _habitats().items():
               for pose in _poses(name):
                   assert animal.picture(4, pose).plain

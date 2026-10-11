@@ -60,7 +60,7 @@ uq_minis_tools = "tools"
 [tool.setuptools.package-data]
 uq_minis = ["py.typed", "core/*.toml"]
 uq_minis_tools = ["config/*.toml"]
-"uq_minis.assets" = ["*.png", "terminal/*.toml", "event/*.csv", "timey/fonts/*.ttf", "timey/fonts/*.txt", "timey/art/*.png", "timey/art/*.md"]
+"uq_minis.assets" = ["*.png", "terminal/*.toml", "event/*.gz", "timey/fonts/*.ttf", "timey/fonts/*.txt", "timey/art/*.png", "timey/art/*.md"]
 "uq_minis.skills" = ["*/SKILL.md"]
 
 [tool.pytest.ini_options]

@@ -30,8 +30,8 @@ Make venue, attendance, contacts and timings agree across the application and ri
 ## Use the tools
 
 When UQ minis is available, read `examples/movie-night/event.toml` for the current input shape and create or update the user's event TOML.
-Read `docs/assets/event/rooms.csv` to research rooms from an agent session.
-It contains `campus,building,room,kind,seats,tour`, checked against https://campuses.uq.edu.au/list-rooms on 2026-10-09.
+Use the room picker or `uq_minis.minis.event.rooms.read()` to research the bundled catalogue
+The public directory is compressed in `docs/assets/event/rooms.csv.gz`, checked against https://campuses.uq.edu.au/list-rooms on 2026-10-09
 Use a current official source to verify changes that affect the booking
 
 For a person choosing in the terminal, run `mini event event.toml --choose-room`.

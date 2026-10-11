@@ -1,3 +1,4 @@
+import gzip
 import json
 from zipfile import ZipFile
 
@@ -8,8 +9,8 @@ from uq_minis.minis.event import rooms
 from uq_minis.minis.event.pipeline import generate
 
 CSV = """campus,building,room,kind,seats,tour
-St Lucia,Steele Building,03-206,Learning Theatre,341,https://tour.panoee.net/example
-St Lucia,Steele Building,03-237,Seminar,26,
+St Lucia,Test Hall,99-001,Learning Theatre,80,https://tour.panoee.net/example
+St Lucia,Test Hall,99-002,Seminar,26,
 """
 
 
@@ -23,12 +24,12 @@ class TestRooms:
                 "St Lucia",
                 "invalid",
                 "20",
-                "03 · Steele Building",
-                "03-206 · 341 seats · Learning Theatre",
+                "99 · Test Hall",
+                "99-001 · 80 seats · Learning Theatre",
                 "tour",
                 "back",
-                "03 · Steele Building",
-                "03-237 · 26 seats · Seminar",
+                "99 · Test Hall",
+                "99-002 · 26 seats · Seminar",
                 "select",
                 "21-50",
             ]
@@ -49,17 +50,18 @@ class TestRooms:
         assert tours == ["https://tour.panoee.net/example"]
         outputs = dict(result.outputs)
         payload = json.loads(outputs["form"].read_text())
-        assert "03-237" in str(payload) and "03-309" not in str(payload)
+        assert "99-002" in str(payload) and "03-309" not in str(payload)
         with ZipFile(outputs["risk-form"]) as document:
-            assert "03-237" in document.read("word/document.xml").decode()
+            assert "99-002" in document.read("word/document.xml").decode()
         assert event_toml.read_bytes() == original
 
     @pytest.mark.parametrize(
         "row",
         [
-            "St Lucia,Steele Building,03-206,Theatre,0,",
-            "St Lucia,Steele Building,03-206,Theatre,20,javascript:alert(1)",
-            "St Lucia,Steele Building,03-206,Theatre,20,https://tour.panoee.net@example.org/tour",
+            "St Lucia,Test Hall,99-001,Theatre,0,",
+            "St Lucia,Test Hall,99-001,Theatre,20,javascript:alert(1)",
+            "St Lucia,Test Hall,99-001,Theatre,20,https://tour.panoee.net@example.org/tour",
+            "St Lucia,Test Hall,99-001,Theatre,20,https://tour.panoee.net:1234/tour",
         ],
     )
     def test_invalid(self, tmp_path, row):
@@ -72,7 +74,8 @@ class TestRooms:
         monkeypatch.setattr(rooms, "STATE", tmp_path)
         catalogue = rooms.read()
         assert {room.campus for room in catalogue} == {"St Lucia", "Gatton", "Herston", "Other"}
-        assert next(room for room in catalogue if room.room == "49-200").seats == 500
+        assert len(catalogue) > 100
+        assert all(room.seats > 0 for room in catalogue)
         custom = tmp_path / "event/rooms.csv"
         custom.parent.mkdir()
         custom.write_text(CSV)
@@ -82,3 +85,13 @@ class TestRooms:
             rooms.read()
         with pytest.raises(MiniError, match="interactive"):
             generate(event_toml, choose_room=True)
+
+    @pytest.mark.parametrize(
+        "data",
+        [b"broken", gzip.compress(CSV.encode())[:-6], gzip.compress(b"x" * (1024 * 1024 + 1))],
+    )
+    def test_compressed(self, tmp_path, data):
+        path = tmp_path / "rooms.csv.gz"
+        path.write_bytes(data)
+        with pytest.raises(MiniError, match="Cannot read room catalogue"):
+            rooms.read(path)

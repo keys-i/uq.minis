@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import csv
+import gzip
 import webbrowser
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -29,15 +31,17 @@ class Room:
 
 
 def read(path: Path | None = None) -> list[Room]:
-    """Load the bundled catalogue or a custom CSV, rejecting ambiguous entries"""
+    """Load the compressed catalogue or a custom CSV, rejecting ambiguous entries"""
     custom = STATE / "event/rooms.csv"
-    path = path or (custom if custom.is_file() else ASSETS / "event/rooms.csv")
+    path = path or (custom if custom.is_file() else ASSETS / "event/rooms.csv.gz")
     rooms = []
     seen = set()
     try:
-        if path.stat().st_size > 1024 * 1024:
+        with gzip.open(path, "rb") if path.suffix == ".gz" else path.open("rb") as source:
+            data = source.read(1024 * 1024 + 1)
+        if len(data) > 1024 * 1024:
             raise ValueError("Room CSV exceeds 1 MiB")
-        with path.open(newline="", encoding="utf-8-sig") as handle:
+        with StringIO(data.decode("utf-8-sig"), newline="") as handle:
             for row in csv.DictReader(handle):
                 campus, building, number, kind = (
                     row[key].strip() for key in ("campus", "building", "room", "kind")
@@ -59,13 +63,14 @@ def read(path: Path | None = None) -> list[Room]:
                         or url.hostname not in TOURS
                         or url.username
                         or url.password
+                        or url.port not in (None, 443)
                     ):
                         raise ValueError(f"Invalid virtual-tour link for {number}")
                 rooms.append(Room(campus, building, number, kind, seats, tour))
                 seen.add(identity)
         if not rooms:
             raise ValueError("Room CSV is empty")
-    except (OSError, ValueError, KeyError, TypeError, AttributeError, csv.Error) as exc:
+    except (OSError, EOFError, ValueError, KeyError, TypeError, AttributeError, csv.Error) as exc:
         raise MiniError(f"Cannot read room catalogue {path}: {exc}") from exc
     return rooms
 

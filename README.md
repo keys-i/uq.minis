@@ -53,7 +53,7 @@ Credentials are saved to a private `.minis/auth/.env`. Sign-in requires a person
 
 For venue selection during event setup, run `uv run mini event event.toml --choose-room`. Choose the campus and minimum capacity, then type a building name/number or room number and use Tab to browse matching entries. Room choices show seats and room type, and rooms with a tour offer `tour` before `select`
 
-The picker uses [UQ's room catalogue](https://campuses.uq.edu.au/list-rooms), bundled as [an editable CSV](docs/assets/event/rooms.csv), checked on 9 October 2026. Put a custom list in `.minis/event/rooms.csv` or pass `--rooms PATH`; use the same `campus,building,room,kind,seats,tour` columns. Selection applies to that run's outputs and asks for the Forms capacity answer without changing the source TOML. The catalogue gives capacity and tours; availability still comes from booking
+The picker uses [UQ's room catalogue](https://campuses.uq.edu.au/list-rooms), bundled as a [compressed catalogue](docs/assets/event/rooms.csv.gz), checked on 9 October 2026. Put a custom list in `.minis/event/rooms.csv` or pass `--rooms PATH`; use the same `campus,building,room,kind,seats,tour` columns. Selection applies to that run's outputs and asks for the Forms capacity answer without changing the source TOML. The catalogue gives capacity and tours; availability still comes from booking. Compression removes the readable CSV from the checkout and package, but does not restrict access to UQ’s public directory or remove the CSV from older Git commits
 
 Existing `.env`, `.timey/` and watcher directories are not migrated automatically. Move saved files to the corresponding `.minis/` location when adopting the new defaults, or use explicit paths such as `--token` and `--state-dir`
 
