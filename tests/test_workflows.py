@@ -6,7 +6,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_workflows_pin_actions_and_isolate_dependabot_permissions():
+def test_actions():
     workflows = ROOT / ".github/workflows"
     for path in workflows.glob("*.yml"):
         text = path.read_text()

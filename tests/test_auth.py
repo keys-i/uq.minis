@@ -3,142 +3,227 @@ from __future__ import annotations
 import os
 import stat
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, call
 
 import pytest
+from dotenv import dotenv_values
 
+from tests import fakes
+from uq_minis import cli
+from uq_minis.cli import auth as command
 from uq_minis.core.common import MiniError
-from uq_minis.core.forms import FormProfile
-from uq_minis.minis.auth.browser import _cookie_header, _guard, capture
+from uq_minis.minis import auth
+from uq_minis.minis.auth import browser as capture
 from uq_minis.minis.auth.credentials import write_env
 
 
-def _profile() -> FormProfile:
-    return FormProfile(
-        Path("profile.toml"),
-        "https://forms.cloud.microsoft/formapi/api/tenant/forms('form')/responses",
-        "https://forms.cloud.microsoft/pages/responsepage.aspx?id=form",
-        "https://forms.cloud.microsoft",
-        "business",
-        "en-AU",
-        False,
-        (),
-        "COOKIE",
-        "TOKEN",
-        "SESSION",
-        "MUID",
-    )
-
-
-class Request:
-    def __init__(self, url: str, method: str, headers: dict[str, str]) -> None:
-        self.url, self.method, self.headers = url, method, headers
-
-    def all_headers(self):
-        return {key.casefold(): value for key, value in self.headers.items()}
-
-
-class Route:
-    def __init__(self, request: Request) -> None:
-        self.request, self.action = request, ""
-
-    def abort(self) -> None:
-        self.action = "abort"
-
-    def continue_(self) -> None:
-        self.action = "continue"
-
-
-def test_capture_is_scoped_and_blocks_only_response_post() -> None:
-    profile, values = _profile(), {}
-    guarded = Route(
-        Request(
-            profile.endpoint,
-            "POST",
-            {
-                "__RequestVerificationToken": "token",
-                "x-userSessionId": "session",
-                "x-ms-form-muid": "muid",
-            },
-        )
-    )
-    _guard(guarded, profile, values)
-    assert guarded.action == "abort"
-    assert values == {"TOKEN": "token", "SESSION": "session", "MUID": "muid"}
-
-    foreign = Route(
-        Request(
-            "https://forms.cloud.microsoft/formapi/api/other/responses",
-            "POST",
-            {"__RequestVerificationToken": "wrong"},
-        )
-    )
-    _guard(foreign, profile, values)
-    assert foreign.action == "abort"
-    assert "wrong" not in values.values()
-
-
-def test_cookie_requires_forms_auth_cookie() -> None:
-    assert not _cookie_header(
+class TestAuth:
+    @pytest.mark.parametrize(
+        "path,method,action,captured",
         [
-            {
-                "name": "__requestverificationtoken",
-                "value": "token",
-                "domain": ".forms.cloud.microsoft",
+            ("tenant/forms('form')/responses", "POST", call.abort(), True),
+            ("tenant/forms('form')/questions", "GET", call.continue_(), True),
+            ("other/responses", "POST", call.abort(), False),
+        ],
+        ids=["submission", "read", "foreign-form"],
+    )
+    def test_capture(self, profile, path, method, action, captured):
+        values = {}
+        headers = {
+            "__requestverificationtoken": "token",
+            "x-usersessionid": "session",
+            "x-ms-form-muid": "muid",
+        }
+        route = Mock(
+            request=SimpleNamespace(
+                url=f"https://forms.cloud.microsoft/formapi/api/{path}",
+                method=method,
+                all_headers=lambda: headers,
+            )
+        )
+        capture._guard(route, profile, values)
+        assert route.method_calls == [action]
+        assert values == (
+            {"TOKEN": "token", "SESSION": "session", "MUID": "muid"} if captured else {}
+        )
+
+    @pytest.mark.parametrize(
+        "name,value,expected",
+        [
+            ("__requestverificationtoken", "token", ""),
+            ("AADAuth.forms", "auth", "AADAuth.forms=auth"),
+        ],
+        ids=["csrf-cookie", "authentication-cookie"],
+    )
+    def test_cookie(self, name, value, expected):
+        cookie = {"name": name, "value": value, "domain": ".forms.cloud.microsoft"}
+        assert capture._cookie_header([cookie]) == expected
+
+    def test_private(self, tmp_path: Path) -> None:
+        path = tmp_path / ".env"
+        write_env(path, {"TOKEN": "secret"}, force=False)
+        assert "TOKEN='secret'" in path.read_text()
+        if os.name == "posix":
+            assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        with pytest.raises(MiniError, match="Refusing"):
+            write_env(path, {"TOKEN": "replacement"}, force=False)
+
+    def test_dependency(self, monkeypatch, profile):
+        import sys
+
+        monkeypatch.setitem(sys.modules, "playwright.sync_api", None)
+        with pytest.raises(MiniError, match="uv run --extra auth playwright install chromium"):
+            capture.capture(profile, browser="chromium", timeout=1)
+
+    def test_refresh(self, tmp_path: Path) -> None:
+        path = tmp_path / ".env"
+        path.write_text("KEEP='yes'\nTOKEN='old'\n")
+        write_env(path, {"TOKEN": "new'quoted"}, force=True)
+        assert dotenv_values(path) == {"KEEP": "yes", "TOKEN": "new'quoted"}
+        with pytest.raises(MiniError, match="control"):
+            write_env(path, {"TOKEN": "bad\nvalue"}, force=True)
+        assert dotenv_values(path) == {"KEEP": "yes", "TOKEN": "new'quoted"}
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://forms.cloud.microsoft/formapi/api/tenant/forms('form')/questions",
+            "https://forms.cloud.microsoft.evil.test/formapi/api/tenant/forms('form')/questions",
+            "https://user@forms.cloud.microsoft/formapi/api/tenant/forms('form')/questions",
+            "https://forms.cloud.microsoft:444/formapi/api/tenant/forms('form')/questions",
+            "https://forms.cloud.microsoft/formapi/api/tenant/forms('other')/questions",
+        ],
+        ids=["http", "host", "userinfo", "port", "form"],
+    )
+    def test_origin(self, profile, url):
+        request = Mock(url=url, method="GET")
+        route = Mock(request=request)
+        values = {}
+        capture._guard(route, profile, values)
+        assert not values
+        request.all_headers.assert_not_called()
+        route.continue_.assert_called_once()
+
+
+class TestCapture:
+    @pytest.mark.parametrize(
+        "name,engine,channel",
+        [
+            ("chromium", "chromium", None),
+            ("firefox", "firefox", None),
+            ("webkit", "webkit", None),
+            ("chrome", "chromium", "chrome"),
+            ("edge", "chromium", "msedge"),
+        ],
+        ids=["chromium", "firefox", "webkit", "chrome", "edge"],
+    )
+    def test_browser(self, browser, name, engine, channel):
+        assert capture._launch(browser.runtime, name) is browser.instance
+        options = {"headless": False, **({"channel": channel} if channel else {})}
+        getattr(browser.runtime, engine).launch.assert_called_once_with(**options)
+
+    @pytest.mark.parametrize("missing", [None, "headers", "cookie"])
+    def test_session(self, browser, profile, monkeypatch, missing):
+        headers = {
+            "__requestverificationtoken": "token",
+            "x-usersessionid": "session",
+            "x-ms-form-muid": "muid",
+        }
+        route = Mock(
+            request=SimpleNamespace(
+                url=profile.endpoint,
+                method="POST",
+                all_headers=lambda: headers,
+            )
+        )
+
+        def load(*args, **kwargs):
+            if missing != "headers":
+                browser.context.route.call_args.args[1](route)
+
+        browser.page.goto.side_effect = load
+        if missing == "cookie":
+            browser.context.cookies.return_value = []
+        monkeypatch.setattr(capture.time, "monotonic", Mock(side_effect=[0, 0, 2]))
+        if missing:
+            with pytest.raises(MiniError, match="Timed out"):
+                capture.capture(profile, browser="chromium", timeout=1)
+            browser.page.wait_for_timeout.assert_called_once_with(250)
+        else:
+            values = capture.capture(profile, browser="chromium", timeout=1)
+            assert values == {
+                "COOKIE": "AADAuth.forms=signed-in",
+                "TOKEN": "token",
+                "SESSION": "session",
+                "MUID": "muid",
             }
-        ]
-    )
-    assert (
-        _cookie_header(
+            route.abort.assert_called_once()
+            browser.page.wait_for_timeout.assert_not_called()
+        browser.instance.new_context.assert_called_once_with(service_workers="block")
+        browser.context.close.assert_called_once()
+        browser.instance.close.assert_called_once()
+
+    def test_failure(self, browser, profile):
+        browser.runtime.chromium.launch.side_effect = fakes.BrowserError("not installed")
+        with pytest.raises(MiniError, match="Could not start chromium"):
+            capture.capture(profile, browser="chromium", timeout=1)
+
+
+class TestCommand:
+    @pytest.mark.parametrize("live", [False, True], ids=["plain", "terminal"])
+    @pytest.mark.parametrize("force", [False, True], ids=["new", "refresh"])
+    def test_save(self, tmp_path, monkeypatch, runner, screen, live, force):
+        console, output = screen(live=live)
+        monkeypatch.setattr(command, "CONSOLE", console)
+        captured = Mock(return_value={"TOKEN": "private-token"})
+        monkeypatch.setattr(auth, "capture", captured)
+        target = tmp_path / "private.env"
+        if force:
+            target.write_text("KEEP='yes'\nTOKEN='old'\n")
+        result = runner.invoke(
+            cli.app,
             [
-                {
-                    "name": "AADAuth.forms",
-                    "value": "auth",
-                    "domain": ".forms.cloud.microsoft",
-                }
-            ]
+                "auth",
+                "-o",
+                str(target),
+                "--browser",
+                "edge",
+                "--timeout",
+                "9",
+                *(["--force"] if force else []),
+            ],
         )
-        == "AADAuth.forms=auth"
-    )
+        assert result.exit_code == 0, result.output
+        assert dotenv_values(target) == {
+            **({"KEEP": "yes"} if force else {}),
+            "TOKEN": "private-token",
+        }
+        assert captured.call_args.kwargs == {"browser": "edge", "timeout": 9}
+        assert "private-token" not in result.output + output.getvalue()
 
-
-def test_env_is_private_and_not_overwritten(tmp_path: Path) -> None:
-    path = tmp_path / ".env"
-    write_env(path, {"TOKEN": "secret"}, force=False)
-    assert "TOKEN='secret'" in path.read_text()
-    if os.name == "posix":
-        assert stat.S_IMODE(path.stat().st_mode) == 0o600
-    with pytest.raises(MiniError, match="Refusing"):
-        write_env(path, {"TOKEN": "replacement"}, force=False)
-
-
-def test_missing_playwright_gives_runnable_setup_command(monkeypatch):
-    import sys
-
-    monkeypatch.setitem(sys.modules, "playwright.sync_api", None)
-    with pytest.raises(MiniError, match="uv run --extra auth playwright install chromium"):
-        capture(_profile(), browser="chromium", timeout=1)
-
-
-def test_auth_captures_get_headers_and_preserves_existing_env(tmp_path: Path) -> None:
-    profile, values = _profile(), {}
-    route = Route(
-        Request(
-            profile.endpoint.replace("/responses", "/questions"),
-            "GET",
-            {
-                "__requestverificationtoken": "fresh",
-                "x-usersessionid": "session",
-                "x-ms-form-muid": "id",
-            },
+    @pytest.mark.parametrize("reason", ["unattended", "exists", "symlink"])
+    def test_refuse(self, tmp_path, monkeypatch, runner, reason):
+        target = tmp_path / "private.env"
+        target.write_text("TOKEN='keep'\n")
+        output = tmp_path / "linked.env" if reason == "symlink" else target
+        if reason == "symlink":
+            output.symlink_to(target)
+        captured = Mock()
+        monkeypatch.setattr(auth, "capture", captured)
+        result = runner.invoke(
+            cli.app,
+            ["auth", "-o", str(output), *(["--no-input"] if reason == "unattended" else [])],
         )
-    )
-    _guard(route, profile, values)
-    assert route.action == "continue" and values["TOKEN"] == "fresh"
-    path = tmp_path / ".env"
-    path.write_text("KEEP='yes'\nTOKEN='old'\n")
-    write_env(path, {"TOKEN": "new'quoted"}, force=True)
-    from dotenv import dotenv_values
+        assert result.exit_code == 2 and "Traceback" not in result.output
+        assert target.read_text() == "TOKEN='keep'\n"
+        captured.assert_not_called()
 
-    assert dotenv_values(path) == {"KEEP": "yes", "TOKEN": "new'quoted"}
-    with pytest.raises(MiniError, match="control"):
-        write_env(path, {"TOKEN": "bad\nvalue"}, force=True)
+    @pytest.mark.parametrize("error", [MiniError, OSError, ValueError], ids=["auth", "io", "value"])
+    def test_failure(self, tmp_path, monkeypatch, runner, error):
+        target = tmp_path / "private.env"
+        monkeypatch.setattr(auth, "capture", Mock(side_effect=error("sign-in failed")))
+        result = runner.invoke(cli.app, ["auth", "-o", str(target)])
+        assert result.exit_code == 2
+        assert "auth: sign-in failed" in result.output and "Traceback" not in result.output
+        assert not target.exists()

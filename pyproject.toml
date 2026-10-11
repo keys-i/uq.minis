@@ -67,9 +67,11 @@ addopts = ["-ra", "--strict-config", "--strict-markers"]
 testpaths = ["tests"]
 
 [tool.coverage.run]
-data_file = ".cache/coverage"
+data_file = ".cache/.coverage"
 branch = true
 source = ["uq_minis", "uq_minis_tools"]
+concurrency = ["thread", "greenlet", "multiprocessing"]
+patch = ["subprocess"]
 
 [tool.coverage.xml]
 output = ".cache/coverage.xml"

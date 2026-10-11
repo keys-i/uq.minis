@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 from zipfile import ZipFile
+
+import pytest
 
 from uq_minis.core.risk_docx import (
     build_form_document,
@@ -10,30 +11,29 @@ from uq_minis.core.risk_docx import (
 )
 
 
-def page_breaks(path: Path) -> int:
+@pytest.mark.parametrize(
+    "build,pages,labels",
+    [
+        (build_form_document, 6, ["EVENT MANAGEMENT RISK ASSESSMENT", "UQ Sample Club"]),
+        (
+            build_pack_document,
+            7,
+            [
+                "SAMPLE EVENT PACK",
+                "External Attendees",
+                "THIS SECTION TO BE COMPLETED BY THE UNIVERSITY OF QUEENSLAND ONLY",
+            ],
+        ),
+    ],
+    ids=["form", "pack"],
+)
+def test_build(event_toml, tmp_path, build, pages, labels):
+    document = build(load_event_config(event_toml))
+    path = tmp_path / "risk.docx"
+    document.save(path)
     with ZipFile(path) as archive:
-        return archive.read("word/document.xml").count(b'w:type="page"')
-
-
-def table_text(document: object) -> str:
-    return "\n".join(
+        assert archive.read("word/document.xml").count(b'w:type="page"') == pages
+    text = "\n".join(
         cell.text for table in document.tables for row in table.rows for cell in row.cells
     )
-
-
-def test_form_and_pack_are_rebuilt_from_event_data(event_toml: Path, tmp_path: Path) -> None:
-    config = load_event_config(event_toml)
-    form = build_form_document(config)
-    pack = build_pack_document(config)
-    form_path = tmp_path / "form.docx"
-    pack_path = tmp_path / "pack.docx"
-    form.save(form_path)
-    pack.save(pack_path)
-
-    assert page_breaks(form_path) == 6
-    assert page_breaks(pack_path) == 7
-    assert "EVENT MANAGEMENT RISK ASSESSMENT" in table_text(form)
-    assert "SAMPLE EVENT PACK" in table_text(pack)
-    assert "External Attendees" in table_text(pack)
-    assert "UQ Sample Club" in table_text(form)
-    assert "THIS SECTION TO BE COMPLETED BY THE UNIVERSITY OF QUEENSLAND ONLY" in table_text(pack)
+    assert all(label in text for label in labels)

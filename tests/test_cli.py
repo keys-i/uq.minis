@@ -1,144 +1,173 @@
-import sys
-from types import ModuleType, SimpleNamespace
+import json
 
 import pytest
-from prompt_toolkit.application import create_app_session
-from prompt_toolkit.input import create_pipe_input
-from prompt_toolkit.output import DummyOutput
-from typer.testing import CliRunner
 
 from uq_minis import cli
-from uq_minis.cli import event as commands
+from uq_minis.cli import event
 from uq_minis.core.common import MiniError
 from uq_minis.minis import agent
-from uq_minis.minis.event import pipeline
-
-runner = CliRunner()
+from uq_minis.minis import event as mini_event
 
 
-@pytest.mark.parametrize(
-    "tool,option",
-    [
-        ("event", "--form"),
-        ("auth", "--browser"),
-    ],
-)
-def test_tool_help_is_forwarded(tool, option):
-    result = runner.invoke(cli.app, ["--tool", tool, "--help"])
-    assert result.exit_code == 0, result.output
-    assert option in result.output
-    assert "Choose a tool" not in result.output
-
-
-def test_dispatcher_lists_and_rejects_unknown_tools():
-    assert runner.invoke(cli.app, []).exit_code == 0
-    result = runner.invoke(cli.app, ["--tool", "not-a-mini"])
-    assert result.exit_code == 2
-    assert "unknown tool" in result.output
-    assert "Traceback" not in result.output
-
-
-def test_noninteractive_dispatch_forwards_flags_and_paths(event_toml, tmp_path):
-    output = tmp_path / "output with spaces"
-    result = runner.invoke(
-        cli.app,
+class TestCLI:
+    @pytest.mark.parametrize(
+        "tool,option",
         [
-            "event",
-            str(event_toml),
-            "--form",
-            "--no-input",
-            "--preview",
-            "-o",
-            str(output),
+            ("event", "--form"),
+            ("auth", "--browser"),
+            ("agent", "login"),
+            ("scrappy", "details"),
+            ("timey", "--length"),
         ],
     )
-    assert result.exit_code == 0, result.output
-    assert [path.name for path in output.iterdir()] == ["sample-event.form.json"]
+    @pytest.mark.parametrize("selector", [[], ["--tool"]], ids=["direct", "option"])
+    def test_help(self, tool, option, selector, runner):
+        result = runner.invoke(cli.app, [*selector, tool, "--help"])
+        assert result.exit_code == 0, result.output
+        assert option in result.output
+        assert "Choose a tool" not in result.output
 
+    @pytest.mark.parametrize("tool", ["not-a-mini", "agents"])
+    def test_unknown(self, tool, runner):
+        result = runner.invoke(cli.app, ["--tool", tool])
+        assert result.exit_code == 2
+        assert "unknown tool" in result.output
+        assert "Traceback" not in result.output
 
-def test_direct_generic_mini_runs_plain_run(tmp_path, monkeypatch):
-    source = tmp_path / "minis/new_mini"
-    source.mkdir(parents=True)
-    (source / "__init__.py").touch()
-    monkeypatch.setattr(cli, "__file__", str(tmp_path / "cli/__init__.py"))
-    module = ModuleType("uq_minis.minis.new_mini")
-    called: list[str] = []
+    def test_list(self, runner):
+        result = runner.invoke(cli.app, [])
+        assert result.exit_code == 0, result.output
+        assert "UQ minis" in result.output
 
-    def run(value: str) -> None:
-        called.append(value)
+    def test_preview(self, event_toml, tmp_path, runner):
+        output = tmp_path / "output with spaces"
+        result = runner.invoke(
+            cli.app,
+            [
+                "event",
+                str(event_toml),
+                "--form",
+                "--no-input",
+                "--preview",
+                "-o",
+                str(output),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert [path.name for path in output.iterdir()] == ["sample-event.form.json"]
 
-    module.run = run
-    monkeypatch.setitem(sys.modules, module.__name__, module)
-    result = runner.invoke(cli.app, ["new-mini", "done"])
-    assert result.exit_code == 0, result.output
-    assert called == ["done"]
+    @pytest.mark.parametrize("name", ["new_mini", "core", "completion"])
+    def test_generic(self, module, name, runner):
+        called: list[str] = []
 
+        def run(value: str) -> None:
+            called.append(value)
 
-def test_interactive_menu_and_missing_event_values(event_toml, monkeypatch):
-    terminal = SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: True))
-    monkeypatch.setattr(cli, "sys", terminal)
-    monkeypatch.setattr(commands, "sys", terminal)
-    event_toml.write_text(event_toml.read_text().replace('mode = "both"\n', ""))
-    with (
-        create_pipe_input() as pipe,
-        create_app_session(input=pipe, output=DummyOutput()),
-    ):
+        module(name, run)
+        result = runner.invoke(cli.app, [name.replace("_", "-"), "done"])
+        assert result.exit_code == 0, result.output
+        assert called == ["done"]
+
+    def test_menu(self, event_toml, monkeypatch, pipe, runner, tty):
+        terminal = tty
+        monkeypatch.setattr(cli, "sys", terminal)
+        monkeypatch.setattr(event, "sys", terminal)
+        event_toml.write_text(event_toml.read_text().replace('mode = "both"\n', ""))
         pipe.send_text(f"event\n{event_toml}\nform\n")
         result = runner.invoke(cli.app, [])
-    assert result.exit_code == 0, result.output
-    assert (event_toml.parent / "generated/sample-event.form.json").exists()
+        assert result.exit_code == 0, result.output
+        assert (event_toml.parent / "generated/sample-event.form.json").exists()
 
-
-def test_no_input_and_conflicting_submission_flags_fail_before_generation(event_toml, monkeypatch):
-    monkeypatch.setattr(
-        commands, "sys", SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: True))
-    )
-    monkeypatch.setattr(
-        pipeline, "generate", lambda *args, **kwargs: pytest.fail("must not generate")
-    )
-    missing = runner.invoke(cli.app, ["--tool", "event", "--no-input"])
-    assert missing.exit_code == 2 and "input is required" in missing.output
-    conflict = runner.invoke(cli.app, ["--tool", "event", str(event_toml), "--submit", "--preview"])
-    assert conflict.exit_code == 2 and "mutually exclusive" in conflict.output
-    invalid = runner.invoke(cli.app, ["--tool", "event", "--jobs", "-1"])
-    assert invalid.exit_code == 2 and "Traceback" not in invalid.output
-
-
-def test_agent_login_requires_ids_and_status_renders_state(tmp_path, monkeypatch):
-    invalid = runner.invoke(cli.app, ["--tool", "agent", "login", "--client-id", "id"])
-    assert invalid.exit_code == 2 and "Missing option" in invalid.output
-
-    monkeypatch.setattr(
-        agent,
-        "status",
-        lambda **_: [
-            {
-                "event_id": "42",
-                "title": "Sample Event",
-                "state": "registered",
-                "outcome": "",
-                "error": "",
-                "details": "",
-                "link": "",
-            }
+    @pytest.mark.parametrize(
+        "args,error",
+        [
+            (["event", "--no-input"], "input is required"),
+            (["event", "event.toml", "--submit", "--preview"], "mutually exclusive"),
+            (["event", "--jobs", "-1"], "--jobs"),
+            (["agent", "login", "--client-id", "id"], "Missing option"),
         ],
+        ids=["missing-input", "conflicting-actions", "invalid-jobs", "missing-login-options"],
     )
-    result = runner.invoke(cli.app, ["--tool", "agent", "status", "--state-dir", str(tmp_path)])
-    assert result.exit_code == 0, result.output
-    assert "registered" in result.output and "State" in result.output
+    def test_invalid(self, event_toml, monkeypatch, args, error, runner, tty):
+        monkeypatch.chdir(event_toml.parent)
+        monkeypatch.setattr(event, "sys", tty)
+        monkeypatch.setattr(
+            mini_event, "generate", lambda *args, **kwargs: pytest.fail("must not generate")
+        )
+        result = runner.invoke(cli.app, args)
+        assert result.exit_code == 2, result.output
+        assert error in result.output and "Traceback" not in result.output
 
+    @pytest.mark.parametrize("selector", [[], ["--tool"]], ids=["direct", "option"])
+    @pytest.mark.parametrize("saved", [True, False], ids=["saved", "empty"])
+    @pytest.mark.parametrize("as_json", [False, True], ids=["pretty", "json"])
+    def test_status(self, tmp_path, monkeypatch, selector, runner, saved, as_json):
+        rows = [{"event_id": "42", "title": "Sample Event", "state": "registered"}] if saved else []
+        monkeypatch.setattr(
+            agent,
+            "status",
+            lambda **_: rows,
+        )
+        result = runner.invoke(
+            cli.app,
+            [
+                *selector,
+                "agent",
+                "status",
+                "--state-dir",
+                str(tmp_path),
+                *(["--json"] if as_json else []),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        if as_json:
+            assert json.loads(result.output) == rows
+        elif saved:
+            assert "registered" in result.output and "State" in result.output
+        else:
+            assert "Nothing to keep an eye on" in result.output
+            assert "mini agent watch" in result.output
 
-def test_dispatcher_reports_agent_errors(tmp_path, monkeypatch):
-    def unavailable(**_):
-        raise MiniError("agent state is unavailable")
+    def test_watch(self, event_toml, tmp_path, runner):
+        state = tmp_path / "state"
+        common = ["--state-dir", str(state)]
+        watched = runner.invoke(
+            cli.app,
+            [
+                "agent",
+                "watch",
+                str(event_toml),
+                "--event-id",
+                "42",
+                "--since",
+                "2026-09-01",
+                *common,
+            ],
+        )
+        assert watched.exit_code == 0, watched.output
+        assert json.loads(watched.output)["event_id"] == "42"
+        stopped = runner.invoke(cli.app, ["agent", "stop", "42", *common])
+        assert stopped.exit_code == 0, stopped.output
+        status = runner.invoke(cli.app, ["agent", "status", "--json", *common])
+        assert status.exit_code == 0, status.output
+        assert json.loads(status.output)[0]["state"] == "stopped"
+        assert runner.invoke(cli.app, ["agent", "poll", *common]).exit_code == 0
 
-    monkeypatch.setattr(agent, "status", unavailable)
-    result = runner.invoke(cli.app, ["agent", "status", "--state-dir", str(tmp_path)])
-    assert result.exit_code == 2
-    assert "agent state is unavailable" in result.output and "Traceback" not in result.output
+    @pytest.mark.parametrize(
+        "args,error",
+        [
+            (["agent", "status"], "agent state is unavailable"),
+            (["scrappy", "links", "--html", "missing.html"], "missing.html"),
+        ],
+        ids=["agent", "scrappy"],
+    )
+    def test_errors(self, tmp_path, monkeypatch, args, error, runner):
+        monkeypatch.chdir(tmp_path)
 
+        def unavailable(**_):
+            raise MiniError("agent state is unavailable")
 
-def test_direct_scrappy_errors_are_friendly(tmp_path):
-    result = runner.invoke(cli.app, ["scrappy", "links", "--html", str(tmp_path / "missing.html")])
-    assert result.exit_code == 2
-    assert "missing.html" in result.output and "Traceback" not in result.output
+        monkeypatch.setattr(agent, "status", unavailable)
+        result = runner.invoke(cli.app, args)
+        assert result.exit_code == 2
+        assert error in result.output and "Traceback" not in result.output
