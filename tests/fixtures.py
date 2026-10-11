@@ -124,12 +124,14 @@ def thumbnails(monkeypatch):
 @pytest.fixture
 def canvas(pipe, screen, monkeypatch):
     frames = []
+    response = None
     native = prompt_toolkit.prompt
 
     def draw(*args, **kwargs):
         app = None
 
         def sample(app):
+            nonlocal response
             view = app.renderer.last_rendered_screen
             if view:
                 frames.append(
@@ -141,6 +143,10 @@ def canvas(pipe, screen, monkeypatch):
                         for y in range(view.height)
                     ]
                 )
+                if response and any(response[0] in row for row in frames[-1]):
+                    _, text = response
+                    response = None
+                    pipe.send_text(text)
 
         def ready():
             nonlocal app
@@ -159,7 +165,9 @@ def canvas(pipe, screen, monkeypatch):
 
     monkeypatch.setattr(prompt_toolkit, "prompt", draw)
 
-    def setup(width=80, rows=24, no_color=False):
+    def setup(width=80, rows=24, no_color=False, reply=None):
+        nonlocal response
+        response = reply
         screen(width=width, live=True, no_color=no_color)
         monkeypatch.setattr(
             get_app_session().output, "get_size", lambda: Size(rows=rows, columns=width)

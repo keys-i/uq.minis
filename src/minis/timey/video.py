@@ -9,6 +9,7 @@ import shutil
 import subprocess
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, replace
+from errno import EINVAL, EPIPE
 from io import BytesIO
 from itertools import chain, islice, repeat
 from pathlib import Path
@@ -1043,8 +1044,10 @@ def _encode(
             finally:
                 try:
                     process.stdin.close()
-                except BrokenPipeError:
-                    pass
+                except OSError as exc:
+                    # Windows reports EINVAL when cancelled FFmpeg closes its input pipe
+                    if exc.errno != EPIPE and not (stopped.is_set() and exc.errno == EINVAL):
+                        failures.append(exc)
 
         writer = Thread(target=feed, name="timey-overlay") if images else None
         if writer:

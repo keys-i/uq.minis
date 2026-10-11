@@ -80,8 +80,8 @@ def test_back(canvas, keys, key):
 
 @pytest.mark.parametrize("width", [40, 80], ids=["compact", "wide"])
 def test_shortcuts(canvas, keys, width):
-    frames = canvas(width=width)
-    keys("?", "?", "done\n")
+    frames = canvas(width=width, reply=(terminal._key("Ctrl+U"), "?done\n"))
+    keys("?")
     assert ask("Name") == "done"
     assert any(terminal._key("Ctrl+U") in row for frame in frames for row in frame)
     assert any("keys" in row for frame in frames for row in frame)
@@ -92,8 +92,8 @@ def test_shortcuts(canvas, keys, width):
 )
 def test_os(canvas, keys, monkeypatch, os, ctrl, alt):
     monkeypatch.setattr(terminal, "sys", SimpleNamespace(platform=os))
-    frames = canvas()
-    keys("?", "?", "done\n")
+    frames = canvas(reply=(ctrl + "U", "?done\n"))
+    keys("?")
     assert ask("Name") == "done"
     view = "\n".join(row for frame in frames for row in frame)
     assert ctrl + "U" in view

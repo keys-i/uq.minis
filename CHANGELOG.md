@@ -4,6 +4,7 @@
 
 - Use shared nonblocking locks on Windows, macOS and Linux so Scrappy exports retain collision protection and checkpoint recovery
 - Verify CLI help with and without ANSI colours, and use native directory separators in completion tests
+- Wait for rendered shortcut panels in interactive tests and handle Windows pipe closure during video cancellation without leaving a thread warning
 - Publish matching SemVer package metadata and curated changelogs, including the changelog in source distributions
 
 Requires Python 3.15+; mini-owned state remains in `.minis/<mini>/`

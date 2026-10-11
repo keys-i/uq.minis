@@ -6,10 +6,11 @@ import threading
 from array import array
 from contextlib import nullcontext
 from dataclasses import replace
+from errno import EINVAL, EIO, EPIPE
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import PropertyMock
+from unittest.mock import Mock, PropertyMock
 
 import httpx
 import pytest
@@ -1372,7 +1373,26 @@ class TestWizard:
         assert not list(tmp_path.glob(".timey-*"))
 
 
+@pytest.mark.filterwarnings("error::pytest.PytestUnhandledThreadExceptionWarning")
 class TestRender:
+    @pytest.mark.parametrize(
+        "error,cancelled,fails",
+        [(EPIPE, False, False), (EINVAL, True, False), (EINVAL, False, True), (EIO, True, True)],
+        ids=["closed", "cancelled", "invalid", "io"],
+    )
+    def test_pipe(self, tmp_path, monkeypatch, error, cancelled, fails):
+        stopped = threading.Event()
+        if cancelled:
+            stopped.set()
+        monkeypatch.setattr(video, "Event", lambda: stopped)
+        process = Mock(stdout=BytesIO(), wait=Mock(return_value=0), poll=Mock(return_value=0))
+        process.stdin.close.side_effect = OSError(error, "closed pipe")
+        monkeypatch.setattr(video.subprocess, "Popen", Mock(return_value=process))
+        with pytest.raises(OSError) if fails else nullcontext():
+            video._encode(["ffmpeg"], tmp_path, 1, "Timer", None, iter([b"frame"]))
+        process.stdin.close.assert_called_once()
+        assert not any(thread.name == "timey-overlay" for thread in threading.enumerate())
+
     def test_timing(self, tmp_path, clip):
         source = clip(
             "source.mp4",
