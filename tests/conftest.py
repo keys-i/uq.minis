@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from uq_minis.core import cache
+
 
 @pytest.fixture
 def event_toml(tmp_path: Path) -> Path:
@@ -99,3 +101,13 @@ title = "Sample Event Pack"
         encoding="utf-8",
     )
     return path
+
+
+@pytest.fixture
+def cached(tmp_path):
+    root = tmp_path / "cache"
+    source = tmp_path / "payload.bin"
+    source.write_bytes(b"completed")
+    key = f"{'0' * 16}-{'a' * 16}"
+    cache.save(root, key, source, {"file": source.name})
+    return root, source, root / key

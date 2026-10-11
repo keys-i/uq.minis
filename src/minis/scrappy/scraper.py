@@ -10,6 +10,7 @@ import sqlite3
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import closing
+from hashlib import sha256
 from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
@@ -20,6 +21,7 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 import httpx
 
 from uq_minis.core.common import MiniError
+from uq_minis.core.paths import STATE
 from uq_minis.minis.scrappy.http import BASE_URL, CODE, CatalogueUnavailable, catalogue_url, fetch
 
 SEARCH_URL = f"{BASE_URL}/search.html?keywords=*&searchType=all"
@@ -407,7 +409,12 @@ def export_details(
     if output.resolve() == offerings.expanduser().resolve():
         raise MiniError("Choose a different file for details and offering links")
     output.parent.mkdir(parents=True, exist_ok=True)
-    checkpoint = output.with_name(f".{output.name}.scrappy.sqlite3")
+    state = STATE / "scrappy"
+    if STATE.is_symlink() or state.is_symlink():
+        raise MiniError("Scrappy state must not be a symlink")
+    state.mkdir(parents=True, exist_ok=True)
+    key = sha256(str(output.resolve()).encode()).hexdigest()[:16]
+    checkpoint = state / f"{key}.sqlite3"
     lock_path = checkpoint.with_suffix(".lock")
     if checkpoint.is_symlink() or lock_path.is_symlink():
         raise MiniError("Scrappy checkpoint must not be a symlink")
