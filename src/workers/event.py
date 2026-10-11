@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 from . import helper, run
 
@@ -129,7 +129,7 @@ def watch(
     state_dir: Path = DEFAULT_STATE,
 ) -> dict:
     """Register an exact event ID and save a fixed copy of its risk form"""
-    from uq_minis.helper.risk_docx import build_form_document, load_event_config
+    from uq_minis.core.risk_docx import build_form_document, load_event_config
 
     if not re.fullmatch(_ID, event_id):
         raise MiniError("Event ID must be 1–80 letters, digits, underscores or hyphens")

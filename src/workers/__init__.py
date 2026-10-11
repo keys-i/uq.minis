@@ -7,7 +7,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 
 def helper(name: str):

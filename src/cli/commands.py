@@ -13,8 +13,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from uq_minis.helper.common import MiniError, RiskLayout
-from uq_minis.helper.prompt import ask
+from uq_minis.core.common import MiniError, RiskLayout
+from uq_minis.core.terminal import ask
 
 CONSOLE = Console()
 ERROR = Console(stderr=True)
@@ -131,7 +131,7 @@ def _auth() -> typer.Typer:
         ] = False,
     ) -> None:
         """Sign in through a browser and save Forms credentials."""
-        from uq_minis.helper.forms import load_form_profile
+        from uq_minis.core.forms import load_form_profile
         from uq_minis.minis import auth
 
         if no_input:

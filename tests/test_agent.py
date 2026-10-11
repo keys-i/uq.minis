@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 from uq_minis.workers import event as worker
 from uq_minis.workers import helper, service
 

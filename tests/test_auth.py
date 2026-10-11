@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from uq_minis.helper.common import MiniError
-from uq_minis.helper.forms import FormProfile
+from uq_minis.core.common import MiniError
+from uq_minis.core.forms import FormProfile
 from uq_minis.minis.auth.browser import _cookie_header, _guard, capture
 from uq_minis.minis.auth.credentials import write_env
 

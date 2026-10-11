@@ -12,8 +12,8 @@ from typer.main import get_command
 from typer.models import CompletionItem, TyperPath
 
 from uq_minis.cli.commands import get_app
-from uq_minis.helper.common import MiniError
-from uq_minis.helper.prompt import ask, complete_path
+from uq_minis.core.common import MiniError
+from uq_minis.core.terminal import ask, complete_path
 
 CONSOLE = Console()
 ERROR = Console(stderr=True)
@@ -33,7 +33,7 @@ def tool_names(incomplete: str = "") -> list[str]:
 
 def command_names(incomplete: str = "") -> list[str]:
     """Complete management commands and direct mini names"""
-    from uq_minis_tools.scripts.mini import app as manage
+    from uq_minis.core.mini import app as manage
 
     names = [*get_command(manage).commands, *tool_names()]
     return [name for name in names if name.startswith(incomplete)]
@@ -44,7 +44,7 @@ class MiniCommand(TyperCommand):
 
     def get_params(self, ctx):
         """Use generated shell setup for the built-in completion options"""
-        from uq_minis_tools.scripts.completion import completion_callback
+        from uq_minis.cli.completion import completion_callback
 
         params = super().get_params(ctx)
         for param in params:
@@ -61,7 +61,7 @@ class MiniCommand(TyperCommand):
             if tool in tool_names():
                 target = get_app(tool)
             elif tool is None and forwarded and forwarded[0] in get_command_names():
-                from uq_minis_tools.scripts.mini import app as target
+                from uq_minis.core.mini import app as target
             elif tool is None and forwarded and forwarded[0] in tool_names():
                 target = get_app(forwarded.pop(0))
             else:
@@ -114,14 +114,14 @@ def dispatch(
     if tool is None and arguments:
         command, *forwarded = arguments
         if command in get_command_names():
-            from uq_minis_tools.scripts.mini import main as manage
+            from uq_minis.core.mini import main as manage
 
             manage(arguments)
             return
         if command in names:
             tool, arguments = command, forwarded
         else:
-            from uq_minis_tools.scripts.mini import main as manage
+            from uq_minis.core.mini import main as manage
 
             manage(arguments)
             return
@@ -156,7 +156,7 @@ def dispatch(
 
 def get_command_names() -> set[str]:
     """Return management commands without direct mini names"""
-    from uq_minis_tools.scripts.mini import app as manage
+    from uq_minis.core.mini import app as manage
 
     return set(get_command(manage).commands)
 

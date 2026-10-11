@@ -9,10 +9,10 @@ from urllib.parse import unquote, urlsplit
 
 from rich.console import Console
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 if TYPE_CHECKING:
-    from uq_minis.helper.forms import FormProfile
+    from uq_minis.core.forms import FormProfile
 
 _HOST = "forms.cloud.microsoft"
 _AUTH_COOKIES = {"AADAuth.forms", "OIDCAuth.forms"}

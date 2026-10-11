@@ -3,7 +3,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from uq_minis_tools.scripts import mini, script
+from uq_minis.core import mini
+from uq_minis_tools.scripts import script
 
 RUNNER = CliRunner()
 

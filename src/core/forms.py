@@ -17,8 +17,9 @@ from uuid import uuid4
 import httpx
 from dotenv import load_dotenv
 
-from uq_minis.helper.common import MiniError, table, text
-from uq_minis.helper.risk_docx import EventConfig
+from uq_minis.core.common import MiniError, table, text
+from uq_minis.core.paths import STATE
+from uq_minis.core.risk_docx import EventConfig
 
 _FORM_HOST = "forms.cloud.microsoft"
 _ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]*\Z")
@@ -335,7 +336,7 @@ def _secret(name: str) -> str:
 
 def submit_payload(profile: FormProfile, payload: Mapping[str, Any]) -> int:
     """Submit with short-lived browser-session values from the environment"""
-    load_dotenv(Path.cwd() / ".env", override=False, interpolate=False)
+    load_dotenv(STATE / "auth/.env", override=False, interpolate=False)
     headers = {
         "Accept": "application/json",
         "Accept-Language": profile.language,

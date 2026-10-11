@@ -17,10 +17,15 @@ generated/
 *.docx
 !docs/assets/*.docx
 _render/
+outputs/
+work/
 
 # == Secrets ==
 .env*
 !.env.example
+client_secret*.json
+.timey/
+.minis/
 
 # == OS/editor files ==
 .DS_Store

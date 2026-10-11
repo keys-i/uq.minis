@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from zipfile import ZipFile
 
-from uq_minis.helper.risk_docx import (
+from uq_minis.core.risk_docx import (
     build_form_document,
     build_pack_document,
     load_event_config,

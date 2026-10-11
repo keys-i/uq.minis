@@ -9,16 +9,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import typer
-from rich.console import Console
+
+from uq_minis.core.terminal import CONSOLE, application
 
 ROOT = Path(__file__).resolve().parents[2]
-CONSOLE = Console()
 FORWARD = {"allow_extra_args": True, "ignore_unknown_options": True}
-app = typer.Typer(
-    rich_markup_mode="rich",
-    pretty_exceptions_show_locals=False,
-    context_settings=FORWARD,
-)
+app = application(add_completion=True, context_settings=FORWARD)
 
 
 def run(argv: list[str]) -> int:

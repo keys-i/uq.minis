@@ -402,16 +402,19 @@ def read_risk_overrides(data: Mapping[str, Any]) -> dict[int, Mapping[str, Any]]
     return parsed
 
 
-def load_event_config(path: Path, cli_logo: Path | None = None) -> EventConfig:
+def load_event_config(
+    path: Path, cli_logo: Path | None = None, *, data: Mapping[str, Any] | None = None
+) -> EventConfig:
     """Load and validate an event TOML file"""
     path = path.expanduser().resolve(strict=False)
-    try:
-        with path.open("rb") as handle:
-            data = tomllib.load(handle)
-    except OSError as exc:
-        raise ConfigError(f"Cannot read {path}: {exc}") from exc
-    except tomllib.TOMLDecodeError as exc:
-        raise ConfigError(f"Invalid TOML in {path}: {exc}") from exc
+    if data is None:
+        try:
+            with path.open("rb") as handle:
+                data = tomllib.load(handle)
+        except OSError as exc:
+            raise ConfigError(f"Cannot read {path}: {exc}") from exc
+        except tomllib.TOMLDecodeError as exc:
+            raise ConfigError(f"Invalid TOML in {path}: {exc}") from exc
 
     club = data.get("club", {})
     event = data.get("event", {})

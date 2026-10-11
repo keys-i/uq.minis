@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 from uq_minis.workers import service
 
 

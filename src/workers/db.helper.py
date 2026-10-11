@@ -7,7 +7,7 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 
 @contextmanager

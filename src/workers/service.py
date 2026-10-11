@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 _LABEL = "au.edu.uq.minis.agent"
 _PLIST_NAME = f"{_LABEL}.plist"

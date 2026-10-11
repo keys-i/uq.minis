@@ -17,7 +17,7 @@ from rich.progress import (
     TextColumn,
 )
 
-from uq_minis.helper.common import (
+from uq_minis.core.common import (
     FORM_ACTIONS,
     OUTPUT_MODES,
     RISK_LAYOUTS,
@@ -35,11 +35,11 @@ from uq_minis.helper.common import (
     table,
     text,
 )
-from uq_minis.helper.prompt import ask
+from uq_minis.core.terminal import ask
 
 if TYPE_CHECKING:
-    from uq_minis.helper.forms import FormProfile
-    from uq_minis.helper.risk_docx import EventConfig
+    from uq_minis.core.forms import FormProfile
+    from uq_minis.core.risk_docx import EventConfig
 
 CONSOLE = Console()
 
@@ -203,7 +203,7 @@ def make_plans(
     interactive: bool,
 ) -> list[Plan]:
     """Validate event data and collect outputs before writing files"""
-    from uq_minis.helper.risk_docx import load_event_config
+    from uq_minis.core.risk_docx import load_event_config
 
     sources = discover_events(input_path)
     raws = [read_toml(source) for source in sources]
@@ -223,7 +223,7 @@ def make_plans(
         profile = None
         form_output = None
         if selected_mode in {"form", "both"}:
-            from uq_minis.helper.forms import create_payload, load_form_profile
+            from uq_minis.core.forms import create_payload, load_form_profile
 
             profile_key = _profile_path(source, raw, form_profile)
             profile = profiles.get(profile_key)
@@ -249,7 +249,7 @@ def make_plans(
 
 def _write_risk(config: EventConfig, layout: RiskLayout, output: Path) -> Path:
     """Build and atomically save one risk document"""
-    from uq_minis.helper.risk_docx import build_form_document, build_pack_document
+    from uq_minis.core.risk_docx import build_form_document, build_pack_document
 
     document = build_pack_document(config) if layout == "pack" else build_form_document(config)
     atomic_docx(output, document)
@@ -343,7 +343,7 @@ def generate(
     submissions: list[tuple[Path, int]] = []
     submit_plans = [plan for plan in plans if plan.form_action == "submit"]
     if submit_plans:
-        from uq_minis.helper.forms import submit_payload
+        from uq_minis.core.forms import submit_payload
 
         with Progress(
             SpinnerColumn(),

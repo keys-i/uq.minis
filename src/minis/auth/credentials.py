@@ -9,7 +9,7 @@ from tempfile import NamedTemporaryFile
 
 from dotenv import set_key
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 
 def write_env(path: Path, values: Mapping[str, str], *, force: bool) -> None:

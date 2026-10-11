@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import httpx
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 BASE_URL = "https://programs-courses.uq.edu.au"
 CODE = re.compile(r"[A-Z]{4}\d{4}[A-Z]?")

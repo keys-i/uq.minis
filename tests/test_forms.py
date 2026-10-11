@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from uq_minis.helper.common import MiniError, read_toml
-from uq_minis.helper.forms import create_payload, load_form_profile
-from uq_minis.helper.risk_docx import load_event_config
+from uq_minis.core.common import MiniError, read_toml
+from uq_minis.core.forms import create_payload, load_form_profile
+from uq_minis.core.risk_docx import load_event_config
 
 
 def answer_map(payload: dict[str, object]) -> dict[str, str | None]:
@@ -61,7 +61,7 @@ value = "x"
 def test_submit_reads_dotenv_without_overriding_environment(tmp_path, monkeypatch):
     import httpx
 
-    from uq_minis.helper import forms
+    from uq_minis.core import forms
 
     monkeypatch.chdir(tmp_path)
     for name in (

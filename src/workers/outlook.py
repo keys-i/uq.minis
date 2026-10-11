@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 from . import helper
 

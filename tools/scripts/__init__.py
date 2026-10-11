@@ -1,1 +1,1 @@
-"""Development tasks and mini management"""
+"""Repository development tasks"""

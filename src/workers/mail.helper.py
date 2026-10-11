@@ -10,7 +10,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 
 SCOPES = ["Mail.ReadWrite", "Mail.Send"]
 GRAPH = "https://graph.microsoft.com/v1.0"

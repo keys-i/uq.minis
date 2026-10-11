@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from uq_minis.helper.common import MiniError, discover_events, ensure_outputs
+from uq_minis.core.common import MiniError, discover_events, ensure_outputs
 
 
 def test_discovery_only_accepts_event_patterns(tmp_path: Path) -> None:

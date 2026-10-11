@@ -6,7 +6,7 @@ import threading
 import httpx
 import pytest
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 from uq_minis.minis.scrappy import scraper
 from uq_minis.minis.scrappy.scraper import (
     OFFERING_FIELDS,

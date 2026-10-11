@@ -18,9 +18,9 @@ from typer.main import get_command
 from typer.testing import CliRunner
 
 from uq_minis import cli
-from uq_minis.helper.prompt import ask
+from uq_minis.core.terminal import ask
 from uq_minis_tools.scripts import script
-from uq_minis_tools.scripts.completion import zsh_script
+from uq_minis.cli.completion import zsh_script
 
 
 @pytest.mark.parametrize(

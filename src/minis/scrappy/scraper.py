@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 
 import httpx
 
-from uq_minis.helper.common import MiniError
+from uq_minis.core.common import MiniError
 from uq_minis.minis.scrappy.http import BASE_URL, CODE, CatalogueUnavailable, catalogue_url, fetch
 
 SEARCH_URL = f"{BASE_URL}/search.html?keywords=*&searchType=all"
