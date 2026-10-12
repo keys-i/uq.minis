@@ -107,16 +107,14 @@ def metadata(context: dict, directory: Path, *, agent: str | None = None, progre
         )
         if not isinstance(snippet, dict) or set(snippet) != set(METADATA["properties"]):
             raise MiniError("Metadata agent returned missing or unsupported fields")
-    validate(
-        {
-            "snippet": snippet,
-            "status": {
-                "privacyStatus": "private",
-                "selfDeclaredMadeForKids": False,
-                "containsSyntheticMedia": False,
-            },
-        }
-    )
+    validate({
+        "snippet": snippet,
+        "status": {
+            "privacyStatus": "private",
+            "selfDeclaredMadeForKids": False,
+            "containsSyntheticMedia": False,
+        },
+    })
     if progress:
         progress(1, "Metadata ready · review your title, description and tags")
     return snippet

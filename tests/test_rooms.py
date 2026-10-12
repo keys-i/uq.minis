@@ -19,21 +19,19 @@ class TestRooms:
         catalogue = tmp_path / "rooms.csv"
         catalogue.write_text(CSV)
         original = event_toml.read_bytes()
-        answers = iter(
-            [
-                "St Lucia",
-                "invalid",
-                "20",
-                "99 · Test Hall",
-                "99-001 · 80 seats · Learning Theatre",
-                "tour",
-                "back",
-                "99 · Test Hall",
-                "99-002 · 26 seats · Seminar",
-                "select",
-                "21-50",
-            ]
-        )
+        answers = iter([
+            "St Lucia",
+            "invalid",
+            "20",
+            "99 · Test Hall",
+            "99-001 · 80 seats · Learning Theatre",
+            "tour",
+            "back",
+            "99 · Test Hall",
+            "99-002 · 26 seats · Seminar",
+            "select",
+            "21-50",
+        ])
         monkeypatch.setattr(rooms, "ask", lambda *args, **kwargs: next(answers))
         tours = []
         monkeypatch.setattr(rooms.webbrowser, "open", lambda url: tours.append(url) or True)

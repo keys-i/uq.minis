@@ -140,57 +140,49 @@ def _object(properties: dict) -> dict:
 NUMBER = {"type": "number", "minimum": 0, "maximum": 540}
 COLOUR = {"type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"}
 POINT = {"type": "array", "items": NUMBER, "minItems": 2, "maxItems": 2}
-TEXT = _object(
-    {
-        "point": POINT,
-        "size": {"type": "integer", "minimum": 8, "maximum": 90},
-        "colour": COLOUR,
-        "outline": COLOUR,
-        "stroke": {"type": "integer", "minimum": 0, "maximum": 5},
-    }
-)
-SCHEMA = _object(
-    {
-        "name": {"type": "string", "minLength": 1, "maxLength": 64},
-        "font": {"type": "string", "enum": ["serif", "sans", "mono", "pixel"]},
-        "shapes": {
+TEXT = _object({
+    "point": POINT,
+    "size": {"type": "integer", "minimum": 8, "maximum": 90},
+    "colour": COLOUR,
+    "outline": COLOUR,
+    "stroke": {"type": "integer", "minimum": 0, "maximum": 5},
+})
+SCHEMA = _object({
+    "name": {"type": "string", "minLength": 1, "maxLength": 64},
+    "font": {"type": "string", "enum": ["serif", "sans", "mono", "pixel"]},
+    "shapes": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 128,
+        "items": _object({
+            "kind": {
+                "type": "string",
+                "enum": ["rect", "round", "ellipse", "polygon", "line"],
+            },
+            "points": {
+                "type": "array",
+                "items": POINT,
+                "minItems": 2,
+                "maxItems": 32,
+            },
+            "colour": COLOUR,
+            "width": {"type": "integer", "minimum": 1, "maximum": 8},
+            "radius": {"type": "integer", "minimum": 0, "maximum": 40},
+        }),
+    },
+    "text": _object({slot: TEXT for slot in ("label", "timer", "caption")}),
+    "bar": _object({
+        "points": {
             "type": "array",
-            "minItems": 1,
-            "maxItems": 128,
-            "items": _object(
-                {
-                    "kind": {
-                        "type": "string",
-                        "enum": ["rect", "round", "ellipse", "polygon", "line"],
-                    },
-                    "points": {
-                        "type": "array",
-                        "items": POINT,
-                        "minItems": 2,
-                        "maxItems": 32,
-                    },
-                    "colour": COLOUR,
-                    "width": {"type": "integer", "minimum": 1, "maximum": 8},
-                    "radius": {"type": "integer", "minimum": 0, "maximum": 40},
-                }
-            ),
+            "items": POINT,
+            "minItems": 2,
+            "maxItems": 2,
         },
-        "text": _object({slot: TEXT for slot in ("label", "timer", "caption")}),
-        "bar": _object(
-            {
-                "points": {
-                    "type": "array",
-                    "items": POINT,
-                    "minItems": 2,
-                    "maxItems": 2,
-                },
-                "colour": COLOUR,
-                "background": COLOUR,
-                "segments": {"type": "integer", "minimum": 1, "maximum": 32},
-            }
-        ),
-    }
-)
+        "colour": COLOUR,
+        "background": COLOUR,
+        "segments": {"type": "integer", "minimum": 1, "maximum": 32},
+    }),
+})
 
 
 def validate(data: object) -> dict:
@@ -476,9 +468,10 @@ def font(value: str, directory: Path, *, progress: Progress | None = None) -> st
         )
         if not family or len(family) > 200:
             raise MiniError("Paste the individual Google Fonts specimen link")
-        value = "https://fonts.googleapis.com/css?" + urlencode(
-            {"family": family, "display": "swap"}
-        )
+        value = "https://fonts.googleapis.com/css?" + urlencode({
+            "family": family,
+            "display": "swap",
+        })
     key = hashlib.sha256(value.encode()).hexdigest()
     target = directory / f"{key}.ttf"
     if target.is_symlink():

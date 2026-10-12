@@ -38,9 +38,13 @@ def catalogue_url(url: str, *, course: bool = False) -> str:
                 (key, value.upper() if key == "course_code" else value) for key, value in query
             ]
         if valid:
-            return urlunsplit(
-                ("https", "programs-courses.uq.edu.au", parsed.path, urlencode(sorted(query)), "")
-            )
+            return urlunsplit((
+                "https",
+                "programs-courses.uq.edu.au",
+                parsed.path,
+                urlencode(sorted(query)),
+                "",
+            ))
     except ValueError:
         pass
     raise MiniError(

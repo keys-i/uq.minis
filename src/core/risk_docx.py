@@ -53,17 +53,15 @@ class Schedule:
 
     @property
     def has_any(self) -> bool:
-        """Return whether any schedule time is set"""
-        return any(
-            (
-                self.setup_start,
-                self.setup_end,
-                self.event_start,
-                self.event_end,
-                self.pack_up_start,
-                self.pack_up_end,
-            )
-        )
+        """Whether any schedule time is set"""
+        return any((
+            self.setup_start,
+            self.setup_end,
+            self.event_start,
+            self.event_end,
+            self.pack_up_start,
+            self.pack_up_end,
+        ))
 
     def compact_sentence(self) -> str:
         """Summarise populated schedule ranges"""

@@ -161,13 +161,11 @@ class _Studio:
             )
             available = None
         families = find_fonts(families=available)
-        previews.update(
-            {
-                name: previews[name.casefold().replace(" ", "")]
-                for name in families
-                if name.casefold().replace(" ", "") in fonts
-            }
-        )
+        previews.update({
+            name: previews[name.casefold().replace(" ", "")]
+            for name in families
+            if name.casefold().replace(" ", "") in fonts
+        })
         while True:
             value = ask(
                 "Font mood or name, Google Fonts link or file (blank for theme default)",
@@ -204,9 +202,10 @@ class _Studio:
                                 style="muted",
                             )
                         choices = dict(matches or families)
-                        choices.update(
-                            {"theme": "Use the theme font", "back": "Change your search words"}
-                        )
+                        choices.update({
+                            "theme": "Use the theme font",
+                            "back": "Change your search words",
+                        })
                         family = ask(
                             "Choose a font", choices=choices, previews=previews, ignore_case=True
                         )

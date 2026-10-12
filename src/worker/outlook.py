@@ -110,9 +110,10 @@ def parse_message(raw: bytes, url: str) -> dict:
         data = part.get_payload(decode=True)
         if data is None:
             raise MiniError("Outlook exported an unreadable attachment")
-        attachments.append(
-            {"name": part.get_filename(), "sha256": hashlib.sha256(data).hexdigest()}
-        )
+        attachments.append({
+            "name": part.get_filename(),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        })
     return {
         "id": identity,
         "from": senders[0],
@@ -246,7 +247,8 @@ class Outlook:
 
     def _search_box(self):
         return (
-            self.page.get_by_role("searchbox", name="Search", exact=True)
+            self.page
+            .get_by_role("searchbox", name="Search", exact=True)
             .or_(self.page.get_by_role("textbox", name="Search", exact=True))
             .or_(self.page.get_by_role("combobox", name="Search", exact=True))
             .or_(
@@ -461,15 +463,13 @@ class Outlook:
             self.page.get_by_role(
                 "menuitem", name=re.compile(r"^(Browse this computer|Browse this device)$", re.I)
             ).click()
-        chooser.value.set_files(
-            {
-                "name": filename,
-                "mimeType": "application/pdf"
-                if filename.endswith(".pdf")
-                else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "buffer": document,
-            }
-        )
+        chooser.value.set_files({
+            "name": filename,
+            "mimeType": "application/pdf"
+            if filename.endswith(".pdf")
+            else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "buffer": document,
+        })
         self.page.get_by_role(
             "button", name=re.compile(rf"^Remove {re.escape(filename)}(?:$| attachment)", re.I)
         ).wait_for(state="visible", timeout=60000)

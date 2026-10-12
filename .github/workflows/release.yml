@@ -95,4 +95,4 @@ jobs:
         run: >-
           gh release create "$GITHUB_REF_NAME"
           .cache/dist/*.whl .cache/dist/*.tar.gz .cache/dist/SHA256SUMS
-          --notes-file .cache/release.md --verify-tag
+          --title "$GITHUB_REF_NAME" --notes-file .cache/release.md --verify-tag

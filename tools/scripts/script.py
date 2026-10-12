@@ -36,7 +36,7 @@ def _checkout() -> None:
 def _task(task: str, extra: list[str]) -> int:
     """Run the selected checks and stop at the first failed command"""
     _checkout()
-    ruff = ["ruff", "--config", "tools/config/ruff.toml"]
+    ruff = ["ruff"]
     tests = [
         sys.executable,
         "-m",
@@ -48,49 +48,43 @@ def _task(task: str, extra: list[str]) -> int:
     if task == "test":
         return run([*tests, *extra])
     if task == "security":
-        if status := run(
-            [
-                "bandit",
-                "-q",
-                "--severity-level",
-                "medium",
-                "-c",
-                "tools/config/bandit.toml",
-                "-r",
-                "src",
-                "tools",
-            ]
-        ):
+        if status := run([
+            "bandit",
+            "-q",
+            "--severity-level",
+            "medium",
+            "-c",
+            "tools/config/bandit.toml",
+            "-r",
+            "src",
+            "tools",
+        ]):
             return status
         with TemporaryDirectory(prefix="uq-minis-audit-") as directory:
             requirements = str(Path(directory) / "requirements.txt")
-            return run(
-                [
-                    "uv",
-                    "export",
-                    "--locked",
-                    "--all-groups",
-                    "--all-extras",
-                    "--no-emit-project",
-                    "--no-header",
-                    "--no-annotate",
-                    "-q",
-                    "-o",
-                    requirements,
-                ]
-            ) or run(
-                [
-                    "pip-audit",
-                    "--strict",
-                    "--require-hashes",
-                    "--disable-pip",
-                    "--progress-spinner",
-                    "off",
-                    "-r",
-                    requirements,
-                    *extra,
-                ]
-            )
+            return run([
+                "uv",
+                "export",
+                "--locked",
+                "--all-groups",
+                "--all-extras",
+                "--no-emit-project",
+                "--no-header",
+                "--no-annotate",
+                "-q",
+                "-o",
+                requirements,
+            ]) or run([
+                "pip-audit",
+                "--strict",
+                "--require-hashes",
+                "--disable-pip",
+                "--progress-spinner",
+                "off",
+                "-r",
+                requirements,
+                *extra,
+            ])
     if task == "check":
         commands = [
             [*ruff, "check", "."],

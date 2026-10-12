@@ -79,12 +79,10 @@ class TestService:
         state_dir.mkdir()
         (state_dir / "seen.sqlite3").write_text("state")
         job.write_bytes(
-            plistlib.dumps(
-                {
-                    "Label": "au.edu.uq.minis.agent",
-                    "ProgramArguments": ["python", "-m", "uq_minis.cli", "--tool", "agent", "poll"],
-                }
-            )
+            plistlib.dumps({
+                "Label": "au.edu.uq.minis.agent",
+                "ProgramArguments": ["python", "-m", "uq_minis.cli", "--tool", "agent", "poll"],
+            })
         )
         service.uninstall()
         assert not job.exists()

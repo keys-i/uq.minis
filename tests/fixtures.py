@@ -134,15 +134,13 @@ def canvas(pipe, screen, monkeypatch):
             nonlocal response
             view = app.renderer.last_rendered_screen
             if view:
-                frames.append(
-                    [
-                        "".join(
-                            view.data_buffer[y][x].char
-                            for x in range(get_app_session().output.get_size().columns)
-                        )
-                        for y in range(view.height)
-                    ]
-                )
+                frames.append([
+                    "".join(
+                        view.data_buffer[y][x].char
+                        for x in range(get_app_session().output.get_size().columns)
+                    )
+                    for y in range(view.height)
+                ])
                 if response and any(response[0] in row for row in frames[-1]):
                     _, text = response
                     response = None

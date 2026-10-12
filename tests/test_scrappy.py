@@ -279,12 +279,10 @@ class TestFetch:
         ]
 
     def test_search(self, monkeypatch):
-        pages = iter(
-            [
-                LISTING + '<a rel="next" href="/search.html?page=2">Next</a>',
-                LISTING + LISTING.replace("COMP3400", "CSSE2002"),
-            ]
-        )
+        pages = iter([
+            LISTING + '<a rel="next" href="/search.html?page=2">Next</a>',
+            LISTING + LISTING.replace("COMP3400", "CSSE2002"),
+        ])
         monkeypatch.setattr(scraper, "fetch", lambda *args, **kwargs: next(pages))
         assert [row["course_code"] for row in scraper.scrape_offerings()] == [
             "COMP3400",

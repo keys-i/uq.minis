@@ -141,13 +141,11 @@ def save(root: Path, key: str, source: Path, metadata: dict) -> None:
         files = list(path.parent.iterdir())
         if any(file.is_symlink() or file.name not in {"info.json", path.name} for file in files):
             continue
-        owned.append(
-            (
-                (path.parent / "info.json").stat().st_mtime,
-                sum(file.stat().st_size for file in files),
-                path.parent,
-            )
-        )
+        owned.append((
+            (path.parent / "info.json").stat().st_mtime,
+            sum(file.stat().st_size for file in files),
+            path.parent,
+        ))
     total, count = sum(size for _, size, _ in owned), len(owned)
     for _, size, entry in sorted(owned):
         if total <= LIMIT and count <= ENTRIES:

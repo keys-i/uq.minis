@@ -34,53 +34,49 @@ except ImportError:
     YoutubeDL = None
     DownloadError = MiniError
 
-STYLES = frozendict(
-    {
-        "temple-run": (
-            "Weathered temple stone, emerald gems and cracked gold numerals",
-            "8EE62C",
-            "171B13",
-            "serif",
-        ),
-        "minecraft": (
-            "Stone hotbar, pixel digits and an emerald XP meter",
-            "8FDA53",
-            "20221F",
-            "mono",
-        ),
-        "subway-surfers": (
-            "Bright blue badge, chunky lettering and a yellow rail",
-            "FFD34D",
-            "123B67",
-            "sans",
-        ),
-        "neon": (
-            "Violet arcade frame and a luminous cyan countdown",
-            "6FE9EF",
-            "19142F",
-            "mono",
-        ),
-        "minimal": (
-            "Quiet charcoal panel with a clean white countdown",
-            "E9EDEA",
-            "161B20",
-            "sans",
-        ),
-        "glass": (
-            "Frosted video glass, clear digits and a soft reflected edge",
-            "E4EDF5",
-            "18212D",
-            "sans",
-        ),
-    }
-)
-FONTS = frozendict(
-    {
-        "temple-run": "skranji",
-        "minecraft": "pressstart2p",
-        "subway-surfers": "bungee",
-    }
-)
+STYLES = frozendict({
+    "temple-run": (
+        "Weathered temple stone, emerald gems and cracked gold numerals",
+        "8EE62C",
+        "171B13",
+        "serif",
+    ),
+    "minecraft": (
+        "Stone hotbar, pixel digits and an emerald XP meter",
+        "8FDA53",
+        "20221F",
+        "mono",
+    ),
+    "subway-surfers": (
+        "Bright blue badge, chunky lettering and a yellow rail",
+        "FFD34D",
+        "123B67",
+        "sans",
+    ),
+    "neon": (
+        "Violet arcade frame and a luminous cyan countdown",
+        "6FE9EF",
+        "19142F",
+        "mono",
+    ),
+    "minimal": (
+        "Quiet charcoal panel with a clean white countdown",
+        "E9EDEA",
+        "161B20",
+        "sans",
+    ),
+    "glass": (
+        "Frosted video glass, clear digits and a soft reflected edge",
+        "E4EDF5",
+        "18212D",
+        "sans",
+    ),
+})
+FONTS = frozendict({
+    "temple-run": "skranji",
+    "minecraft": "pressstart2p",
+    "subway-surfers": "bungee",
+})
 POSITIONS = (
     "top-right",
     "top-left",
@@ -199,18 +195,16 @@ def search(query: str) -> list[dict]:
     if YoutubeDL is None:
         raise MiniError("Use uv run --extra timey mini timey to enable YouTube search")
     try:
-        with YoutubeDL(
-            {
-                "quiet": True,
-                "no_warnings": True,
-                "extract_flat": True,
-                "skip_download": True,
-                "socket_timeout": 10,
-                "retries": 1,
-                "extractor_retries": 1,
-                "playlistend": 5,
-            }
-        ) as client:
+        with YoutubeDL({
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+            "skip_download": True,
+            "socket_timeout": 10,
+            "retries": 1,
+            "extractor_retries": 1,
+            "playlistend": 5,
+        }) as client:
             data = client.extract_info(f"ytsearch5:{query.strip()}", download=False)
     except DownloadError as exc:
         raise MiniError(f"YouTube search failed: {exc}") from exc
@@ -236,9 +230,11 @@ def search(query: str) -> list[dict]:
             if type(seconds) in {int, float} and 0 < seconds < 10**8
             else "duration unavailable"
         )
-        results.append(
-            {"url": youtube_url(f"https://youtu.be/{id}"), "title": title, "length": length}
-        )
+        results.append({
+            "url": youtube_url(f"https://youtu.be/{id}"),
+            "title": title,
+            "length": length,
+        })
         if len(results) == 5:
             break
     return results
@@ -1191,9 +1187,12 @@ def _surface(first: bytes, timer: Timer, work: Path) -> tuple[Path, Path]:
     inset = max(1, round(mask.height / 100))
     padded = Image.new("L", (mask.width + inset * 2, mask.height + inset * 2))
     padded.paste(mask, (inset, inset))
-    eroded = padded.filter(ImageFilter.MinFilter(inset * 2 + 1)).crop(
-        (inset, inset, mask.width + inset, mask.height + inset)
-    )
+    eroded = padded.filter(ImageFilter.MinFilter(inset * 2 + 1)).crop((
+        inset,
+        inset,
+        mask.width + inset,
+        mask.height + inset,
+    ))
     edge = ImageChops.subtract(mask, eroded)
     if temple:
         edge = ImageChops.lighter(edge, gems)

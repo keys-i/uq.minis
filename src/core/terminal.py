@@ -44,23 +44,21 @@ COLOURS = {
     "surface": "#262c34",
     "text": "#f1eee9",
 }
-THEME = Theme(
-    {
-        **COLOURS,
-        "heading": "bold",
-        "key": "bold",
-        "muted": "dim",
-        "prompt": "bold",
-        "prompt.default": COLOURS["accent"],
-        "prompt.choices": "dim",
-        "prompt.invalid": COLOURS["error"],
-        "progress.description": "bold",
-        "progress.percentage": COLOURS["accent"],
-        "bar.complete": COLOURS["peach"],
-        "bar.finished": COLOURS["mint"],
-        "bar.pulse": COLOURS["peach"],
-    }
-)
+THEME = Theme({
+    **COLOURS,
+    "heading": "bold",
+    "key": "bold",
+    "muted": "dim",
+    "prompt": "bold",
+    "prompt.default": COLOURS["accent"],
+    "prompt.choices": "dim",
+    "prompt.invalid": COLOURS["error"],
+    "progress.description": "bold",
+    "progress.percentage": COLOURS["accent"],
+    "bar.complete": COLOURS["peach"],
+    "bar.finished": COLOURS["mint"],
+    "bar.pulse": COLOURS["peach"],
+})
 CONSOLE = Console(theme=THEME, highlight=False)
 ERROR = Console(stderr=True, theme=THEME, highlight=False)
 
@@ -475,31 +473,27 @@ class _Input:
             for segment in picture.render(console):
                 colour = segment.style.color if segment.style else None
                 background = segment.style.bgcolor if segment.style else None
-                fragments.append(
-                    (
-                        " ".join(
-                            colour
-                            for colour in (
-                                f"fg:{colour.get_truecolor().hex}" if colour else "",
-                                f"bg:{background.get_truecolor().hex}" if background else "",
-                            )
-                            if colour
-                        ),
-                        segment.text,
-                    )
-                )
+                fragments.append((
+                    " ".join(
+                        colour
+                        for colour in (
+                            f"fg:{colour.get_truecolor().hex}" if colour else "",
+                            f"bg:{background.get_truecolor().hex}" if background else "",
+                        )
+                        if colour
+                    ),
+                    segment.text,
+                ))
             if not preview:
                 phase = (1 - cos((now - started) * pi / 4)) / 2 if moving else 0
                 colour = blend(look.primary, look.secondary, phase)
                 fragments.append((f"class:animal fg:{colour}", f"  {look.name}\n"))
                 if now < bubble:
                     lines = Text(blurb).wrap(console, 38)[:2]
-                    fragments.append(
-                        (
-                            "class:bubble",
-                            "  ╭ " + "\n  │ ".join(line.plain for line in lines) + "\n  ╰─\n",
-                        )
-                    )
+                    fragments.append((
+                        "class:bubble",
+                        "  ╭ " + "\n  │ ".join(line.plain for line in lines) + "\n  ╰─\n",
+                    ))
                 else:
                     colour = blend(*status, phase)
                     fragments.append((f"class:status fg:{colour}", f"  {look.status}\n  "))
@@ -671,34 +665,30 @@ class _Input:
                 align=VerticalAlign.TOP,
             )
             app.layout.container = ConditionalContainer(
-                HSplit(
-                    [
-                        VSplit(
-                            [
-                                Window(
-                                    portrait_control,
-                                    width=44,
-                                    height=22,
-                                ),
-                                panel,
-                            ],
-                            padding=2,
-                            height=22,
-                        )
-                    ]
-                ),
+                HSplit([
+                    VSplit(
+                        [
+                            Window(
+                                portrait_control,
+                                width=44,
+                                height=22,
+                            ),
+                            panel,
+                        ],
+                        padding=2,
+                        height=22,
+                    )
+                ]),
                 filter=Condition(roomy),
-                alternative_content=HSplit(
-                    [
-                        ConditionalContainer(
-                            Window(FormattedTextControl(shortcuts_text), height=12),
-                            filter=Condition(lambda: helping),
-                        ),
-                        Window(FormattedTextControl(nav), height=1),
-                        original,
-                        Window(FormattedTextControl(footer), height=1),
-                    ]
-                ),
+                alternative_content=HSplit([
+                    ConditionalContainer(
+                        Window(FormattedTextControl(shortcuts_text), height=12),
+                        filter=Condition(lambda: helping),
+                    ),
+                    Window(FormattedTextControl(nav), height=1),
+                    original,
+                    Window(FormattedTextControl(footer), height=1),
+                ]),
             )
             if self.completer and (self.choices or getattr(self, "previews", None)):
                 app.current_buffer.start_completion(select_first=False)

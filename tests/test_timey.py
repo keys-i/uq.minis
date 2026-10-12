@@ -222,7 +222,8 @@ class TestPreview:
         if state in {"image", "fallback"}:
             assert len(result.picture.plain.splitlines()[0]) == 40
             assert (
-                preview.httpx.stream.call_args_list[-1]
+                preview.httpx.stream
+                .call_args_list[-1]
                 .args[1]
                 .endswith("hqdefault.jpg" if state == "fallback" else "sddefault.jpg")
             )
@@ -514,9 +515,12 @@ class TestVideo:
                     "out_time_us=5000000\ntotal_size=1048576\nspeed=2.0x\nprogress=continue\n"
                 )
                 assert measured.wait(1)
-                self.options["progress_hooks"][0](
-                    {"status": "downloading", "downloaded_bytes": 10, "speed": 5, "eta": 2}
-                )
+                self.options["progress_hooks"][0]({
+                    "status": "downloading",
+                    "downloaded_bytes": 10,
+                    "speed": 5,
+                    "eta": 2,
+                })
                 (tmp_path / "source.m4a").write_bytes(b"music")
                 return {"title": "Music"}
 
@@ -547,14 +551,12 @@ class TestStyle:
         "state", ["fresh", "cached", "stale", "broken", "large", "offline", "malformed"]
     )
     def test_catalogue(self, tmp_path, monkeypatch, state):
-        payload = json.dumps(
-            {
-                "familyMetadataList": [
-                    {"family": "Open Sans", "category": "Sans Serif"},
-                    {"family": "Noto Sans Devanagari", "category": "Sans Serif"},
-                ]
-            }
-        ).encode()
+        payload = json.dumps({
+            "familyMetadataList": [
+                {"family": "Open Sans", "category": "Sans Serif"},
+                {"family": "Noto Sans Devanagari", "category": "Sans Serif"},
+            ]
+        }).encode()
         path = tmp_path / "catalogue.json"
         if state in {"cached", "stale", "broken"}:
             path.write_bytes(b"bad" if state == "broken" else payload)
@@ -799,7 +801,8 @@ class TestStyle:
         with Image.open((video.ASSETS / "timey/art") / "plate.png") as stone:
             backdrop = stone.convert("RGBA").resize(live.size, Image.Resampling.LANCZOS)
             assert (
-                ImageChops.difference(live, backdrop)
+                ImageChops
+                .difference(live, backdrop)
                 .convert("RGB")
                 .crop((400, 358, 680, 380))
                 .getbbox()
@@ -1034,12 +1037,10 @@ class TestUpload:
         monkeypatch.setattr(
             youtube.Credentials, "from_authorized_user_file", lambda *args: credentials
         )
-        replies = iter(
-            [
-                (SimpleNamespace(progress=lambda: 0.5), None),
-                (None, {"id": "abcdefghijk", "status": {"privacyStatus": "private"}}),
-            ]
-        )
+        replies = iter([
+            (SimpleNamespace(progress=lambda: 0.5), None),
+            (None, {"id": "abcdefghijk", "status": {"privacyStatus": "private"}}),
+        ])
         called, closed, progress = [], [], []
 
         def insert(**kwargs):
@@ -1430,17 +1431,15 @@ class TestRender:
             assert Image.open(image).getpixel((5, 5))[0] > 75
         details = output.with_suffix(".youtube.json")
         details.write_text(
-            json.dumps(
-                {
-                    "snippet": {"title": "Timestamped timer", "description": "", "tags": ["timer"]},
-                    "status": {
-                        "privacyStatus": "private",
-                        "selfDeclaredMadeForKids": False,
-                        "containsSyntheticMedia": False,
-                    },
-                    "thumbnail": "first-frame",
-                }
-            )
+            json.dumps({
+                "snippet": {"title": "Timestamped timer", "description": "", "tags": ["timer"]},
+                "status": {
+                    "privacyStatus": "private",
+                    "selfDeclaredMadeForKids": False,
+                    "containsSyntheticMedia": False,
+                },
+                "thumbnail": "first-frame",
+            })
         )
         data = youtube.prepare(output, details)
         thumbnail = Path(data["thumbnail"])
@@ -1629,9 +1628,12 @@ class TestRender:
         outside = quiet.crop((10, 10, 18, 22))
         assert max(ImageStat.Stat(crop).stddev) < max(ImageStat.Stat(outside).stddev) / 3
         delta = ImageChops.difference(moving, quiet)
-        centre = delta.crop(
-            (x + 20, y + 10, x + round(540 * scale) - 20, y + round(234 * scale) - 10)
-        )
+        centre = delta.crop((
+            x + 20,
+            y + 10,
+            x + round(540 * scale) - 20,
+            y + round(234 * scale) - 10,
+        ))
         assert max(ImageStat.Stat(centre).mean) < 2
         assert max(high for low, high in delta.getextrema()) > 10
 

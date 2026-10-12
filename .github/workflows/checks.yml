@@ -45,8 +45,8 @@ jobs:
 
       - name: Lint, format and compile
         run: |
-          uv run --no-sync ruff --config tools/config/ruff.toml check .
-          uv run --no-sync ruff --config tools/config/ruff.toml format --check .
+          uv run --no-sync ruff check .
+          uv run --no-sync ruff format --check .
           uv run --no-sync python -m compileall -q src tools tests
 
   python:

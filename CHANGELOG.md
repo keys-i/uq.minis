@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.31.1
+
+- Centralise Ruff rules in `pyproject.toml` so direct commands, `dev` and CI share the same configuration
+- Enable Python 3.15 preview support and apply safe lint fixes and consistent formatting across source, tools, tests and the artwork generator
+- Preserve the 100-column layout and test docstring exemptions, and give automated GitHub releases their SemVer title
+
+Requires Python 3.15+
+
+[Development changes](https://github.com/keys-i/uq.minis/compare/v0.31.0...v0.31.1)
+
 ## v0.31.0
 
 - Use shared nonblocking locks on Windows, macOS and Linux so Scrappy exports retain collision protection and checkpoint recovery

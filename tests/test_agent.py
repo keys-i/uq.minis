@@ -34,20 +34,18 @@ class TestWatcher:
         assert box.drafts["draft-1"]["toRecipients"] == [{"emailAddress": {"address": return_to}}]
         worker.poll(state_dir=state)
         assert box.sent == 1
-        box.incoming.extend(
-            [
-                message("update"),
-                message(
-                    "unrelated",
-                    mail.CLUBS_SENDER,
-                    thread="different",
-                    content="Your room is booked.",
-                ),
-                message(
-                    "other-event", mail.CLUBS_SENDER, event_id="43", content="Your room is booked."
-                ),
-            ]
-        )
+        box.incoming.extend([
+            message("update"),
+            message(
+                "unrelated",
+                mail.CLUBS_SENDER,
+                thread="different",
+                content="Your room is booked.",
+            ),
+            message(
+                "other-event", mail.CLUBS_SENDER, event_id="43", content="Your room is booked."
+            ),
+        ])
         worker.poll(state_dir=state)
         assert worker.status(state_dir=state)[0]["state"] == "waiting_reply"
         box.incoming.append(
