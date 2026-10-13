@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.32.0
+
+- Enforce strict basedpyright across source, tools, tests and the terminal artwork generator, with zero errors or warnings
+- Type shared prompts, worker state, browser requests, media previews and upload credentials; validate nullable streams and keep custom thumbnails intact when saving upload drafts
+- Give test fixtures and callbacks explicit contracts, preserve lazy CLI imports and make completion assertions wait for rendered choices
+- Keep all 50 mascots visible in monochrome menus and show still portraits in compact or plain interactive terminals
+- Run typing checks in `dev check` and GitHub CI against a freshly built wheel in an isolated environment, keeping interactive minis available throughout
+
+Requires Python 3.15+
+
+[Development changes](https://github.com/keys-i/uq.minis/compare/v0.31.1...v0.32.0)
+
 ## v0.31.1
 
 - Centralise Ruff rules in `pyproject.toml` so direct commands, `dev` and CI share the same configuration

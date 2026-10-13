@@ -49,6 +49,13 @@ jobs:
           uv run --no-sync ruff format --check .
           uv run --no-sync python -m compileall -q src tools tests
 
+      - name: Check strict types across source, tests and artwork
+        env:
+          UV_PROJECT_ENVIRONMENT: .cache/types
+        run: >-
+          uv run --locked --all-extras --no-editable --reinstall-package uq-minis
+          basedpyright --pythonpath .cache/types/bin/python --warnings
+
   python:
     needs: quality
     strategy:
@@ -152,11 +159,11 @@ jobs:
           from importlib.resources import files
           from typer.testing import CliRunner
           from uq_minis.cli import app, tool_names
-          from uq_minis.core.art import _habitats, _poses
+          from uq_minis.core.art import habitats, poses
           from uq_minis.minis.event.rooms import read
 
           assert set(tool_names()) == {"agent", "auth", "event", "scrappy", "timey"}
-          assert len(_habitats()) == 50
+          assert len(habitats()) == 50
           for name in tool_names():
               result = CliRunner().invoke(app, [name, "--help"])
               assert result.exit_code == 0, result.output
@@ -165,13 +172,13 @@ jobs:
               "timey/fonts/bungee.ttf",
               "timey/art/plate.png",
               "terminal/forest.toml",
-              *(f"terminal/{name}.toml" for name in _habitats()),
+              *(f"terminal/{name}.toml" for name in habitats()),
           ):
               assert files("uq_minis.assets").joinpath(asset).is_file(), asset
           assert not files("uq_minis.assets").joinpath("event/rooms.csv").is_file()
           assert read()
-          for name, animal in _habitats().items():
-              for pose in _poses(name):
+          for name, animal in habitats().items():
+              for pose in poses(name):
                   assert animal.picture(4, pose).plain
           assert files("uq_minis.skills").joinpath("event/SKILL.md").is_file()
           assert files("uq_minis.core").joinpath("uq-event-booking.toml").is_file()

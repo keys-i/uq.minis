@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -17,20 +18,42 @@ FORWARD = {"allow_extra_args": True, "ignore_unknown_options": True}
 app = application(add_completion=True, context_settings=FORWARD)
 
 
-def run(argv: list[str]) -> int:
+def run(argv: list[str], *, env: dict[str, str] | None = None) -> int:
     """Run a development command from the project root and return its exit status"""
     executable = shutil.which(argv[0])
     if executable is None:
         CONSOLE.print(f"Missing executable: {argv[0]}", style="red", markup=False)
         return 127
     CONSOLE.print(" ".join(argv), style="cyan", markup=False)
-    return subprocess.run([executable, *argv[1:]], cwd=ROOT, check=False).returncode
+    return subprocess.run([executable, *argv[1:]], cwd=ROOT, check=False, env=env).returncode
 
 
 def _checkout() -> None:
     """Require an editable checkout for development tasks"""
     if not (ROOT / "pyproject.toml").is_file() or not (ROOT / "src").is_dir():
         raise typer.BadParameter("dev requires an editable checkout; run uv sync in the project")
+
+
+def _types() -> int:
+    """Check the current wheel without replacing the interactive environment"""
+    directory = ROOT / ".cache/types"
+    python = directory / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    return run(
+        [
+            "uv",
+            "run",
+            "--locked",
+            "--all-extras",
+            "--no-editable",
+            "--reinstall-package",
+            "uq-minis",
+            "basedpyright",
+            "--pythonpath",
+            str(python),
+            "--warnings",
+        ],
+        env={**os.environ, "UV_PROJECT_ENVIRONMENT": str(directory)},
+    )
 
 
 def _task(task: str, extra: list[str]) -> int:
@@ -90,7 +113,6 @@ def _task(task: str, extra: list[str]) -> int:
             [*ruff, "check", "."],
             [*ruff, "format", "--check", "."],
             [sys.executable, "-m", "compileall", "-q", "src", "tools", "tests"],
-            [*tests, *extra],
         ]
     else:
         check = "--check" in extra
@@ -102,6 +124,8 @@ def _task(task: str, extra: list[str]) -> int:
     for command in commands:
         if status := run(command):
             return status
+    if task == "check":
+        return _types() or run([*tests, *extra])
     return 0
 
 

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("name", ["checks", "security", "release"])
-def test_runtime(name):
+def test_runtime(name: str) -> None:
     version = (ROOT / ".python-version").read_text().strip()
     workflow = yaml.safe_load((ROOT / f".github/workflows/{name}.yml").read_text())
     for job in workflow["jobs"].values():
@@ -21,7 +21,7 @@ def test_runtime(name):
 
 
 @pytest.mark.parametrize("case", ["valid", "wrong-tag", "missing-notes"])
-def test_release(tmp_path, monkeypatch, case):
+def test_release(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str) -> None:
     project = (ROOT / "pyproject.toml").read_text()
     version = tomllib.loads(project)["project"]["version"]
     tag = f"v{version}"
@@ -39,7 +39,11 @@ def test_release(tmp_path, monkeypatch, case):
     )
     source = step["run"].split("\n", 1)[1].rsplit("\nPY", 1)[0]
     result = subprocess.run(
-        [sys.executable, "-c", source], cwd=tmp_path, capture_output=True, text=True, check=False
+        [sys.executable, "-c", source],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert result.returncode == (0 if case == "valid" else 1), result.stderr
     notes = tmp_path / ".cache/release.md"
@@ -49,7 +53,7 @@ def test_release(tmp_path, monkeypatch, case):
         assert not notes.exists()
 
 
-def test_actions():
+def test_actions() -> None:
     workflows = ROOT / ".github/workflows"
     for path in workflows.glob("*.yml"):
         text = path.read_text()

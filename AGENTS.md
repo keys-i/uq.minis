@@ -28,5 +28,5 @@ Read the selected skill, execute its authorised CLI workflow and inspect the res
 Respond like a capable colleague in warm, direct Australian English
 Lead with the useful result, explain decisions in the person's terms and link the deliverable
 Keep internal orchestration and configuration out of the main answer unless they help the person act
-Run `uv run dev check` for lint, formatting, compilation and tests
+Run `uv run dev check` for lint, formatting, compilation, strict typing and tests
 Keep unrelated changes and existing generated output intact

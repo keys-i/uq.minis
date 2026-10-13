@@ -16,7 +16,7 @@ Expected errors in interactive runs offer a return to the menu or a review of sa
 
 Press Esc or Alt+← to return from a mini to the menu, `?` in an empty field or Alt+H for keyboard help, and Alt+M to pause or resume motion. Ctrl+Space opens suggestions, Ctrl+U clears the line and Ctrl+C cancels. Shortcut labels follow your OS: ⌃/⌥ on macOS, Ctrl/Alt on Windows and Linux
 
-Terminals smaller than 80 columns or 24 rows show compact prompts. `MINI_MOTION=0` keeps artwork, captions and text colours still; `NO_COLOR` keeps the interface monochrome and still. Redirected input or `TERM=dumb` uses ordinary text prompts. Editable sculptures, movement frames, depth, material and pointer maps live in [docs/assets/terminal](docs/assets/terminal/), with conservation sources and palette choices recorded in [forest.toml](docs/assets/terminal/forest.toml). Run `uv run python docs/assets/terminal/sculpt.py` to rebuild the 80 × 64 dot sculptures from their editable geometry; append species names, such as `axolotl`, to rebuild just their movement frames
+Terminals smaller than 80 columns or 24 rows show compact prompts with a still animal portrait when at least 44 columns are available. `MINI_MOTION=0` keeps artwork, captions and text colours still; `NO_COLOR` keeps the mascot visible in monochrome. Redirected input uses ordinary text prompts; an interactive `TERM=dumb` terminal keeps a still portrait without cursor animations. Editable sculptures, movement frames, depth, material and pointer maps live in [docs/assets/terminal](docs/assets/terminal/), with conservation sources and palette choices recorded in [forest.toml](docs/assets/terminal/forest.toml). Run `uv run python docs/assets/terminal/sculpt.py` to rebuild the 80 × 64 dot sculptures from their editable geometry; append species names, such as `axolotl`, to rebuild just their movement frames
 
 ## AI agents
 
@@ -195,10 +195,12 @@ uv run dev check --cov-fail-under=85
 
 Tests cover every mini, shared infrastructure and the worker. Shared setup lives in `tests/fixtures.py` and test doubles in `tests/fakes.py`. Browser checks use local pages with external requests blocked, and video checks render short generated clips. Optional checks are reported as skipped when their dependencies are missing
 
+`dev check` also runs strict basedpyright over source, tools, tests and the artwork generator in an isolated environment, keeping the editable checkout available for interactive use
+
 Coverage measures lines and branches, including greenlets, worker processes and CLI subprocesses. CI runs all extras, Chromium and FFmpeg on Linux, Windows and macOS, with an 85% minimum on Linux. Test results and HTML coverage are kept for seven days, including failed runs
 
 Lint, formatting and compilation run once before the test matrix. Packaging rebuilds the wheel from its source archive and checks installed commands, skills and assets away from the checkout. Release checks run the complete suite before publishing
 
 Security CI audits the locked dependencies and gates medium/high Bandit findings. Typer's completion-language option and the worker's validated SQL identifiers have specific false-positive annotations; subprocess calls pass argument lists without a shell
 
-Python 3.15's native lazy imports keep command help from loading browser, document or media dependencies. Timey's preset maps use `frozendict` to prevent accidental changes. On macOS with Python 3.15, `tests/benchmarks/cli.py` measured Timey help at a median 387 ms before lazy imports and 110 ms after, across five fresh processes for each; the help budget is 200 ms
+Python 3.15's native lazy imports keep command help from loading browser, document or media dependencies. Timey's preset maps are read-only to prevent accidental changes. On macOS with Python 3.15, `tests/benchmarks/cli.py` measured Timey help at a median 387 ms before lazy imports and 110 ms after, across five fresh processes for each; the help budget is 200 ms
