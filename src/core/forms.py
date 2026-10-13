@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -119,9 +119,10 @@ def load_form_profile(path: Path | None = None) -> FormProfile:
         raise MiniError("The form profile needs [[answers]] entries")
     answers: list[AnswerSpec] = []
     seen: set[str] = set()
-    for index, item in enumerate(raw_answers, start=1):
+    for index, item in enumerate(cast(Sequence[object], raw_answers), start=1):
         if not isinstance(item, Mapping):
             raise MiniError(f"[[answers]] entry {index} must be a table")
+        item = cast(Mapping[str, Any], item)
         question_id = _required(item, "question_id", section=f"answers #{index}")
         if question_id in seen:
             raise MiniError(f"Duplicate form question ID: {question_id}")
@@ -222,7 +223,7 @@ def build_form_context(raw: Mapping[str, Any], config: EventConfig) -> dict[str,
         room=room,
         **_required_schedule(config),
     )
-    for key, value in values.items():
+    for key, value in cast(Mapping[str, Any], values).items():
         name = str(key).strip()
         if not _VALUE_NAME.fullmatch(name):
             raise MiniError(f"Invalid [form.values] key: {name!r}")
@@ -243,7 +244,7 @@ def _answer_overrides(raw: Mapping[str, Any]) -> Mapping[str, Any]:
     overrides = table(raw, "form").get("answer_overrides", {})
     if not isinstance(overrides, Mapping):
         raise MiniError("[form.answer_overrides] must be a TOML table")
-    return overrides
+    return cast(Mapping[str, Any], overrides)
 
 
 def build_answers(

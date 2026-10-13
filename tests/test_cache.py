@@ -1,8 +1,11 @@
 import json
+import os
 import sys
 from contextlib import nullcontext
 from errno import EACCES, EIO
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
@@ -13,7 +16,7 @@ from uq_minis.core.common import MiniError
 
 class TestLock:
     @pytest.mark.parametrize("failed", [False, True], ids=["success", "failure"])
-    def test_release(self, tmp_path, failed):
+    def test_release(self, tmp_path: Path, failed: bool) -> None:
         path = tmp_path / "state.lock"
         with pytest.raises(ValueError) if failed else nullcontext():
             with cache.locked(path):
@@ -26,11 +29,15 @@ class TestLock:
             assert path.is_file()
 
     @pytest.mark.parametrize("error", [None, EACCES, EIO], ids=["release", "busy", "io"])
-    def test_windows(self, tmp_path, monkeypatch, error):
+    def test_windows(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: int | None
+    ) -> None:
         locking = Mock(side_effect=OSError(error, "lock failed") if error else None)
         monkeypatch.setattr(cache, "os", SimpleNamespace(name="nt"))
         monkeypatch.setitem(
-            sys.modules, "msvcrt", SimpleNamespace(LK_NBLCK=1, LK_UNLCK=2, locking=locking)
+            sys.modules,
+            "msvcrt",
+            SimpleNamespace(LK_NBLCK=1, LK_UNLCK=2, locking=locking),
         )
         expected = MiniError if error == EACCES else OSError
         with pytest.raises(expected) if error else nullcontext():
@@ -40,21 +47,20 @@ class TestLock:
             [(1, 1)] if error else [(1, 1), (2, 1)]
         )
 
-    def test_symlink(self, tmp_path):
+    def test_symlink(self, tmp_path: Path) -> None:
         path = tmp_path / "state.lock"
         path.symlink_to(tmp_path / "outside")
-        with pytest.raises(MiniError, match="symlink"):
-            with cache.locked(path):
-                pytest.fail("must not lock through a symlink")
+        with pytest.raises(MiniError, match="symlink"), cache.locked(path):
+            pytest.fail("must not lock through a symlink")
 
 
 class TestCache:
     @pytest.mark.parametrize("state", ["fresh", "stale", "missing", "large", "symlink"])
-    def test_snapshot(self, tmp_path, state):
+    def test_snapshot(self, tmp_path: Path, state: str) -> None:
         path = tmp_path / "snapshot.json"
         path.write_bytes(b"valid")
         if state == "stale":
-            cache.os.utime(path, (1, 1))
+            os.utime(path, (1, 1))
         elif state == "missing":
             path.unlink()
         elif state == "large":
@@ -70,7 +76,9 @@ class TestCache:
         assert cache.read(path, fresh=False) == (b"valid" if state in {"fresh", "stale"} else None)
 
     @pytest.mark.parametrize("budget", ["entries", "bytes"])
-    def test_evict(self, cached, monkeypatch, budget):
+    def test_evict(
+        self, cached: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch, budget: str
+    ) -> None:
         root, source, entry = cached
         if budget == "entries":
             monkeypatch.setattr(cache, "ENTRIES", 2)
@@ -101,17 +109,17 @@ class TestCache:
         ],
         ids=["traversal", "index", "bool", "empty", "size", "type", "json", "large"],
     )
-    def test_metadata(self, cached, metadata):
+    def test_metadata(self, cached: tuple[Path, Path, Path], metadata: Any) -> None:
         root, source, entry = cached
         index = entry / "info.json"
         if isinstance(metadata, dict):
-            metadata = {**json.loads(index.read_text()), **metadata}
+            metadata = {**json.loads(index.read_text()), **cast(dict[str, Any], metadata)}
         index.write_text(metadata if isinstance(metadata, str) else json.dumps(metadata))
         assert not list(cache.entries(root))
         assert source.read_bytes() == b"completed"
 
     @pytest.mark.parametrize("part", ["root", "entry", "index", "file"])
-    def test_symlink(self, cached, tmp_path, part):
+    def test_symlink(self, cached: tuple[Path, Path, Path], tmp_path: Path, part: str) -> None:
         root, source, entry = cached
         if part == "root":
             linked = tmp_path / "linked"
@@ -133,7 +141,9 @@ class TestCache:
             assert outside.read_bytes() == data
 
     @pytest.mark.parametrize("part", ["key", "file", "root", "entry"])
-    def test_publish_refuse(self, cached, tmp_path, part):
+    def test_publish_refuse(
+        self, cached: tuple[Path, Path, Path], tmp_path: Path, part: str
+    ) -> None:
         root, source, entry = cached
         key, filename = entry.name, source.name
         if part == "key":
@@ -154,12 +164,18 @@ class TestCache:
         assert not list(root.glob(".cache-*"))
 
     @pytest.mark.parametrize("fallback", [False, True], ids=["link", "copy"])
-    def test_reuse(self, cached, tmp_path, monkeypatch, fallback):
+    def test_reuse(
+        self,
+        cached: tuple[Path, Path, Path],
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        fallback: bool,
+    ) -> None:
         root, source, entry = cached
         index = entry / "info.json"
-        cache.os.utime(index, (1, 1))
+        os.utime(index, (1, 1))
         if fallback:
-            monkeypatch.setattr(cache.os, "link", Mock(side_effect=OSError("different filesystem")))
+            monkeypatch.setattr(os, "link", Mock(side_effect=OSError("different filesystem")))
         target = tmp_path / "result.bin"
         cache.reuse(next(cache.entries(root))[1], target)
         assert target.read_bytes() == source.read_bytes()
@@ -169,7 +185,7 @@ class TestCache:
         assert target.read_bytes() == b"completed"
 
     @pytest.mark.parametrize("outcome", ["success", "failure", "symlink"])
-    def test_atomic(self, tmp_path, outcome):
+    def test_atomic(self, tmp_path: Path, outcome: str) -> None:
         original = tmp_path / "original.bin"
         original.write_bytes(b"previous")
         target = tmp_path / "linked.bin" if outcome == "symlink" else original

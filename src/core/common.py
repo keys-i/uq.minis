@@ -41,7 +41,7 @@ def table(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     value = data.get(key, {})
     if not isinstance(value, Mapping):
         raise MiniError(f"[{key}] must be a TOML table")
-    return value
+    return cast(Mapping[str, Any], value)
 
 
 def text(value: Any, *, field: str, required: bool = False) -> str:

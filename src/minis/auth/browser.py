@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import unquote, urlsplit
 
 from uq_minis.core.common import MiniError
 from uq_minis.core.terminal import CONSOLE
 
 if TYPE_CHECKING:
+    from playwright.sync_api import Browser, Playwright, Request, Route
+
     from uq_minis.core.forms import FormProfile
 
 _HOST = "forms.cloud.microsoft"
@@ -43,7 +45,7 @@ def _response_post(url: str, method: str, profile: FormProfile) -> bool:
     )
 
 
-def _capture(request: object, profile: FormProfile, values: dict[str, str]) -> None:
+def _capture(request: Request, profile: FormProfile, values: dict[str, str]) -> None:
     """Capture session headers only from the configured form."""
     if not _same_target(request.url, profile):
         return
@@ -56,7 +58,7 @@ def _capture(request: object, profile: FormProfile, values: dict[str, str]) -> N
             values[name] = value
 
 
-def _guard(route: object, profile: FormProfile, values: dict[str, str]) -> None:
+def _guard(route: Route, profile: FormProfile, values: dict[str, str]) -> None:
     """Capture matching headers and block Forms response submissions."""
     request = route.request
     _capture(request, profile, values)
@@ -66,12 +68,13 @@ def _guard(route: object, profile: FormProfile, values: dict[str, str]) -> None:
         route.continue_()
 
 
-def _cookie_header(cookies: list[object]) -> str:
+def _cookie_header(cookies: Sequence[object]) -> str:
     """Join Forms cookies only when an authentication cookie is present."""
     items = [
-        (cookie["name"], cookie["value"])
+        (cast(Mapping[str, Any], cookie)["name"], cast(Mapping[str, Any], cookie)["value"])
         for cookie in cookies
-        if isinstance(cookie, Mapping) and cookie.get("domain", "").lstrip(".") == _HOST
+        if isinstance(cookie, Mapping)
+        and cast(Mapping[str, Any], cookie).get("domain", "").lstrip(".") == _HOST
     ]
     if not {name for name, value in items if value} & _AUTH_COOKIES:
         return ""
@@ -91,13 +94,13 @@ def _complete(values: Mapping[str, str], profile: FormProfile) -> bool:
     )
 
 
-def _launch(playwright: object, browser: str) -> object:
+def _launch(playwright: Playwright, browser: str) -> Browser:
     """Open the requested browser with a visible window."""
     name, channel = {
         "chrome": ("chromium", "chrome"),
         "edge": ("chromium", "msedge"),
     }.get(browser, (browser, None))
-    options = {"headless": False}
+    options: dict[str, Any] = {"headless": False}
     if channel:
         options["channel"] = channel
     return getattr(playwright, name).launch(**options)

@@ -3,6 +3,7 @@
 import json
 import statistics
 import time
+from typing import Any
 from unittest.mock import patch
 
 import httpx
@@ -17,20 +18,21 @@ def main() -> None:
         f"https://programs-courses.uq.edu.au/course.html?course_code=TEST{n:04}" for n in range(32)
     ]
 
-    def respond(request):
+    def respond(request: httpx.Request):
         time.sleep(0.01)
         return httpx.Response(
-            200, text=f'<h1 id="course-title">Example ({request.url.params["course_code"]})</h1>'
+            200,
+            text=f'<h1 id="course-title">Example ({request.url.params["course_code"]})</h1>',
         )
 
-    def client(**kwargs):
+    def client(**kwargs: Any):
         return real_client(transport=httpx.MockTransport(respond), **kwargs)
 
     timings = {}
     expected = [url[-8:] for url in urls]
     with patch("uq_minis.minis.scrappy.scraper.httpx.Client", side_effect=client):
         for jobs in (1, 4):
-            samples = []
+            samples: list[float] = []
             for _ in range(5):
                 start = time.perf_counter()
                 rows = scrape_details([*urls, urls[0]], jobs=jobs)

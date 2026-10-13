@@ -72,6 +72,7 @@ def fetch(url: str, *, client: httpx.Client | None = None) -> str:
         with httpx.Client(timeout=30, follow_redirects=False) as connection:
             return fetch(url, client=connection)
     for _ in range(6):
+        response: httpx.Response | None = None
         for attempt in range(3):
             try:
                 response = client.get(url, follow_redirects=False)
@@ -84,6 +85,7 @@ def fetch(url: str, *, client: httpx.Client | None = None) -> str:
                 time.sleep(_delay(response.headers.get("Retry-After", ""), attempt))
                 continue
             break
+        assert response is not None
         if response.is_redirect:
             target = response.headers.get("Location")
             if not target:

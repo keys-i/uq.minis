@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import os
 import stat
+import time
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock, call
 
 import pytest
 from dotenv import dotenv_values
+from typer.testing import CliRunner
 
 from tests import fakes
+from tests.fixtures import Screen
 from uq_minis import cli
 from uq_minis.cli import auth as command
 from uq_minis.core.common import MiniError
+from uq_minis.core.forms import FormProfile
 from uq_minis.minis import auth
 from uq_minis.minis.auth import browser as capture
 from uq_minis.minis.auth.credentials import write_env
@@ -28,8 +33,10 @@ class TestAuth:
         ],
         ids=["submission", "read", "foreign-form"],
     )
-    def test_capture(self, profile, path, method, action, captured):
-        values = {}
+    def test_capture(
+        self, profile: FormProfile, path: str, method: str, action: Any, captured: bool
+    ) -> None:
+        values: dict[str, Any] = {}
         headers = {
             "__requestverificationtoken": "token",
             "x-usersessionid": "session",
@@ -56,7 +63,7 @@ class TestAuth:
         ],
         ids=["csrf-cookie", "authentication-cookie"],
     )
-    def test_cookie(self, name, value, expected):
+    def test_cookie(self, name: str, value: str, expected: str) -> None:
         cookie = {"name": name, "value": value, "domain": ".forms.cloud.microsoft"}
         assert capture._cookie_header([cookie]) == expected
 
@@ -69,7 +76,7 @@ class TestAuth:
         with pytest.raises(MiniError, match="Refusing"):
             write_env(path, {"TOKEN": "replacement"}, force=False)
 
-    def test_dependency(self, monkeypatch, profile):
+    def test_dependency(self, monkeypatch: pytest.MonkeyPatch, profile: FormProfile) -> None:
         import sys
 
         monkeypatch.setitem(sys.modules, "playwright.sync_api", None)
@@ -96,10 +103,10 @@ class TestAuth:
         ],
         ids=["http", "host", "userinfo", "port", "form"],
     )
-    def test_origin(self, profile, url):
+    def test_origin(self, profile: FormProfile, url: str) -> None:
         request = Mock(url=url, method="GET")
         route = Mock(request=request)
-        values = {}
+        values: dict[str, Any] = {}
         capture._guard(route, profile, values)
         assert not values
         request.all_headers.assert_not_called()
@@ -118,13 +125,21 @@ class TestCapture:
         ],
         ids=["chromium", "firefox", "webkit", "chrome", "edge"],
     )
-    def test_browser(self, browser, name, engine, channel):
+    def test_browser(
+        self, browser: SimpleNamespace, name: str, engine: str, channel: None | str
+    ) -> None:
         assert capture._launch(browser.runtime, name) is browser.instance
         options = {"headless": False, **({"channel": channel} if channel else {})}
         getattr(browser.runtime, engine).launch.assert_called_once_with(**options)
 
     @pytest.mark.parametrize("missing", [None, "headers", "cookie"])
-    def test_session(self, browser, profile, monkeypatch, missing):
+    def test_session(
+        self,
+        browser: SimpleNamespace,
+        profile: FormProfile,
+        monkeypatch: pytest.MonkeyPatch,
+        missing: None | str,
+    ) -> None:
         headers = {
             "__requestverificationtoken": "token",
             "x-usersessionid": "session",
@@ -138,14 +153,14 @@ class TestCapture:
             )
         )
 
-        def load(*args, **kwargs):
+        def load(*args: Any, **kwargs: Any):
             if missing != "headers":
                 browser.context.route.call_args.args[1](route)
 
         browser.page.goto.side_effect = load
         if missing == "cookie":
             browser.context.cookies.return_value = []
-        monkeypatch.setattr(capture.time, "monotonic", Mock(side_effect=[0, 0, 2]))
+        monkeypatch.setattr(time, "monotonic", Mock(side_effect=[0, 0, 2]))
         if missing:
             with pytest.raises(MiniError, match="Timed out"):
                 capture.capture(profile, browser="chromium", timeout=1)
@@ -164,7 +179,7 @@ class TestCapture:
         browser.context.close.assert_called_once()
         browser.instance.close.assert_called_once()
 
-    def test_failure(self, browser, profile):
+    def test_failure(self, browser: SimpleNamespace, profile: FormProfile) -> None:
         browser.runtime.chromium.launch.side_effect = fakes.BrowserError("not installed")
         with pytest.raises(MiniError, match="Could not start chromium"):
             capture.capture(profile, browser="chromium", timeout=1)
@@ -173,7 +188,15 @@ class TestCapture:
 class TestCommand:
     @pytest.mark.parametrize("live", [False, True], ids=["plain", "terminal"])
     @pytest.mark.parametrize("force", [False, True], ids=["new", "refresh"])
-    def test_save(self, tmp_path, monkeypatch, runner, screen, live, force):
+    def test_save(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        screen: Screen,
+        live: bool,
+        force: bool,
+    ) -> None:
         console, output = screen(live=live)
         monkeypatch.setattr(command, "CONSOLE", console)
         captured = Mock(return_value={"TOKEN": "private-token"})
@@ -203,7 +226,9 @@ class TestCommand:
         assert "private-token" not in result.output + output.getvalue()
 
     @pytest.mark.parametrize("reason", ["unattended", "exists", "symlink"])
-    def test_refuse(self, tmp_path, monkeypatch, runner, reason):
+    def test_refuse(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner, reason: str
+    ) -> None:
         target = tmp_path / "private.env"
         target.write_text("TOKEN='keep'\n")
         output = tmp_path / "linked.env" if reason == "symlink" else target
@@ -213,14 +238,25 @@ class TestCommand:
         monkeypatch.setattr(auth, "capture", captured)
         result = runner.invoke(
             cli.app,
-            ["auth", "-o", str(output), *(["--no-input"] if reason == "unattended" else [])],
+            [
+                "auth",
+                "-o",
+                str(output),
+                *(["--no-input"] if reason == "unattended" else []),
+            ],
         )
         assert result.exit_code == 2 and "Traceback" not in result.output
         assert target.read_text() == "TOKEN='keep'\n"
         captured.assert_not_called()
 
     @pytest.mark.parametrize("error", [MiniError, OSError, ValueError], ids=["auth", "io", "value"])
-    def test_failure(self, tmp_path, monkeypatch, runner, error):
+    def test_failure(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        error: type[Exception],
+    ) -> None:
         target = tmp_path / "private.env"
         monkeypatch.setattr(auth, "capture", Mock(side_effect=error("sign-in failed")))
         result = runner.invoke(cli.app, ["auth", "-o", str(target)])

@@ -15,14 +15,22 @@ from html.parser import HTMLParser
 from itertools import islice
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import ClassVar
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urljoin, urlsplit
 
 import httpx
 
 from uq_minis.core import MiniError, locked
 from uq_minis.core.paths import STATE
-from uq_minis.minis.scrappy.http import BASE_URL, CODE, CatalogueUnavailable, catalogue_url, fetch
+from uq_minis.minis.scrappy.http import (
+    BASE_URL,
+    CODE,
+    CatalogueUnavailable,
+    catalogue_url,
+)
+from uq_minis.minis.scrappy.http import (
+    fetch as fetch,
+)
 
 SEARCH_URL = f"{BASE_URL}/search.html?keywords=*&searchType=all"
 OFFERING_FIELDS = ("course_code", "course_name", "offering_link")
@@ -54,7 +62,7 @@ def _text(parts: list[str]) -> str:
     return " ".join("".join(parts).split())
 
 
-def _offering(row: dict) -> dict[str, str]:
+def _offering(row: dict[str, Any]) -> dict[str, str]:
     code = (row.get("course_code") or "").strip().upper()
     name = (row.get("course_name") or "").strip()
     url = catalogue_url(row.get("offering_link") or "", course=True)
@@ -250,7 +258,7 @@ def write_csv(path: Path, fields: Iterable[str], rows: Iterable[dict[str, str]])
             delete=False,
         ) as handle:
             temporary = Path(handle.name)
-            writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+            writer = csv.DictWriter(handle, fieldnames=tuple(fields), extrasaction="ignore")
             writer.writeheader()
             writer.writerows(rows)
             handle.flush()
@@ -265,7 +273,8 @@ def scrape_offerings(*, html: str | None = None) -> list[dict[str, str]]:
     """Read saved HTML, or follow the live search result's next-page links."""
     if html is not None:
         return parse_offerings(html)
-    rows, visited = {}, set()
+    rows: dict[str, dict[str, str]] = {}
+    visited: set[str] = set()
     url = catalogue_url(SEARCH_URL)
     with httpx.Client(timeout=30, follow_redirects=False) as client:
         while url:
@@ -287,7 +296,7 @@ def _results(urls: list[str], jobs: int) -> Iterator[tuple[str, dict[str, str] |
     if not urls:
         return
 
-    def read(url):
+    def read(url: str) -> dict[str, str]:
         row = parse_course(fetch(url, client=client))
         if row["Course Code"] != parse_qs(urlsplit(url).query)["course_code"][0]:
             raise MiniError("UQ returned a different course than requested")
@@ -295,7 +304,9 @@ def _results(urls: list[str], jobs: int) -> Iterator[tuple[str, dict[str, str] |
 
     with (
         httpx.Client(
-            timeout=30, follow_redirects=False, limits=httpx.Limits(max_connections=jobs)
+            timeout=30,
+            follow_redirects=False,
+            limits=httpx.Limits(max_connections=jobs),
         ) as client,
         ThreadPoolExecutor(max_workers=jobs) as pool,
     ):
@@ -327,10 +338,11 @@ def scrape_details(
             return [parse_course(pages[url]) for url in unique]
         except KeyError as exc:
             raise MiniError(f"No supplied page for {exc.args[0]}") from exc
-    rows = {}
+    rows: dict[str, dict[str, str]] = {}
     for url, row, error in _results(unique, jobs):
         if error:
             raise MiniError(f"{url}: {error}")
+        assert row is not None
         rows[url] = row
     return [rows[url] for url in unique]
 
@@ -346,7 +358,7 @@ def export_links(output: Path, *, html: Path | None = None) -> int:
 
 def load_offerings(offerings: Path) -> list[dict[str, str]]:
     """Read and validate an offering CSV before any network requests."""
-    rows = {}
+    rows: dict[str, dict[str, str]] = {}
     try:
         with offerings.expanduser().open(encoding="utf-8-sig", newline="") as source:
             reader = csv.DictReader(source, strict=True)
@@ -373,7 +385,7 @@ def list_courses(
     query: str = "",
     offset: int = 0,
     limit: int = 50,
-) -> dict:
+) -> dict[str, Any]:
     """Search an offering CSV by code or name and return one bounded page."""
     if offset < 0 or not 1 <= limit <= 200:
         raise MiniError("Offset must be nonnegative and limit between 1 and 200")
@@ -383,7 +395,11 @@ def list_courses(
         for row in load_offerings(offerings)
         if query in f"{row['course_code']} {row['course_name']}".casefold()
     ]
-    return {"courses": rows[offset : offset + limit], "total": len(rows), "offset": offset}
+    return {
+        "courses": rows[offset : offset + limit],
+        "total": len(rows),
+        "offset": offset,
+    }
 
 
 def export_details(
@@ -432,21 +448,23 @@ def export_details(
                 if url in active_urls
             }
             completed = len(saved)
-            errors = []
+            errors: list[str] = []
             if progress:
                 progress(completed, len(urls), "Resuming" if saved else "Fetching")
             for url, row, error in _results([url for url in urls if url not in saved], jobs):
                 if error:
                     errors.append(f"{url}: {error}")
                 else:
+                    assert row is not None
                     db.execute(
-                        "INSERT OR REPLACE INTO courses VALUES (?,?)", (url, json.dumps(row))
+                        "INSERT OR REPLACE INTO courses VALUES (?,?)",
+                        (url, json.dumps(row)),
                     )
                     db.commit()
                     saved[url] = row
                 completed += 1
                 if progress:
-                    progress(completed, len(urls), "Failed" if error else row["Course Code"])
+                    progress(completed, len(urls), "Failed" if error else saved[url]["Course Code"])
             if errors:
                 raise MiniError(
                     f"{len(errors)} course(s) failed; existing output kept. Rerun to resume completed work.\n"

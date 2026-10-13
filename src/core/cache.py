@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from errno import EACCES, EAGAIN, EDEADLK
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
 from uq_minis.core.common import MiniError, atomic_json
 
@@ -46,6 +47,8 @@ def locked(path: Path):
         finally:
             if os.name == "nt":
                 stream.seek(0)
+                import msvcrt
+
                 msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
 
 
@@ -110,7 +113,7 @@ def reuse(source: Path, target: Path) -> None:
     (source.parent / "info.json").touch()
 
 
-def save(root: Path, key: str, source: Path, metadata: dict) -> None:
+def save(root: Path, key: str, source: Path, metadata: dict[str, Any]) -> None:
     """Publish the index last and enforce the shared byte and entry budgets"""
     size = source.stat().st_size
     if size <= 0 or size > LIMIT:
@@ -136,7 +139,7 @@ def save(root: Path, key: str, source: Path, metadata: dict) -> None:
             raise MiniError("A cache entry must not be a symlink")
         target.replace(destination / filename)
         (work / "info.json").replace(destination / "info.json")
-    owned = []
+    owned: list[tuple[float, int, Path]] = []
     for _, path in entries(root):
         files = list(path.parent.iterdir())
         if any(file.is_symlink() or file.name not in {"info.json", path.name} for file in files):

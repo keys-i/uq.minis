@@ -10,7 +10,7 @@ from uq_minis.core.common import MiniError, discover_events, ensure_outputs
 
 
 @pytest.mark.parametrize("package", ["uq_minis.core", "uq_minis.minis.timey"])
-def test_exports(package):
+def test_exports(package: str) -> None:
     result = subprocess.run(
         [
             sys.executable,

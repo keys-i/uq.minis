@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Literal
 from unittest.mock import Mock
 
 import pytest
@@ -46,22 +47,41 @@ class TestEvent:
             generate(event_toml, mode="form", destination=destination, jobs=-1)
         assert not destination.exists()
 
-    def test_quiet(self, event_toml, tmp_path, capsys):
+    def test_quiet(
+        self, event_toml: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         result = generate(
-            event_toml, mode="form", form_action="preview", destination=tmp_path / "quiet"
+            event_toml,
+            mode="form",
+            form_action="preview",
+            destination=tmp_path / "quiet",
         )
         assert result.outputs
         assert capsys.readouterr().out == ""
 
-    def test_parallel(self, event_toml, tmp_path):
+    def test_parallel(self, event_toml: Path, tmp_path: Path) -> None:
         result = generate(
-            event_toml, mode="both", risk_layout="both", destination=tmp_path / "pack", jobs=2
+            event_toml,
+            mode="both",
+            risk_layout="both",
+            destination=tmp_path / "pack",
+            jobs=2,
         )
-        assert [kind for kind, _ in result.outputs] == ["risk-pack", "risk-form", "form"]
+        assert [kind for kind, _ in result.outputs] == [
+            "risk-pack",
+            "risk-form",
+            "form",
+        ]
         assert all(path.is_file() and path.stat().st_size > 0 for _, path in result.outputs)
 
     @pytest.mark.parametrize("action", ["preview", "submit", "failed"])
-    def test_submit(self, event_toml, tmp_path, monkeypatch, action):
+    def test_submit(
+        self,
+        event_toml: Path,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        action: Literal["preview", "submit", "failed"],
+    ) -> None:
         submit = Mock(
             return_value=201,
             side_effect=MiniError("service unavailable") if action == "failed" else None,

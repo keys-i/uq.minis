@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
+import httpx
 import pytest
 
 from uq_minis.core.common import MiniError, read_toml
@@ -31,7 +33,9 @@ class TestForms:
         event_toml.write_text(event_toml.read_text().replace('terms = "Agree"\n', ""))
         with pytest.raises(MiniError, match=r"Missing \[form.values\] keys: terms"):
             create_payload(
-                read_toml(event_toml), load_event_config(event_toml), load_form_profile()
+                read_toml(event_toml),
+                load_event_config(event_toml),
+                load_form_profile(),
             )
 
     def test_profile(self, event_toml: Path, tmp_path: Path) -> None:
@@ -53,7 +57,7 @@ value = "x"
         with pytest.raises(MiniError, match="forms.cloud.microsoft"):
             load_form_profile(profile)
 
-    def test_submit(self, tmp_path, monkeypatch):
+    def test_submit(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         import httpx
 
         from uq_minis.core import forms
@@ -73,18 +77,18 @@ value = "x"
         )
         monkeypatch.setenv("UQ_FORMS_VERIFICATION_TOKEN", "environment-token")
         client_type = httpx.Client
-        options = {}
+        options: dict[str, Any] = {}
 
-        def respond(request):
+        def respond(request: httpx.Request):
             assert request.url.host == "forms.cloud.microsoft"
             assert request.headers["cookie"] == "example=${UNCHANGED}"
             assert request.headers["__requestverificationtoken"] == "environment-token"
             return httpx.Response(201)
 
-        def client(**kwargs):
+        def client(**kwargs: Any):
             options.update(kwargs)
             return client_type(transport=httpx.MockTransport(respond), **kwargs)
 
-        monkeypatch.setattr(forms.httpx, "Client", client)
+        monkeypatch.setattr(httpx, "Client", client)
         assert forms.submit_payload(load_form_profile(), {"answers": "[]"}) == 201
         assert options["follow_redirects"] is False and options["trust_env"] is False

@@ -8,6 +8,7 @@ import webbrowser
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from uq_minis.assets import ROOT as ASSETS
@@ -34,8 +35,8 @@ def read(path: Path | None = None) -> list[Room]:
     """Load the compressed catalogue or a custom CSV, rejecting ambiguous entries"""
     custom = STATE / "event/rooms.csv"
     path = path or (custom if custom.is_file() else ASSETS / "event/rooms.csv.gz")
-    rooms = []
-    seen = set()
+    rooms: list[Room] = []
+    seen: set[tuple[str, str]] = set()
     try:
         with gzip.open(path, "rb") if path.suffix == ".gz" else path.open("rb") as source:
             data = source.read(1024 * 1024 + 1)
@@ -70,21 +71,30 @@ def read(path: Path | None = None) -> list[Room]:
                 seen.add(identity)
         if not rooms:
             raise ValueError("Room CSV is empty")
-    except (OSError, EOFError, ValueError, KeyError, TypeError, AttributeError, csv.Error) as exc:
+    except (
+        OSError,
+        EOFError,
+        ValueError,
+        KeyError,
+        TypeError,
+        AttributeError,
+        csv.Error,
+    ) as exc:
         raise MiniError(f"Cannot read room catalogue {path}: {exc}") from exc
     return rooms
 
 
-def choose(raw: dict, path: Path | None = None, *, form: bool = False) -> None:
+def choose(raw: dict[str, Any], path: Path | None = None, *, form: bool = False) -> None:
     """Search buildings and rooms, with a tour before committing the venue"""
     rooms = read(path)
-    event = table(raw, "event")
+    event = dict(table(raw, "event"))
+    raw["event"] = event
     intro("Find your room", "Room to gather · filter by seats, then take a look around")
     campuses = sorted({room.campus for room in rooms})
     campus = ask(
         "Campus",
         choices=campuses,
-        default=event.get("campus") if event.get("campus") in campuses else campuses[0],
+        default=str(event["campus"]) if event.get("campus") in campuses else campuses[0],
     )
     attendance = str(event.get("estimated_attendance", ""))
     while True:
@@ -122,7 +132,8 @@ def choose(raw: dict, path: Path | None = None, *, form: bool = False) -> None:
             )
         ]
         CONSOLE.print(
-            f"{room.room} · {room.building} · {room.seats} seats · {room.kind}", markup=False
+            f"{room.room} · {room.building} · {room.seats} seats · {room.kind}",
+            markup=False,
         )
         actions = ["select", "back", *(["tour"] if room.tour else [])]
         while True:

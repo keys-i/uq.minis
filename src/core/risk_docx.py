@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import re
 import tomllib
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, cast
 
 from docx import Document
 from docx.document import Document as DocumentType
@@ -18,6 +19,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Pt, RGBColor
+from docx.styles.style import ParagraphStyle
 
 UQ_PURPLE = "51247A"
 MID_GREY = "D9D9D9"
@@ -309,7 +311,7 @@ def display_value(value: Any, *, field: str) -> str:
     if isinstance(value, bool):
         return "Yes" if value else "No"
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        return ", ".join(clean_text(item, field=field) for item in value)
+        return ", ".join(clean_text(item, field=field) for item in cast(Sequence[object], value))
     return clean_text(value, field=field)
 
 
@@ -320,10 +322,12 @@ def read_application(
     raw = data.get("application", {})
     if not isinstance(raw, Mapping):
         raise ConfigError("[application] must be a TOML table")
+    raw = cast(Mapping[str, Any], raw)
     title = clean_text(raw.get("title"), field="[application].title") or "EVENT APPLICATION SUMMARY"
     fields = raw.get("fields", {})
     if not isinstance(fields, Mapping):
         raise ConfigError("[application.fields] must be a TOML table")
+    fields = cast(Mapping[str, Any], fields)
     rows: list[tuple[str, str]] = []
     for label, value in fields.items():
         rendered = display_value(value, field=f"[application.fields].{label}")
@@ -343,6 +347,7 @@ def resolve_logo(config_path: Path, data: Mapping[str, Any], cli_logo: Path | No
     document = data.get("document", {})
     if not isinstance(document, Mapping):
         raise ConfigError("[document] must be a TOML table")
+    document = cast(Mapping[str, Any], document)
     logo_value = clean_text(document.get("logo"), field="[document].logo")
     if logo_value.lower() in {"none", "false", "off"}:
         return None
@@ -385,6 +390,7 @@ def read_risk_overrides(data: Mapping[str, Any]) -> dict[int, Mapping[str, Any]]
         return {}
     if not isinstance(raw, Mapping):
         raise ConfigError("[risk_overrides] must be a TOML table")
+    raw = cast(Mapping[str, Any], raw)
 
     parsed: dict[int, Mapping[str, Any]] = {}
     for key, value in raw.items():
@@ -470,7 +476,8 @@ def load_event_config(
         )
     elif isinstance(stakeholders_raw, Sequence) and not isinstance(stakeholders_raw, (str, bytes)):
         stakeholders = tuple(
-            clean_text(item, field="[event].stakeholders") for item in stakeholders_raw
+            clean_text(item, field="[event].stakeholders")
+            for item in cast(Sequence[object], stakeholders_raw)
         )
         stakeholders = tuple(item for item in stakeholders if item)
     else:
@@ -1083,7 +1090,7 @@ def build_risks(cfg: EventConfig) -> list[RiskRow]:
                 raise ConfigError(f"Risk {definition.number} hazards must be an array of strings")
             hazards = tuple(
                 expand_text(item, cfg, field=f"risk {definition.number} hazards")
-                for item in raw_hazards
+                for item in cast(Sequence[object], raw_hazards)
             )
         if "initial_risk" in override:
             initial = expand_text(
@@ -1376,10 +1383,11 @@ def apply_document_defaults(doc: DocumentType) -> None:
 
     styles = doc.styles
     normal = styles["Normal"]
+    assert isinstance(normal, ParagraphStyle)
     normal.font.name = FONT_NAME
-    normal._element.rPr.rFonts.set(qn("w:ascii"), FONT_NAME)
-    normal._element.rPr.rFonts.set(qn("w:hAnsi"), FONT_NAME)
-    normal._element.rPr.rFonts.set(qn("w:eastAsia"), FONT_NAME)
+    fonts = normal.element.xpath("./w:rPr/w:rFonts")[0]
+    for name in ("ascii", "hAnsi", "eastAsia"):
+        fonts.set(qn(f"w:{name}"), FONT_NAME)
     normal.font.size = Pt(8.5)
     normal.paragraph_format.space_after = Pt(0)
     normal.paragraph_format.space_before = Pt(0)
@@ -1472,7 +1480,7 @@ def add_cover_page(doc: DocumentType, cfg: EventConfig) -> None:
     set_table_borders(table)
     for row in table.rows:
         prevent_row_split(row)
-        for index, cell in enumerate(row.cells):
+        for cell in row.cells:
             set_cell_margins(cell, top=45, start=65, bottom=45, end=65)
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
 

@@ -155,7 +155,7 @@ def resolve_form_actions(
         action = explicit or configured or "preview"
         if action not in FORM_ACTIONS:
             raise MiniError(f"Invalid form action for {source}: {action}")
-        result.append(cast(FormAction, action))
+        result.append(action)
     return result
 
 
@@ -307,7 +307,7 @@ def generate(
     ensure_outputs(outputs, force=force)
 
     completed: list[tuple[str, Path]] = []
-    risk_jobs = [
+    risk_jobs: list[tuple[EventConfig, RiskLayout, Path]] = [
         (plan.config, layout, output) for plan in plans for layout, output in plan.risk_outputs
     ]
     with activity("Making your event pack", show=show_progress) as progress:

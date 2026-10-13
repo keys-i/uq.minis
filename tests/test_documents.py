@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 from zipfile import ZipFile
 
 import pytest
@@ -14,7 +17,11 @@ from uq_minis.core.risk_docx import (
 @pytest.mark.parametrize(
     "build,pages,labels",
     [
-        (build_form_document, 6, ["EVENT MANAGEMENT RISK ASSESSMENT", "UQ Sample Club"]),
+        (
+            build_form_document,
+            6,
+            ["EVENT MANAGEMENT RISK ASSESSMENT", "UQ Sample Club"],
+        ),
         (
             build_pack_document,
             7,
@@ -27,7 +34,9 @@ from uq_minis.core.risk_docx import (
     ],
     ids=["form", "pack"],
 )
-def test_build(event_toml, tmp_path, build, pages, labels):
+def test_build(
+    event_toml: Path, tmp_path: Path, build: Callable[..., Any], pages: int, labels: list[str]
+) -> None:
     document = build(load_event_config(event_toml))
     path = tmp_path / "risk.docx"
     document.save(path)

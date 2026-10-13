@@ -1,5 +1,9 @@
 import gzip
 import json
+import webbrowser
+from pathlib import Path
+from typing import Any
+from unittest.mock import Mock
 from zipfile import ZipFile
 
 import pytest
@@ -15,7 +19,9 @@ St Lucia,Test Hall,99-002,Seminar,26,
 
 
 class TestRooms:
-    def test_select(self, event_toml, tmp_path, monkeypatch):
+    def test_select(
+        self, event_toml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         catalogue = tmp_path / "rooms.csv"
         catalogue.write_text(CSV)
         original = event_toml.read_bytes()
@@ -32,9 +38,14 @@ class TestRooms:
             "select",
             "21-50",
         ])
-        monkeypatch.setattr(rooms, "ask", lambda *args, **kwargs: next(answers))
-        tours = []
-        monkeypatch.setattr(rooms.webbrowser, "open", lambda url: tours.append(url) or True)
+        monkeypatch.setattr(rooms, "ask", Mock(side_effect=answers))
+        tours: list[str] = []
+
+        def tour(url: str) -> bool:
+            tours.append(url)
+            return True
+
+        monkeypatch.setattr(webbrowser, "open", tour)
         result = generate(
             event_toml,
             mode="both",
@@ -62,16 +73,23 @@ class TestRooms:
             "St Lucia,Test Hall,99-001,Theatre,20,https://tour.panoee.net:1234/tour",
         ],
     )
-    def test_invalid(self, tmp_path, row):
+    def test_invalid(self, tmp_path: Path, row: str) -> None:
         path = tmp_path / "rooms.csv"
         path.write_text(CSV.splitlines()[0] + "\n" + row)
         with pytest.raises(MiniError, match="Cannot read room catalogue"):
             rooms.read(path)
 
-    def test_catalogue(self, event_toml, tmp_path, monkeypatch):
+    def test_catalogue(
+        self, event_toml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(rooms, "STATE", tmp_path)
         catalogue = rooms.read()
-        assert {room.campus for room in catalogue} == {"St Lucia", "Gatton", "Herston", "Other"}
+        assert {room.campus for room in catalogue} == {
+            "St Lucia",
+            "Gatton",
+            "Herston",
+            "Other",
+        }
         assert len(catalogue) > 100
         assert all(room.seats > 0 for room in catalogue)
         custom = tmp_path / "event/rooms.csv"
@@ -86,9 +104,13 @@ class TestRooms:
 
     @pytest.mark.parametrize(
         "data",
-        [b"broken", gzip.compress(CSV.encode())[:-6], gzip.compress(b"x" * (1024 * 1024 + 1))],
+        [
+            b"broken",
+            gzip.compress(CSV.encode())[:-6],
+            gzip.compress(b"x" * (1024 * 1024 + 1)),
+        ],
     )
-    def test_compressed(self, tmp_path, data):
+    def test_compressed(self, tmp_path: Path, data: Any) -> None:
         path = tmp_path / "rooms.csv.gz"
         path.write_bytes(data)
         with pytest.raises(MiniError, match="Cannot read room catalogue"):

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import csv
 import threading
+from pathlib import Path
+from typing import Any
+from unittest.mock import Mock
 
 import httpx
 import pytest
@@ -31,7 +34,7 @@ COURSE = """
 
 
 class TestParse:
-    def test_fields(self):
+    def test_fields(self) -> None:
         assert parse_offerings(LISTING) == [
             {
                 "course_code": "COMP3400",
@@ -44,14 +47,14 @@ class TestParse:
         assert course["Pre-Requisites"] == "MATH1061 or CSSE2002"
         assert course["Course Profile1"] == "https://profile.example/1"
 
-    def test_nested(self):
+    def test_nested(self) -> None:
         course = parse_course(
             "<h1 id=course-title>Logic (COMP3400)</h1>"
             "<div id=course-level>Undergraduate <span>course</span></div><p>Outside</p>"
         )
         assert course["Course Level"] == "Undergraduate course"
 
-    def test_markup(self):
+    def test_markup(self) -> None:
         rows = parse_offerings((LISTING + LISTING).replace('class="code"', 'class="code selected"'))
         assert len(rows) == 1
         details = parse_course(
@@ -64,21 +67,19 @@ class TestParse:
 
 
 class TestExport:
-    def test_pages(self, monkeypatch):
+    def test_pages(self, monkeypatch: pytest.MonkeyPatch) -> None:
         url = "https://programs-courses.uq.edu.au/course.html?course_code=COMP3400"
         assert len(scrape_details([url, url], pages={url: COURSE})) == 1
-        monkeypatch.setattr(
-            scraper.httpx, "Client", lambda **kwargs: pytest.fail("must not connect")
-        )
+        monkeypatch.setattr(httpx, "Client", Mock(side_effect=AssertionError("must not connect")))
         with pytest.raises(MiniError, match="No supplied page"):
             scrape_details([url], pages={})
 
-    def test_csv(self, tmp_path):
+    def test_csv(self, tmp_path: Path) -> None:
         output = tmp_path / "offerings.csv"
         write_csv(output, OFFERING_FIELDS, parse_offerings(LISTING))
         assert output.read_text(encoding="utf-8").splitlines()[1].startswith("COMP3400,")
 
-    def test_preserve(self, tmp_path):
+    def test_preserve(self, tmp_path: Path) -> None:
         output = tmp_path / "offerings.csv"
         output.write_text("old\n", encoding="utf-8")
 
@@ -91,13 +92,13 @@ class TestExport:
         assert output.read_text(encoding="utf-8") == "old\n"
         assert not list(tmp_path.glob(".offerings.csv.*"))
 
-    def test_shared(self, tmp_path, monkeypatch):
+    def test_shared(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         html, offerings, output = (
             tmp_path / name for name in ("search.html", "links.csv", "courses.csv")
         )
         html.write_text(LISTING)
         assert scraper.export_links(offerings, html=html) == 1
-        monkeypatch.setattr(scraper, "fetch", lambda *args, **kwargs: COURSE)
+        monkeypatch.setattr(scraper, "fetch", Mock(return_value=COURSE))
         assert scraper.export_details(offerings, output) == 1
         saved = output.read_bytes()
         offerings.write_text("wrong_column\nvalue\n")
@@ -105,7 +106,7 @@ class TestExport:
             scraper.export_details(offerings, output)
         assert output.read_bytes() == saved
 
-    def test_resume(self, tmp_path, monkeypatch):
+    def test_resume(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         offerings, output = tmp_path / "links.csv", tmp_path / "courses.csv"
         write_csv(
             offerings,
@@ -120,9 +121,9 @@ class TestExport:
             ],
         )
         output.write_text("existing export\n")
-        calls = []
+        calls: list[str] = []
 
-        def first(url, **kwargs):
+        def first(url: str, **kwargs: Any):
             calls.append(url[-8:])
             if url.endswith("CSSE2002"):
                 raise MiniError("temporary failure")
@@ -134,7 +135,7 @@ class TestExport:
         assert output.read_text() == "existing export\n"
         calls.clear()
 
-        def second(url, **kwargs):
+        def second(url: str, **kwargs: Any):
             calls.append(url[-8:])
             return COURSE.replace("COMP3400", "CSSE2002")
 
@@ -142,9 +143,12 @@ class TestExport:
         assert scraper.export_details(offerings, output, jobs=1) == 2
         assert calls == ["CSSE2002"]
         with output.open() as file:
-            assert [row["Course Code"] for row in csv.DictReader(file)] == ["COMP3400", "CSSE2002"]
+            assert [row["Course Code"] for row in csv.DictReader(file)] == [
+                "COMP3400",
+                "CSSE2002",
+            ]
 
-    def test_codes(self, tmp_path):
+    def test_codes(self, tmp_path: Path) -> None:
         # UQ currently lists courses such as ACCT1101E and AGRC1135D.
         html, output = tmp_path / "search.html", tmp_path / "links.csv"
         html.write_text(LISTING.replace("COMP3400", "ACCT1101E"))
@@ -157,7 +161,7 @@ class TestExport:
             scraper.export_links(output, html=html)
         assert output.read_bytes() == saved
 
-    def test_collision(self, tmp_path, monkeypatch):
+    def test_collision(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         html, offerings, output = (
             tmp_path / "search.html",
             tmp_path / "links.csv",
@@ -167,7 +171,7 @@ class TestExport:
         scraper.export_links(offerings, html=html)
         entered, release = threading.Event(), threading.Event()
 
-        def fetch(*args, **kwargs):
+        def fetch(*args: Any, **kwargs: Any):
             entered.set()
             assert release.wait(timeout=5)
             return COURSE
@@ -187,23 +191,23 @@ class TestExport:
 
 
 class TestFetch:
-    def test_client(self, monkeypatch):
+    def test_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
         first = "https://programs-courses.uq.edu.au/course.html?course_code=COMP3400"
         second = "https://programs-courses.uq.edu.au/course.html?course_code=CSSE2002"
-        clients = []
+        clients: list[Client] = []
 
         class Client:
-            def __init__(self, **kwargs):
-                self.urls = []
+            def __init__(self, **kwargs: Any):
+                self.urls: list[str] = []
                 clients.append(self)
 
             def __enter__(self):
                 return self
 
-            def __exit__(self, *args):
+            def __exit__(self, *args: Any):
                 return None
 
-            def get(self, url, **kwargs):
+            def get(self, url: str, **kwargs: Any):
                 self.urls.append(url)
                 return httpx.Response(
                     200,
@@ -211,12 +215,12 @@ class TestFetch:
                     request=httpx.Request("GET", url),
                 )
 
-        monkeypatch.setattr(scraper.httpx, "Client", Client)
+        monkeypatch.setattr(httpx, "Client", Client)
         assert len(scrape_details([first, second, first])) == 2
         assert len(clients) == 1
         assert sorted(clients[0].urls) == [first, second]
 
-    def test_invalid(self, monkeypatch):
+    def test_invalid(self, monkeypatch: pytest.MonkeyPatch) -> None:
         with pytest.raises(MiniError, match="No course offerings"):
             parse_offerings("<h1>Maintenance</h1>")
         with pytest.raises(MiniError, match="No course title"):
@@ -224,18 +228,18 @@ class TestFetch:
         with pytest.raises(MiniError, match="Offering URLs"):
             scrape_details(["http://localhost/course.html"])
         monkeypatch.setattr(
-            scraper.httpx.Client,
+            httpx.Client,
             "get",
-            lambda *args, **kwargs: (_ for _ in ()).throw(scraper.httpx.ConnectError("offline")),
+            Mock(side_effect=httpx.ConnectError("offline")),
         )
-        monkeypatch.setattr("uq_minis.minis.scrappy.http.time.sleep", lambda _: None)
+        monkeypatch.setattr("uq_minis.minis.scrappy.http.time.sleep", Mock(return_value=None))
         with pytest.raises(MiniError, match="Cannot fetch"):
             scraper.fetch("https://programs-courses.uq.edu.au/course.html?course_code=COMP3400")
 
-    def test_retry(self, monkeypatch):
-        attempts = []
+    def test_retry(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        attempts: list[str] = []
 
-        def respond(request):
+        def respond(request: httpx.Request):
             attempts.append(str(request.url))
             return (
                 httpx.Response(503, headers={"Retry-After": "0"})
@@ -245,12 +249,13 @@ class TestFetch:
 
         with httpx.Client(transport=httpx.MockTransport(respond)) as client:
             assert "COMP3400" in scraper.fetch(
-                "https://programs-courses.uq.edu.au/course.html?course_code=COMP3400", client=client
+                "https://programs-courses.uq.edu.au/course.html?course_code=COMP3400",
+                client=client,
             )
         assert len(attempts) == 2
         attempts.clear()
 
-        def redirect(request):
+        def redirect(request: httpx.Request):
             attempts.append(str(request.url))
             return httpx.Response(302, headers={"Location": "http://localhost/private"})
 
@@ -262,14 +267,14 @@ class TestFetch:
                 )
         assert len(attempts) == 1
 
-    def test_parallel(self, monkeypatch):
+    def test_parallel(self, monkeypatch: pytest.MonkeyPatch) -> None:
         barrier = threading.Barrier(2)
         urls = [
             f"https://programs-courses.uq.edu.au/course.html?course_code=TEST{n:04}"
             for n in range(4)
         ]
 
-        def fetch(url, **kwargs):
+        def fetch(url: str, **kwargs: Any):
             barrier.wait(timeout=3)
             return COURSE.replace("COMP3400", url[-8:])
 
@@ -278,18 +283,18 @@ class TestFetch:
             url[-8:] for url in urls
         ]
 
-    def test_search(self, monkeypatch):
+    def test_search(self, monkeypatch: pytest.MonkeyPatch) -> None:
         pages = iter([
             LISTING + '<a rel="next" href="/search.html?page=2">Next</a>',
             LISTING + LISTING.replace("COMP3400", "CSSE2002"),
         ])
-        monkeypatch.setattr(scraper, "fetch", lambda *args, **kwargs: next(pages))
+        monkeypatch.setattr(scraper, "fetch", Mock(side_effect=pages))
         assert [row["course_code"] for row in scraper.scrape_offerings()] == [
             "COMP3400",
             "CSSE2002",
         ]
 
-    def test_denied(self, tmp_path, monkeypatch):
+    def test_denied(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         offerings = tmp_path / "links.csv"
         rows = [
             {
@@ -300,9 +305,9 @@ class TestFetch:
             for code in ("COMP3400", "CSSE2002", "MATH1061")
         ]
         write_csv(offerings, OFFERING_FIELDS, rows)
-        attempts = []
+        attempts: list[str] = []
 
-        def denied(self, url, **kwargs):
+        def denied(self: httpx.Client, url: str, **kwargs: Any):
             attempts.append(url)
             return httpx.Response(403, request=httpx.Request("GET", url))
 
