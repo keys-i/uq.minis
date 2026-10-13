@@ -1,5 +1,6 @@
 import random
 from collections.abc import Callable
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import Mock
@@ -209,7 +210,7 @@ def test_pokes(
         control = app.layout.container.content.children[0].children[0].content
         x, y = next(
             (x + 2, y)
-            for y, row in enumerate(look.hit.splitlines())
+            for y, row in enumerate(look.drawing()["hit"].splitlines())
             for x, region in enumerate(row)
             if region == "2"
         )
@@ -227,23 +228,62 @@ def test_pokes(
 
 
 @pytest.mark.parametrize("name", list(art.habitats()))
-def test_regions(name: str) -> None:
+@pytest.mark.parametrize("width,height", [(40, 16), (58, 22), (64, 24)])
+def test_regions(name: str, width: int, height: int) -> None:
     look = art.habitats()[name]
+    size = width, height
+    picture = look.picture(size=size)
+    assert len(picture.plain.splitlines()) == height
+    assert {cell_len(row) for row in picture.plain.splitlines()} == {width + 2}
     assert "7" in look.tone
     for pose, frames in art.poses(name).items():
         for index in (0, len(frames) // 2):
-            rows = frames[index]["hit"].splitlines()
-            assert len(rows) == 16
-            assert {len(row) for row in rows} == {40}
+            rows = look.drawing(index, pose, size)["hit"].splitlines()
+            assert len(rows) == height
+            assert {len(row) for row in rows} == {width}
             targets = {
-                look.region(index, pose, x + 2, y)
+                look.region(index, pose, x + 2, y, size)
                 for y, row in enumerate(rows)
                 for x in range(len(row))
             }
             assert targets == {None, "ears", "pet", "object"}
     assert look.region(0, "idle", -1, 0) is None
     assert look.region(0, "idle", 0, -1) is None
-    assert look.region(0, "idle", 44, 16) is None
+    assert look.region(0, "idle", width + 2, height, size) is None
+
+
+def test_flag() -> None:
+    look = art.habitats()["numbat"]
+    other = replace(look, flag="#69baff #ffffff #ff6a99")
+    assert look.picture().plain == other.picture().plain
+    assert look.picture().spans != other.picture().spans
+    assert look.colours()[0][:4] == other.colours()[0][:4]
+    assert look.colours()[3] != other.colours()[3]
+
+
+def test_hover(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    ask("Name")
+    entry.call_args.kwargs["pre_run"]()
+    _, clock, app = cursor
+    control = app.layout.container.content.children[0].children[0].content
+    look = terminal._look()
+    x, y = next(
+        (x + 2, y)
+        for y, row in enumerate(look.drawing()["hit"].splitlines())
+        for x, region in enumerate(row)
+        if region == "1"
+    )
+    control.mouse_handler(
+        MouseEvent(Point(x, y), MouseEventType.MOUSE_MOVE, MouseButton.NONE, frozenset())
+    )
+    clock.return_value = 0.5
+    assert "".join(text for _, text in control.text()).startswith(look.picture(6, "peek").plain)
 
 
 def test_pause(canvas: Canvas, keys: Keys, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -275,8 +315,10 @@ def test_focus(
     focus = styles.get_attrs_for_style_str("class:completion-menu.completion.current")
     assert focus.reverse is no_color
     if not no_color:
-        assert focus.bgcolor == terminal._look().primary.lstrip("#")
-        assert focus.color == terminal.COLOURS["ink"].lstrip("#")
+        assert focus.bgcolor == art.blend(
+            terminal.COLOURS["surface"], terminal._look().primary, 0.18
+        ).lstrip("#")
+        assert focus.color == terminal.COLOURS["text"].lstrip("#")
 
 
 @pytest.mark.parametrize("name", list(art.habitats()))
@@ -407,13 +449,13 @@ def test_interrupt(
     control.text()
     clock.return_value = 5
     assert "".join(text for _, text in control.text()).startswith(
-        terminal._look().picture(16, "wander").plain
+        terminal._look().picture(art.FPS * 2, "wander").plain
     )
     buffer.text = "hello"
     control.text()
     clock.return_value = 5.5
     assert "".join(text for _, text in control.text()).startswith(
-        terminal._look().picture(4, "listen").plain
+        terminal._look().picture(art.FPS // 2, "listen").plain
     )
 
 
@@ -472,8 +514,10 @@ def test_habitat(screen: Screen, name: str) -> None:
         (40, 24, False, False),
         (80, 12, False, False),
         (80, 24, True, True),
+        (112, 32, False, True),
+        (140, 34, False, True),
     ],
-    ids=["wide", "narrow", "short", "monochrome"],
+    ids=["wide", "narrow", "short", "monochrome", "detailed", "full"],
 )
 def test_layout(
     canvas: Canvas, keys: Keys, width: int, rows: int, no_color: bool, art: bool
@@ -486,7 +530,14 @@ def test_layout(
     assert "Window too small" not in view
     assert any("\u2800" <= char <= "\u28ff" for char in view) is art
     if art:
-        assert all(not any(row.strip() for row in frame[22:]) for frame in frames)
+        limit = 30 if width >= 140 else 28 if width >= 112 and rows >= 32 else 22
+        assert all(not any(row.strip() for row in frame[limit:]) for frame in frames)
+        assert all(
+            row.index("First choice") >= round(width * 0.55) + 2
+            for frame in frames
+            for row in frame
+            if "First choice" in row
+        )
 
 
 @pytest.mark.parametrize(
@@ -548,7 +599,7 @@ def test_touch(
     target = {"ears": "1", "pet": "2", "object": "3"}[region]
     x, y = next(
         (x + 2, y)
-        for y, row in enumerate(look.hit.splitlines())
+        for y, row in enumerate(look.drawing()["hit"].splitlines())
         for x, value in enumerate(row)
         if value == target
     )
@@ -567,8 +618,8 @@ def test_touch(
         clock.return_value = index * 10
         control.text()
         # Click the drawn resting frame so the hit target follows the animation
-        frame = int(clock.return_value * 8) % 16
-        rows = art.poses(look.animal)["breathe"][frame]["hit"].splitlines()
+        frame = int(clock.return_value * art.FPS) % (art.FPS * 3)
+        rows = look.drawing(frame, "breathe")["hit"].splitlines()
         x, y = next(
             (x + 2, y)
             for y, row in enumerate(rows)
@@ -579,13 +630,15 @@ def test_touch(
             MouseEvent(Point(x, y), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset())
         )
         clock.return_value += 0.5
-        assert "".join(text for _, text in control.text()).startswith(look.picture(4, pose).plain)
+        assert "".join(text for _, text in control.text()).startswith(
+            look.picture(art.FPS // 2, pose).plain
+        )
     buffer.text = "first"
     clock.return_value = 30
     control.text()
     clock.return_value = 31.5
     assert "".join(text for _, text in control.text()).startswith(
-        terminal._look().picture(7, "listen").plain
+        terminal._look().picture(art.FPS - 1, "listen").plain
     )
 
 
@@ -672,7 +725,10 @@ def test_render(screen: Screen, width: int, live: bool, no_color: bool) -> None:
     console, output = screen(width=width, live=live, no_color=no_color)
     terminal.intro("[red]A mini[/red]", "Something nice to make")
     view = terminal.table("File", "Saved to")
-    assert view.row_styles == [terminal._look().primary, terminal._look().secondary]
+    assert (
+        console.get_style(view.row_styles[0]).bgcolor
+        != console.get_style(view.row_styles[1]).bgcolor
+    )
     path = "folder[rose]/a-long-file.docx"
     view.add_row(Text("event"), Text(path))
     console.print(view)

@@ -32,7 +32,7 @@ from rich.theme import Theme
 from typer import rich_utils
 from typer._click.exceptions import ClickException
 
-from uq_minis.core.art import Habitat, Preview, blend, habitats
+from uq_minis.core.art import FPS, Habitat, Preview, blend, habitats
 
 if TYPE_CHECKING:
     from prompt_toolkit.completion import Completer
@@ -164,7 +164,10 @@ def table(*headers: str, title: str | None = None) -> Table:
         border_style="muted",
         box=box.SIMPLE,
         padding=(0, 1),
-        row_styles=[_look().primary, _look().secondary],
+        row_styles=[
+            f"{colour} on {blend(COLOURS['surface'], colour, 0.22)}"
+            for colour in (_look().primary, _look().secondary)
+        ],
     )
     if view.columns:
         view.columns[0].style = "key"
@@ -318,6 +321,16 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                 and console.encoding.lower().startswith("utf")
             )
 
+        def split() -> int:
+            size = get_app_session().output.get_size()
+            return round(min(console.width, size.columns) * 0.55)
+
+        def sculpture() -> tuple[int, int]:
+            size = get_app_session().output.get_size()
+            columns = min(64, max(40, split() - 4))
+            rows = min(24, max(16, round(columns * 3 / 8)), max(16, size.rows - 8))
+            return columns, rows
+
         look = _look()
         if (
             console.is_terminal
@@ -385,7 +398,10 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                         choice = state.completions[index]
                         text = caption(choice.display_text, max(1, width - 2), "choice")
                         style = f"class:completion-menu.completion.current {choice.style} {choice.selected_style}"
-                        return [(style, " " + set_cell_size(text, max(1, width - 2)) + " ")]
+                        return [
+                            (style + f" fg:{look.primary}", "›"),
+                            (style, set_cell_size(text, max(1, width - 2)) + " "),
+                        ]
                     return [
                         (item[0] + f" class:row{index % 2}", item[1], item[2])
                         if len(item) == 3
@@ -491,16 +507,16 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                     deadline = now + look.seconds(action) + random.uniform(3, 7)
                 if action != "idle" and now - acted < look.seconds(action):
                     pose = action
-                    frame = int(max(0, now - acted) * 8)
+                    frame = int(max(0, now - acted) * FPS)
                 elif focus != "idle":
                     pose = focus
-                    frame = 7
+                    frame = FPS - 1
                 else:
-                    pose, frame = "breathe", int(now * 8) % 16
+                    pose, frame = "breathe", int(now * FPS) % (FPS * 3)
             drawn = (frame, pose)
             fragments: StyleAndTextTuples = []
             picture = (
-                look.picture(frame, pose)
+                look.picture(frame, pose, size=sculpture())
                 if not preview
                 else Text(preview.description)
                 if console.no_color
@@ -531,7 +547,7 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                 colour = blend(look.primary, look.secondary, phase)
                 fragments.append((f"class:animal fg:{colour}", f"  {look.name}\n"))
                 if now < bubble:
-                    lines = Text(blurb).wrap(console, 38)[:2]
+                    lines = Text(blurb).wrap(console, sculpture()[0] - 2)[:2]
                     fragments.append((
                         "class:bubble",
                         "  ╭ " + "\n  │ ".join(line.plain for line in lines) + "\n  ╰─\n",
@@ -569,19 +585,32 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                 return
             if event.event_type in {MouseEventType.MOUSE_MOVE, MouseEventType.MOUSE_UP}:
                 x, y = event.position.x, event.position.y
-                if region := look.region(*drawn, x, y):
+                if region := look.region(*drawn, x, y, size=sculpture()):
                     buffer = get_app().current_buffer
                     chosen = buffer.complete_state and buffer.complete_state.current_completion
                     if getattr(self, "preview", None) or getattr(self, "previews", {}).get(
                         chosen.text if chosen else buffer.text
                     ):
                         return
+                    previous = hover
                     hover = {
                         "ears": look.head,
                         "pet": look.body,
                         "object": f"{look.object} · click to explore",
                     }[region]
                     if event.event_type == MouseEventType.MOUSE_MOVE:
+                        if (
+                            moving
+                            and previous != hover
+                            and (
+                                action == "idle" or time.monotonic() - acted >= look.seconds(action)
+                            )
+                        ):
+                            action, acted = (
+                                "peek" if x < (sculpture()[0] + 2) / 2 else "look",
+                                time.monotonic(),
+                            )
+                            deadline = acted + random.uniform(4, 7)
                         get_app().invalidate()
                         return
                     state = "look" if chosen else "listen" if buffer.text else "idle"
@@ -629,12 +658,19 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                 assert buffer.complete_state.complete_index is not None
                 count = len(buffer.complete_state.completions)
                 action += f" · {buffer.complete_state.complete_index + 1}/{count}"
-            return [
+            fragments: StyleAndTextTuples = [
                 (
                     "class:chosen" if chosen else "class:hint",
                     f"  {action}",
                 )
             ]
+            if (
+                roomy()
+                and not helping
+                and not (getattr(self, "preview", None) or getattr(self, "previews", None))
+            ):
+                fragments.append(("class:hint", "\n  hover · click to explore"))
+            return fragments
 
         def nav():
             fragments: StyleAndTextTuples = []
@@ -643,7 +679,7 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
             if allowed:
                 buttons["motion"] = ("play" if not moving else "pause", _key("Alt+M"))
             size = get_app_session().output.get_size()
-            width = min(console.width, size.columns) - (46 if roomy() else 0)
+            width = min(console.width, size.columns) - (split() + 2 if roomy() else 0)
             chords = sum(cell_len(label + key) + 3 for label, key in buttons.values())
             chords += (len(buttons) - 1) * 2
             for index, (name, (label, key)) in enumerate(buttons.items()):
@@ -707,7 +743,7 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                     ),
                     Window(FormattedTextControl(nav), height=1),
                     original,
-                    Window(FormattedTextControl(footer), height=1),
+                    Window(FormattedTextControl(footer), height=2),
                 ],
                 padding=1,
                 align=VerticalAlign.TOP,
@@ -718,13 +754,13 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                         [
                             Window(
                                 portrait_control,
-                                width=44,
-                                height=22,
+                                width=split,
+                                height=lambda: sculpture()[1] + 6,
                             ),
                             panel,
                         ],
                         padding=2,
-                        height=22,
+                        height=lambda: sculpture()[1] + 6,
                     )
                 ]),
                 filter=Condition(roomy),
@@ -742,7 +778,7 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                 app.current_buffer.start_completion(select_first=False)
 
         rows = [
-            blend(COLOURS["surface"], colour, 0.22) for colour in (look.primary, look.secondary)
+            blend(COLOURS["surface"], colour, 0.40) for colour in (look.primary, look.secondary)
         ]
         answer = read_input(
             [("class:question", question.plain)],
@@ -759,7 +795,7 @@ class _Input[T: (str, bool, float)](PromptBase[T]):
                 {
                     "question": f"bold {look.secondary}",
                     "completion-menu.completion": f"bg:{COLOURS['surface']} {COLOURS['text']}",
-                    "completion-menu.completion.current": f"bold noreverse bg:{look.primary} {COLOURS['ink']}",
+                    "completion-menu.completion.current": f"bold noreverse bg:{blend(COLOURS['surface'], look.primary, 0.18)} {COLOURS['text']}",
                     "row0": f"bg:{rows[0]} {COLOURS['text']}",
                     "row1": f"bg:{rows[1]} {COLOURS['text']}",
                     "scrollbar.background": f"bg:{COLOURS['surface']}",
