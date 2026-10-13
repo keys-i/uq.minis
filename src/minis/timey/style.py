@@ -13,6 +13,7 @@ from collections.abc import Callable
 from difflib import get_close_matches
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs, unquote_plus, urlencode, urlsplit
 
 import httpx
@@ -21,10 +22,13 @@ from uq_minis.core import cache
 from uq_minis.core.cache import writing
 from uq_minis.core.common import MiniError, atomic_json
 
-try:
+if TYPE_CHECKING:
     from PIL import ImageFont
-except ImportError:
-    ImageFont = None
+else:
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        ImageFont = None
 
 Progress = Callable[[float | None, str], None]
 
@@ -53,13 +57,16 @@ _FAMILIES = {
 def catalogue(directory: Path) -> dict[str, str]:
     """Load Google Fonts' complete family list, with a cached offline fallback"""
 
-    def parse(data: bytes) -> dict[str, str]:
+    def parse(data: bytes | bytearray) -> dict[str, str]:
         try:
-            families = json.loads(data)["familyMetadataList"]
-            if not isinstance(families, list) or not 1 <= len(families) <= 10000:
+            families: Any = json.loads(data)["familyMetadataList"]
+            if (
+                not isinstance(families, list)
+                or not 1 <= len(cast(list[object], families)) <= 10000
+            ):
                 raise ValueError("invalid family list")
-            result = {}
-            for item in families:
+            result: dict[str, str] = {}
+            for item in cast(list[dict[str, Any]], families):
                 name, category = item["family"], item["category"]
                 if any(
                     not isinstance(value, str)
@@ -128,7 +135,7 @@ def fonts(query: str = "", families: dict[str, str] | None = None) -> dict[str, 
     }
 
 
-def _object(properties: dict) -> dict:
+def _object(properties: dict[str, Any]) -> dict[str, Any]:
     return {
         "type": "object",
         "properties": properties,
@@ -185,23 +192,26 @@ SCHEMA = _object({
 })
 
 
-def validate(data: object) -> dict:
+def validate(data: object) -> dict[str, Any]:
     """Bound all generated artwork before it reaches the image renderer"""
 
-    def check(value: object, schema: dict) -> None:
+    def check(value: object, schema: dict[str, Any]) -> None:
         kind = schema["type"]
         if kind == "object":
-            if not isinstance(value, dict) or set(value) != set(schema["properties"]):
+            if not isinstance(value, dict) or set(cast(dict[str, object], value)) != set(
+                schema["properties"]
+            ):
                 raise MiniError("Style artwork has missing or unsupported fields")
+            value = cast(dict[str, Any], value)
             for key, child in schema["properties"].items():
                 check(value[key], child)
         elif kind == "array":
             if (
                 not isinstance(value, list)
-                or not schema["minItems"] <= len(value) <= schema["maxItems"]
+                or not schema["minItems"] <= len(cast(list[object], value)) <= schema["maxItems"]
             ):
                 raise MiniError("Style artwork has too many shapes or invalid coordinates")
-            for item in value:
+            for item in cast(list[object], value):
                 check(item, schema["items"])
         elif kind in {"integer", "number"}:
             if (
@@ -223,6 +233,7 @@ def validate(data: object) -> dict:
                 raise MiniError("Style colours must be hex RGB or RGBA values")
 
     check(data, SCHEMA)
+    data = cast(dict[str, Any], data)
     for shape in [*data["shapes"], data["bar"]]:
         points = shape["points"]
         if any(y > 234 for _, y in points):
@@ -240,7 +251,7 @@ def validate(data: object) -> dict:
     return data
 
 
-def read(path: Path) -> dict:
+def read(path: Path) -> dict[str, Any]:
     """Load a bounded style file without executing generated code"""
     try:
         if path.stat().st_size > 128 * 1024:
@@ -263,17 +274,19 @@ def designer(value: str) -> str:
 
 def generate(
     prompt: str,
-    schema: dict,
+    schema: dict[str, Any],
     directory: Path,
     *,
     agent: str = "auto",
     background: Path | None = None,
     progress: Progress | None = None,
     task: str = "Crafting your overlay",
-) -> dict:
+) -> dict[str, Any]:
     """Request bounded structured data through an installed, signed-in coding agent"""
     agent = designer(agent)
     executable = shutil.which(agent)
+    if executable is None:
+        raise MiniError(f"The {agent} executable is unavailable")
     directory.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=".design-", dir=directory) as scratch:
         work = Path(scratch)
@@ -322,6 +335,7 @@ def generate(
             process = subprocess.Popen(
                 argv, stdin=subprocess.PIPE, stdout=output, stderr=error, cwd=work
             )
+            assert process.stdin is not None
             try:
                 process.stdin.write(prompt.encode("utf-8"))
                 process.stdin.close()
@@ -399,9 +413,9 @@ def design(
     agent: str = "auto",
     background: Path | None = None,
     context: str = "",
-    base: dict | None = None,
+    base: dict[str, Any] | None = None,
     progress: Progress | None = None,
-) -> tuple[dict, Path]:
+) -> tuple[dict[str, Any], Path]:
     """Ask an installed coding agent for reusable artwork using its normal sign-in"""
     if not instructions.strip() or len(instructions) > 4000:
         raise MiniError("Describe the overlay in 1–4000 characters")
@@ -420,7 +434,14 @@ def design(
     if base:
         prompt += f"\nRefine this existing design using the brief: {json.dumps(base)}"
     data = validate(
-        generate(prompt, SCHEMA, directory, agent=agent, background=background, progress=progress)
+        generate(
+            prompt,
+            SCHEMA,
+            directory,
+            agent=agent,
+            background=background,
+            progress=progress,
+        )
     )
     slug = re.sub(r"[^a-z0-9]+", "-", data["name"].casefold()).strip("-")[:48] or "custom"
     key = hashlib.sha256(instructions.encode()).hexdigest()[:8]
@@ -488,7 +509,8 @@ def font(value: str, directory: Path, *, progress: Progress | None = None) -> st
         progress(None, "Finding your font · reading Google Fonts")
     try:
         with httpx.Client(
-            timeout=30, headers={"User-Agent": "Timey/1.0", "Accept-Encoding": "identity"}
+            timeout=30,
+            headers={"User-Agent": "Timey/1.0", "Accept-Encoding": "identity"},
         ) as client:
 
             def fetch(url: str, limit: int) -> bytes:
@@ -522,7 +544,9 @@ def font(value: str, directory: Path, *, progress: Progress | None = None) -> st
 
             if host != "fonts.gstatic.com":
                 css = fetch(value, 128 * 1024).decode("utf-8")
-                urls = re.findall(r"url\(['\"]?(https://fonts\.gstatic\.com/[^)'\"\s]+)", css)
+                urls: list[str] = re.findall(
+                    r"url\(['\"]?(https://fonts\.gstatic\.com/[^)'\"\s]+)", css
+                )
                 candidates = [url for url in urls if urlsplit(url).path.endswith((".ttf", ".otf"))]
                 if not candidates:
                     raise MiniError(

@@ -1,43 +1,61 @@
 import json
 import math
 import os
+import shutil
 import subprocess
 import threading
+import time
 from array import array
+from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import replace
 from errno import EINVAL, EIO, EPIPE
+from functools import partial
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, PropertyMock
+from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import MagicMock, Mock, PropertyMock
 
 import httpx
 import pytest
+from PIL import ImageFont
+from prompt_toolkit.input import PipeInput
 from rich.text import Text
+from typer.testing import CliRunner
 
+from tests.fixtures import Clip, Screen
 from uq_minis import cli
+from uq_minis.assets import ROOT as ASSETS
 from uq_minis.cli import timey as wizard
 from uq_minis.core import cache, terminal
+from uq_minis.core.art import Preview
 from uq_minis.core.common import MiniError
 from uq_minis.minis import timey
 from uq_minis.minis.timey import cache as media_cache
 from uq_minis.minis.timey import preview, style, video, youtube
 
-try:
+if TYPE_CHECKING:
     from PIL import Image, ImageChops, ImageStat
-except ImportError:
-    Image = ImageChops = ImageStat = None
+else:
+    try:
+        from PIL import Image, ImageChops, ImageStat
+    except ImportError:
+        Image = ImageChops = ImageStat = None
 
 
 class TestSearch:
-    def test_results(self, videos):
+    def test_results(self, videos: tuple[Mock, MagicMock]) -> None:
         factory, client = videos
         client.extract_info.return_value["entries"] += [
             {"id": "abcdefghijk", "title": "Duplicate"},
             {"id": "bad/url", "title": "Untrusted ID"},
             {"id": "zyxwvutsrqp", "is_live": True},
-            {"id": "12345678901", "title": "\x1b[31mForest\nwalk", "duration": float("inf")},
+            {
+                "id": "12345678901",
+                "title": "\x1b[31mForest\nwalk",
+                "duration": float("inf"),
+            },
             None,
         ]
         results = video.search(" forest ")
@@ -50,13 +68,15 @@ class TestSearch:
         )
 
     @pytest.mark.parametrize("query", ["", "x" * 201])
-    def test_query(self, videos, query):
+    def test_query(self, videos: tuple[Mock, MagicMock], query: str) -> None:
         with pytest.raises(MiniError, match="200"):
             video.search(query)
         videos[0].assert_not_called()
 
     @pytest.mark.parametrize("failure", ["unavailable", "network", "malformed", "empty"])
-    def test_failure(self, videos, monkeypatch, failure):
+    def test_failure(
+        self, videos: tuple[Mock, MagicMock], monkeypatch: pytest.MonkeyPatch, failure: str
+    ) -> None:
         _, client = videos
         if failure == "unavailable":
             monkeypatch.setattr(video, "YoutubeDL", None)
@@ -77,9 +97,11 @@ class TestSearch:
             "forest\nback\n\nhttps://www.youtube.com/watch?v=abcdefghijk\n",
         ],
     )
-    def test_choose(self, videos, thumbnails, runner, answers):
+    def test_choose(
+        self, videos: tuple[Mock, MagicMock], thumbnails: MagicMock, runner: CliRunner, answers: str
+    ) -> None:
         app = terminal.application()
-        result = []
+        result: list[str] = []
 
         @app.command()
         def run():
@@ -90,7 +112,7 @@ class TestSearch:
         assert result == ["https://www.youtube.com/watch?v=abcdefghijk"]
         assert "A quiet forest · 01:23" in invoked.output
 
-    def test_path(self, videos, runner):
+    def test_path(self, videos: tuple[Mock, MagicMock], runner: CliRunner) -> None:
         app = terminal.application()
 
         @app.command()
@@ -112,9 +134,9 @@ class TestPreview:
         ],
         ids=["placement", "palette", "review-colour"],
     )
-    def test_choices(self, field, answers, expected, runner):
+    def test_choices(self, field: str, answers: str, expected: str, runner: CliRunner) -> None:
         app = terminal.application()
-        picked = []
+        picked: list[str] = []
 
         @app.command()
         def run():
@@ -146,7 +168,10 @@ class TestPreview:
             ("Ciznel\nCinzel\ny\n", "https://fonts.google.com/specimen/Cinzel"),
             ("random nonsense\nback\nbungee\n", None),
             ("open sans\ny\n", "https://fonts.google.com/specimen/Open+Sans"),
-            ("noto sans devanagari\ny\n", "https://fonts.google.com/specimen/Noto+Sans+Devanagari"),
+            (
+                "noto sans devanagari\ny\n",
+                "https://fonts.google.com/specimen/Noto+Sans+Devanagari",
+            ),
         ],
         ids=[
             "family",
@@ -161,11 +186,25 @@ class TestPreview:
             "full-list",
         ],
     )
-    def test_font_review(self, answer, source, runner, monkeypatch, fontlist):
-        font = str(video.ASSETS / "timey/fonts/bungee.ttf")
-        resolve = []
+    def test_font_review(
+        self,
+        answer: str,
+        source: None | str,
+        runner: CliRunner,
+        monkeypatch: pytest.MonkeyPatch,
+        fontlist: dict[str, str],
+    ) -> None:
+        font = str(ASSETS / "timey/fonts/bungee.ttf")
+        resolve: list[str] = []
+
+        def resolve_font(value: str, *args: Any, **kwargs: Any) -> str:
+            resolve.append(value)
+            return font
+
         monkeypatch.setattr(
-            wizard, "resolve_font", lambda value, *args, **kwargs: (resolve.append(value), font)[1]
+            wizard,
+            "resolve_font",
+            Mock(side_effect=resolve_font),
         )
         app = terminal.application()
 
@@ -177,10 +216,12 @@ class TestPreview:
         assert result.exit_code == 0, result.output
         assert resolve == ([source] if source else [])
 
-    def test_font_failure(self, runner, monkeypatch, fontlist):
-        requests = []
+    def test_font_failure(
+        self, runner: CliRunner, monkeypatch: pytest.MonkeyPatch, fontlist: dict[str, str]
+    ) -> None:
+        requests: list[str] = []
 
-        def fail(value, *args, **kwargs):
+        def fail(value: Any, *args: Any, **kwargs: Any):
             requests.append(value)
             raise MiniError("Google Fonts is offline")
 
@@ -199,7 +240,9 @@ class TestPreview:
         assert requests == ["https://fonts.google.com/specimen/Creepster"]
 
     @pytest.mark.parametrize("timer", [None, timey.Timer(start_gap=5)])
-    def test_frame(self, clip, timer, tmp_path, monkeypatch):
+    def test_frame(
+        self, clip: Clip, timer: video.Timer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.chdir(tmp_path)
         source = clip("opening.mp4", "color=c=navy:s=480x270:r=24", seconds=1)
         result = preview.frame(source, timer)
@@ -207,7 +250,9 @@ class TestPreview:
         assert not list(tmp_path.glob(".timey-preview-*"))
 
     @pytest.mark.parametrize("state", ["image", "fallback", "oversized", "broken", "offline"])
-    def test_thumbnail(self, videos, thumbnails, state):
+    def test_thumbnail(
+        self, videos: tuple[Mock, MagicMock], thumbnails: MagicMock, state: str
+    ) -> None:
         if state == "fallback":
             type(thumbnails).status_code = PropertyMock(side_effect=[404, 200])
         elif state == "oversized":
@@ -222,7 +267,7 @@ class TestPreview:
         if state in {"image", "fallback"}:
             assert len(result.picture.plain.splitlines()[0]) == 40
             assert (
-                preview.httpx.stream
+                cast(Mock, httpx.stream)
                 .call_args_list[-1]
                 .args[1]
                 .endswith("hqdefault.jpg" if state == "fallback" else "sddefault.jpg")
@@ -238,25 +283,30 @@ class TestPreview:
             ("accent", ["", "#8FDA53", "#6FE9EF"]),
         ],
     )
-    def test_samples(self, field, values):
+    def test_samples(self, field: str, values: Any) -> None:
         samples = wizard._Studio(timey.Timer()).samples(field, values)
         assert len({sample.picture.spans.__repr__() for sample in samples.values()}) == len(values)
         assert all(len(sample.picture.plain.splitlines()) <= 14 for sample in samples.values())
 
     @pytest.mark.parametrize("name", ["bungee", "Bungee", "Press Start 2P", "Skranji"])
     @pytest.mark.parametrize("offline", [False, True])
-    def test_fonts(self, runner, name, monkeypatch, fontlist, offline):
+    def test_fonts(
+        self,
+        runner: CliRunner,
+        name: str,
+        monkeypatch: pytest.MonkeyPatch,
+        fontlist: dict[str, str],
+        offline: bool,
+    ) -> None:
         if offline:
 
-            def fail(directory):
+            def fail(directory: Path):
                 raise MiniError("Google Fonts is offline")
 
             monkeypatch.setattr(wizard, "catalogue", fail)
-        monkeypatch.setattr(
-            wizard, "resolve_font", lambda *args, **kwargs: pytest.fail("Downloaded")
-        )
+        monkeypatch.setattr(wizard, "resolve_font", Mock(side_effect=AssertionError("Downloaded")))
         app = terminal.application()
-        paths = []
+        paths: list[str] = []
 
         @app.command()
         def run():
@@ -288,11 +338,11 @@ class TestTimer:
         ],
         ids=lambda settings: next(iter(settings)),
     )
-    def test_invalid(self, settings):
+    def test_invalid(self, settings: dict[str, Any]) -> None:
         with pytest.raises(MiniError):
             timey.Timer(**settings)
 
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         assert timey.Timer(seconds=3, start_gap=2, end_gap=4).total == 9
         assert timey.clock(0, hours=True) == "00:00:00"
         assert timey.clock(3661) == "01:01:01"
@@ -333,7 +383,7 @@ class TestTimer:
             "order",
         ],
     )
-    def test_duration(self, value, expected):
+    def test_duration(self, value: str, expected: None | int) -> None:
         with pytest.raises(MiniError) if expected is None else nullcontext():
             assert timey.duration(value) == expected
 
@@ -364,28 +414,28 @@ class TestVideo:
             "malformed",
         ],
     )
-    def test_url(self, source, valid):
+    def test_url(self, source: str, valid: bool) -> None:
         with nullcontext() if valid else pytest.raises(MiniError):
             assert timey.youtube_url(source) == "https://www.youtube.com/watch?v=abcdefghijk"
 
-    def test_download(self, tmp_path, monkeypatch):
+    def test_download(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         source = tmp_path / "minecraft.mp4"
         source.write_bytes(b"local")
         assert timey.download(str(source), tmp_path) == (source, "minecraft")
-        options = {}
+        options: dict[str, Any] = {}
 
         class Downloader:
-            def __init__(self, config):
+            def __init__(self, config: dict[str, Any]):
                 options.update(config)
                 self.params = config
 
             def __enter__(self):
                 return self
 
-            def __exit__(self, *_):
+            def __exit__(self, *_: Any):
                 pass
 
-            def extract_info(self, url, download, process):
+            def extract_info(self, url: str, download: bool, process: Mock):
                 assert (
                     url == "https://www.youtube.com/watch?v=abcdefghijk"
                     and not download
@@ -393,7 +443,7 @@ class TestVideo:
                 )
                 return {"title": "Minecraft gameplay", "duration": 20}
 
-            def process_ie_result(self, info, download):
+            def process_ie_result(self, info: dict[str, Any], download: bool):
                 assert download
                 (tmp_path / "source.mp4").write_bytes(b"download")
                 return info
@@ -401,7 +451,10 @@ class TestVideo:
         monkeypatch.setattr(video, "YoutubeDL", Downloader)
         monkeypatch.setattr(video, "DownloadError", RuntimeError)
         path, title = timey.download(
-            "https://youtu.be/abcdefghijk?tracking=" + "x" * 600, tmp_path, seconds=12, height=720
+            "https://youtu.be/abcdefghijk?tracking=" + "x" * 600,
+            tmp_path,
+            seconds=12,
+            height=720,
         )
         assert path.name == "source.mp4" and title == "Minecraft gameplay"
         assert options["noplaylist"] and "height<=720" in options["format"]
@@ -409,25 +462,26 @@ class TestVideo:
         assert options["download_ranges"]({"duration": 20}, None)[0]["end_time"] == 12
         assert options["download_ranges"]({"duration": 5}, None)[0]["end_time"] == 5
 
-    def test_cache(self, tmp_path, monkeypatch):
+    def test_cache(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         root = tmp_path / "cache"
-        calls, updates = [], []
+        calls: list[str] = []
+        updates: list[str] = []
 
         class Downloader:
-            def __init__(self, options):
+            def __init__(self, options: dict[str, Any]):
                 self.params = options
 
             def __enter__(self):
                 return self
 
-            def __exit__(self, *_):
+            def __exit__(self, *_: Any):
                 pass
 
-            def extract_info(self, url, download, process):
+            def extract_info(self, url: str, download: bool, process: Mock):
                 calls.append(url)
                 return {"title": "Minecraft gameplay", "duration": 20}
 
-            def process_ie_result(self, info, download):
+            def process_ie_result(self, info: dict[str, Any], download: bool):
                 assert self.params["concurrent_fragment_downloads"] == 8
                 if "download_ranges" in self.params:
                     section = self.params["download_ranges"](info, self)[0]
@@ -483,30 +537,31 @@ class TestVideo:
                 video.download(url, work, seconds=1, start=start, cache=root)
         assert not list(root.glob(".cache-*"))
 
-    def test_progress(self, tmp_path, monkeypatch):
-        updates, measured = [], threading.Event()
+    def test_progress(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        updates: list[tuple[float | None, str]] = []
+        measured = threading.Event()
 
-        def progress(done, stage):
+        def progress(done: float | None, stage: str):
             updates.append((done, stage))
             if done == 0.5 and "speed" in stage:
                 measured.set()
 
         class Downloader:
-            def __init__(self, options):
+            def __init__(self, options: dict[str, Any]):
                 self.options = options
                 self.params = options
 
             def __enter__(self):
                 return self
 
-            def __exit__(self, *_):
+            def __exit__(self, *_: Any):
                 pass
 
-            def extract_info(self, url, download, process):
+            def extract_info(self, url: str, download: bool, process: Mock):
                 assert not download and not process
                 return {"title": "Music", "duration": 30}
 
-            def process_ie_result(self, info, download):
+            def process_ie_result(self, info: dict[str, Any], download: bool):
                 assert self.options["format"] == "bestaudio/best"
                 self.options["download_ranges"]({"duration": 30}, None)
                 arguments = self.options["external_downloader_args"]["ffmpeg_o"]
@@ -526,7 +581,11 @@ class TestVideo:
 
         monkeypatch.setattr(video, "YoutubeDL", Downloader)
         path, title = video.download(
-            "https://youtu.be/abcdefghijk", tmp_path, seconds=10, audio=True, progress=progress
+            "https://youtu.be/abcdefghijk",
+            tmp_path,
+            seconds=10,
+            audio=True,
+            progress=progress,
         )
         assert path.suffix == ".m4a" and title == "Music"
         assert any(done is None and "ETA" in stage for done, stage in updates)
@@ -534,14 +593,18 @@ class TestVideo:
         assert not any(thread.name == "timey-download" for thread in threading.enumerate())
         measured.clear()
 
-        def fail(done, stage):
+        def fail(done: float | None, stage: str):
             if done == 0.5 and "speed" in stage:
                 measured.set()
                 raise RuntimeError("progress callback failed")
 
         with pytest.raises(RuntimeError, match="callback failed"):
             video.download(
-                "https://youtu.be/abcdefghijk", tmp_path, seconds=10, audio=True, progress=fail
+                "https://youtu.be/abcdefghijk",
+                tmp_path,
+                seconds=10,
+                audio=True,
+                progress=fail,
             )
         assert not any(thread.name == "timey-download" for thread in threading.enumerate())
 
@@ -550,7 +613,7 @@ class TestStyle:
     @pytest.mark.parametrize(
         "state", ["fresh", "cached", "stale", "broken", "large", "offline", "malformed"]
     )
-    def test_catalogue(self, tmp_path, monkeypatch, state):
+    def test_catalogue(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str) -> None:
         payload = json.dumps({
             "familyMetadataList": [
                 {"family": "Open Sans", "category": "Sans Serif"},
@@ -562,10 +625,10 @@ class TestStyle:
             path.write_bytes(b"bad" if state == "broken" else payload)
             if state == "stale":
                 os.utime(path, (1, 1))
-        requests = []
+        requests: list[str] = []
 
-        def reply(request):
-            requests.append(request.url)
+        def reply(request: httpx.Request):
+            requests.append(str(request.url))
             if state in {"offline", "stale"}:
                 raise httpx.ConnectError("Offline")
             data = payload
@@ -576,7 +639,7 @@ class TestStyle:
             return httpx.Response(200, content=data)
 
         with httpx.Client(transport=httpx.MockTransport(reply)) as client:
-            monkeypatch.setattr(style.httpx, "stream", client.stream)
+            monkeypatch.setattr(httpx, "stream", client.stream)
             if state in {"offline", "large", "malformed"}:
                 with pytest.raises(MiniError, match="catalogue"):
                     style.catalogue(tmp_path)
@@ -592,9 +655,14 @@ class TestStyle:
 
     @pytest.mark.parametrize(
         "query,family",
-        [("spook", "Creepster"), ("ariel", "Arimo"), ("Ciznel", "Cinzel"), ("sci fi", "Orbitron")],
+        [
+            ("spook", "Creepster"),
+            ("ariel", "Arimo"),
+            ("Ciznel", "Cinzel"),
+            ("sci fi", "Orbitron"),
+        ],
     )
-    def test_fonts(self, query, family):
+    def test_fonts(self, query: str, family: str) -> None:
         assert family in style.fonts(query)
         assert family in style.fonts(query)[family]
         assert not style.fonts("random nonsense")
@@ -604,15 +672,17 @@ class TestStyle:
     @pytest.mark.parametrize(
         "status,message", [(400, "did not recognise"), (503, "Could not download")]
     )
-    def test_font_error(self, tmp_path, monkeypatch, status, message):
-        if style.ImageFont is None:
+    def test_font_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int, message: str
+    ) -> None:
+        if ImageFont is None:
             pytest.skip("Pillow is an optional Timey dependency")
         client = httpx.Client
         monkeypatch.setattr(
-            style.httpx,
+            httpx,
             "Client",
-            lambda **kwargs: client(
-                transport=httpx.MockTransport(lambda request: httpx.Response(status)), **kwargs
+            partial(
+                client, transport=httpx.MockTransport(Mock(return_value=httpx.Response(status)))
             ),
         )
         with pytest.raises(MiniError, match=message):
@@ -660,8 +730,13 @@ class TestStyle:
             "code",
         ],
     )
-    def test_invalid(self, art, path, value):
-        target = art
+    def test_invalid(
+        self,
+        art: dict[str, Any],
+        path: tuple[str, int, str] | tuple[str, str, str] | tuple[str, str] | tuple[str],
+        value: Any,
+    ) -> None:
+        target: Any = art
         for key in path[:-1]:
             target = target[key]
         target[path[-1]] = value
@@ -669,8 +744,10 @@ class TestStyle:
             style.validate(art)
 
     @pytest.mark.parametrize("agent", ["codex", "claude"])
-    def test_generate(self, tmp_path, art, designer, agent):
-        progress = []
+    def test_generate(
+        self, tmp_path: Path, art: dict[str, Any], designer: SimpleNamespace, agent: str
+    ) -> None:
+        progress: list[tuple[float | None, str]] = []
         generated, saved = style.design(
             "Hollow Knight mask and soul vessel",
             tmp_path,
@@ -689,11 +766,24 @@ class TestStyle:
             ("codex", "{}", 1, "could not finish"),
             ("claude", "{broken", 0, "valid structured data"),
             ("claude", "{}", 0, "valid structured data"),
-            ("claude", '{"is_error":true,"result":"not signed in"}', 0, "not signed in"),
+            (
+                "claude",
+                '{"is_error":true,"result":"not signed in"}',
+                0,
+                "not signed in",
+            ),
         ],
         ids=["json", "size", "exit", "claude-json", "claude-fields", "claude-error"],
     )
-    def test_response(self, tmp_path, designer, agent, response, status, error):
+    def test_response(
+        self,
+        tmp_path: Path,
+        designer: SimpleNamespace,
+        agent: str,
+        response: Any,
+        status: int,
+        error: str,
+    ) -> None:
         designer.output[agent], designer.status = response, status
         original = tmp_path / "saved.json"
         original.write_text("keep")
@@ -704,21 +794,27 @@ class TestStyle:
 
     @pytest.mark.skipif(Image is None, reason="Pillow is an optional Timey dependency")
     @pytest.mark.parametrize("font", ["serif", "pixel"])
-    def test_custom(self, art, font):
+    def test_custom(self, art: dict[str, Any], font: str) -> None:
         art["font"] = font
         timer = timey.Timer(seconds=2, start_gap=0, end_gap=0, style=art["name"], artwork=art)
         assert len(list(timey.frames(timer, 1920, 1080))) == 2
         assert next(timey.frames(replace(timer, seconds=3600), 720, 1280, preview=True))
 
     @pytest.mark.parametrize("force", [False, True], ids=["terminate", "kill"])
-    def test_timeout(self, tmp_path, monkeypatch, designer, force):
+    def test_timeout(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        designer: SimpleNamespace,
+        force: bool,
+    ) -> None:
         from unittest.mock import Mock
 
         process = Mock(stdin=BytesIO())
         process.poll.side_effect = [None, None]
         process.wait.side_effect = [subprocess.TimeoutExpired("agent", 5), 0] if force else [0]
-        monkeypatch.setattr(style.subprocess, "Popen", Mock(return_value=process))
-        monkeypatch.setattr(style.time, "monotonic", Mock(side_effect=[0, 301]))
+        monkeypatch.setattr(subprocess, "Popen", Mock(return_value=process))
+        monkeypatch.setattr(time, "monotonic", Mock(side_effect=[0, 301]))
         with pytest.raises(MiniError, match="timed out"):
             style.design("A custom theme", tmp_path, agent="codex")
         process.terminate.assert_called_once()
@@ -737,24 +833,32 @@ class TestStyle:
         ],
         ids=["preferred", "fallback", "explicit", "none", "missing", "invalid"],
     )
-    def test_designer(self, monkeypatch, chosen, available, expected):
-        monkeypatch.setattr(
-            style.shutil, "which", lambda name: f"/bin/{name}" if name in available else None
-        )
+    def test_designer(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        chosen: str,
+        available: tuple[str, ...],
+        expected: None | str,
+    ) -> None:
+        def which(name: str) -> str | None:
+            return f"/bin/{name}" if name in available else None
+
+        monkeypatch.setattr(shutil, "which", which)
         with nullcontext() if expected else pytest.raises(MiniError):
             assert style.designer(chosen) == expected
 
     @pytest.mark.parametrize(
-        "title,expected", [("Temple_Run gameplay", "temple-run"), ("Unknown game", "minimal")]
+        "title,expected",
+        [("Temple_Run gameplay", "temple-run"), ("Unknown game", "minimal")],
     )
-    def test_suggest(self, title, expected):
+    def test_suggest(self, title: str, expected: str) -> None:
         assert timey.suggest_style(title) == expected
 
     @pytest.mark.parametrize("name", timey.STYLES)
     @pytest.mark.parametrize(
         "width,height", [(1920, 1080), (720, 1280)], ids=["landscape", "portrait"]
     )
-    def test_layouts(self, name, width, height):
+    def test_layouts(self, name: str, width: int, height: int) -> None:
         if Image is None:
             pytest.skip("Pillow is an optional Timey dependency")
         timer = timey.Timer(seconds=2, start_gap=2, end_gap=2, style=name, position="bottom-centre")
@@ -769,11 +873,11 @@ class TestStyle:
             assert panel.mode == "RGBA"
 
     @pytest.mark.skipif(Image is None, reason="Pillow is an optional Timey dependency")
-    def test_preview(self):
+    def test_preview(self) -> None:
         timer = timey.Timer(seconds=86400, start_gap=3600, end_gap=3600)
         assert len(list(timey.frames(timer, 1920, 1080, preview=True))) == 1
 
-    def test_art(self, tmp_path, monkeypatch):
+    def test_art(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         if Image is None:
             pytest.skip("Pillow is an optional Timey dependency")
         original = video._temple_digits
@@ -784,9 +888,9 @@ class TestStyle:
             glyph.mode == "RGBA" and glyph.getchannel("A").getextrema() == (0, 255)
             for glyph in glyphs.values()
         )
-        calls = []
+        calls: list[int] = []
 
-        def load(height):
+        def load(height: int):
             calls.append(height)
             return original(height)
 
@@ -796,10 +900,14 @@ class TestStyle:
         assert len(images) == 4 and calls == [176]
         intro = Image.open(BytesIO(images[0]))
         live = Image.open(BytesIO(images[1]))
-        left, top, right, bottom = ImageChops.difference(intro, live).convert("RGB").getbbox()
+        bounds = ImageChops.difference(intro, live).convert("RGB").getbbox()
+        assert bounds is not None
+        left, top, right, bottom = bounds
         assert 210 <= left < right <= 871 and 376 <= top < bottom <= 409
-        with Image.open((video.ASSETS / "timey/art") / "plate.png") as stone:
-            backdrop = stone.convert("RGBA").resize(live.size, Image.Resampling.LANCZOS)
+        with Image.open((ASSETS / "timey/art") / "plate.png") as stone:
+            backdrop = stone.convert("RGBA").resize(  # pyright: ignore[reportUnknownMemberType]
+                live.size, Image.Resampling.LANCZOS
+            )
             assert (
                 ImageChops
                 .difference(live, backdrop)
@@ -822,23 +930,31 @@ class TestStyle:
             )
             for seconds in (86400, 3661)
         ]
-        left, top, right, bottom = ImageChops.difference(*previews).convert("RGB").getbbox()
+        bounds = ImageChops.difference(*previews).convert("RGB").getbbox()
+        assert bounds is not None
+        left, top, right, bottom = bounds
         assert 150 <= left < right <= 930 and 186 <= top < bottom <= 358
-        custom = replace(timer, font=str((video.ASSETS / "timey/fonts") / "skranji.ttf"))
+        custom = replace(timer, font=str((ASSETS / "timey/fonts") / "skranji.ttf"))
         calls.clear()
         custom_frame = next(timey.frames(custom, 3840, 2160, preview=True))
         assert not calls and custom_frame != images[1]
         next(timey.frames(replace(timer, label="Focus time"), 3840, 2160, preview=True))
         assert calls == [124]
 
-    def test_motion(self, tmp_path, monkeypatch, clip):
+    def test_motion(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clip: Clip) -> None:
         source = clip("source.mp4", "color=c=black:s=640x360:r=30:d=1")
         timer = timey.Timer(
-            seconds=86400, start_gap=3600, end_gap=3600, style="temple-run", size=2, loop_blend=0
+            seconds=86400,
+            start_gap=3600,
+            end_gap=3600,
+            style="temple-run",
+            size=2,
+            loop_blend=0,
         )
-        original, counts = video.frames, []
+        original = video.frames
+        counts: list[bool] = []
 
-        def frames(*args, **kwargs):
+        def frames(*args: Any, **kwargs: Any):
             for png in original(*args, **kwargs):
                 counts.append(True)
                 yield png
@@ -897,25 +1013,30 @@ class TestStyle:
         with pytest.raises(MiniError, match="still preview or a motion sample"):
             timey.render(source, tmp_path / "invalid.png", timer, preview=True, sample=True)
 
-    def test_font(self, tmp_path, monkeypatch):
+    def test_font(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         if Image is None:
             pytest.skip("Pillow is an optional Timey dependency")
-        payload = Path(video._font("mono", 16).path).read_bytes()
-        requested = []
+        font_path = video._font("mono", 16).path
+        assert isinstance(font_path, (str, bytes, Path))
+        payload = Path(
+            font_path.decode() if isinstance(font_path, bytes) else font_path
+        ).read_bytes()
+        requested: list[str] = []
         real_client = httpx.Client
 
-        def response(request):
+        def response(request: httpx.Request):
             requested.append(str(request.url))
             if request.url.host == "fonts.googleapis.com":
                 return httpx.Response(
-                    200, text="@font-face {src: url(https://fonts.gstatic.com/s/test/font.ttf)}"
+                    200,
+                    text="@font-face {src: url(https://fonts.gstatic.com/s/test/font.ttf)}",
                 )
             return httpx.Response(200, content=payload)
 
         monkeypatch.setattr(
-            style.httpx,
+            httpx,
             "Client",
-            lambda **kwargs: real_client(transport=httpx.MockTransport(response), **kwargs),
+            partial(real_client, transport=httpx.MockTransport(response)),
         )
         cached = style.font("https://fonts.google.com/specimen/Press+Start+2P", tmp_path)
         assert Path(cached).read_bytes() == payload
@@ -931,15 +1052,15 @@ class TestStyle:
             with pytest.raises(MiniError, match="HTTPS Google Fonts"):
                 style.font(link, tmp_path)
         monkeypatch.setattr(
-            style.httpx,
+            httpx,
             "Client",
-            lambda **kwargs: real_client(
+            partial(
+                real_client,
                 transport=httpx.MockTransport(
                     lambda request: httpx.Response(
                         302, headers={"location": "https://evil.test/font.ttf"}
                     )
                 ),
-                **kwargs,
             ),
         )
         with pytest.raises(MiniError, match="HTTPS Google Fonts"):
@@ -947,7 +1068,22 @@ class TestStyle:
 
 
 class TestUpload:
-    def test_metadata(self, draft):
+    def test_thumbnail(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        image = tmp_path / "thumbnail.png"
+        image.write_bytes(b"original image")
+        path = tmp_path / "details.json"
+        monkeypatch.setattr(
+            wizard,
+            "ask",
+            Mock(side_effect=["Title", "Description", "timer", "private", "custom", str(image)]),
+        )
+        monkeypatch.setattr(wizard, "confirm", Mock(side_effect=[False, False, True, False]))
+        monkeypatch.setattr(wizard, "picture", Mock(return_value=Preview(Text("image"), "Image")))
+        wizard._upload_details(path, "Title", metadata=False)
+        assert image.read_bytes() == b"original image"
+        assert youtube.read_details(path)["thumbnail"] == str(image)
+
+    def test_metadata(self, draft: dict[str, Any]) -> None:
         data = draft
         assert "tags" not in youtube.validate(data)["snippet"]
         data["status"]["publishAt"] = "2099-01-01T18:00:00+10:00"
@@ -998,22 +1134,26 @@ class TestUpload:
             "status-type",
         ],
     )
-    def test_invalid(self, draft, section, change):
+    def test_invalid(
+        self, draft: dict[str, Any], section: None | str, change: dict[str, Any]
+    ) -> None:
         draft["status"]["publishAt"] = "2099-01-01T18:00:00+10:00"
         (draft[section] if section else draft).update(change)
         with pytest.raises(MiniError):
             youtube.validate(draft)
 
     @pytest.mark.parametrize(
-        "content", ["{broken", "[]", " " * 65537], ids=["invalid-json", "wrong-shape", "too-large"]
+        "content",
+        ["{broken", "[]", " " * 65537],
+        ids=["invalid-json", "wrong-shape", "too-large"],
     )
-    def test_draft(self, tmp_path, content):
+    def test_draft(self, tmp_path: Path, content: Any) -> None:
         draft = tmp_path / "details.json"
         draft.write_text(content)
         with pytest.raises(MiniError):
             youtube.read_details(draft)
 
-    def test_chunks(self, tmp_path, monkeypatch):
+    def test_chunks(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         if youtube.build is None:
             pytest.skip("Google's upload client is an optional Timey dependency")
         data = {
@@ -1035,19 +1175,21 @@ class TestUpload:
             valid=True, expired=False, to_json=lambda: '{"token":"private"}'
         )
         monkeypatch.setattr(
-            youtube.Credentials, "from_authorized_user_file", lambda *args: credentials
+            youtube.Credentials, "from_authorized_user_file", Mock(return_value=credentials)
         )
         replies = iter([
             (SimpleNamespace(progress=lambda: 0.5), None),
             (None, {"id": "abcdefghijk", "status": {"privacyStatus": "private"}}),
         ])
-        called, closed, progress = [], [], []
+        called: list[dict[str, Any]] = []
+        closed: list[bool] = []
+        progress: list[float | None] = []
 
-        def insert(**kwargs):
+        def insert(**kwargs: Any):
             called.append(kwargs)
-            return SimpleNamespace(next_chunk=lambda num_retries: next(replies))
+            return SimpleNamespace(next_chunk=Mock(side_effect=replies))
 
-        def thumbnail_set(**kwargs):
+        def thumbnail_set(**kwargs: Any):
             assert video.with_suffix(".uploaded.json").exists()
             raise youtube.HttpError(SimpleNamespace(status=403, reason="Forbidden"), b"{}")
 
@@ -1056,7 +1198,7 @@ class TestUpload:
             thumbnails=lambda: SimpleNamespace(set=thumbnail_set),
             close=lambda: closed.append(True),
         )
-        monkeypatch.setattr(youtube, "build", lambda *args, **kwargs: service)
+        monkeypatch.setattr(youtube, "build", Mock(return_value=service))
         with pytest.raises(MiniError, match="Video uploaded to .*thumbnail failed"):
             youtube.upload(
                 video,
@@ -1077,7 +1219,13 @@ class TestUpload:
 
 
 class TestWizard:
-    def test_metadata(self, tmp_path, monkeypatch, runner, tty):
+    def test_metadata(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+    ) -> None:
         context = {
             "video_title": "Unverified Minecraft gameplay title",
             "style": "temple-run",
@@ -1095,13 +1243,16 @@ class TestWizard:
         assert "00:05" in draft["description"] and "01:05" in draft["description"]
         assert context["source_url"] in draft["description"] and "Minecraft" not in draft["title"]
         assert "Audio: muted" in draft["description"]
-        prompts = []
+        prompts: list[str] = []
 
-        def generate(prompt, schema, directory, **kwargs):
+        def generate(prompt: str, schema: dict[str, Any], directory: Path, **kwargs: Any):
             prompts.append(prompt)
             assert schema == youtube.METADATA and kwargs["agent"] == "claude"
             assert kwargs["task"] == "Writing your YouTube metadata"
-            return {**draft, "title": "1 Minute Countdown Timer | Temple-Inspired Stone & Gold"}
+            return {
+                **draft,
+                "title": "1 Minute Countdown Timer | Temple-Inspired Stone & Gold",
+            }
 
         monkeypatch.setattr(youtube, "generate", generate)
         generated = youtube.metadata(context, tmp_path, agent="claude")
@@ -1110,17 +1261,17 @@ class TestWizard:
         for bad in ({"seconds": "60"}, {"seconds": True}, {"seconds": 0}):
             with pytest.raises(MiniError, match="Metadata"):
                 youtube.metadata({**context, "countdown_seconds": bad["seconds"]}, tmp_path)
-        monkeypatch.setattr(
-            youtube, "generate", lambda *args, **kwargs: {**draft, "title": "x" * 101}
-        )
+        monkeypatch.setattr(youtube, "generate", Mock(return_value={**draft, "title": "x" * 101}))
         with pytest.raises(MiniError, match="title"):
             youtube.metadata(context, tmp_path, agent="claude")
         monkeypatch.setattr(wizard, "sys", tty)
-        monkeypatch.setattr(wizard, "_metadata", lambda *args: generated)
+        monkeypatch.setattr(wizard, "_metadata", Mock(return_value=generated))
         path = tmp_path / "wizard.youtube.json"
-        monkeypatch.setattr(
-            wizard, "prepare_upload", lambda *args, **kwargs: youtube.read_details(path)
-        )
+
+        def read_draft(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            return youtube.read_details(path)
+
+        monkeypatch.setattr(wizard, "prepare_upload", Mock(side_effect=read_draft))
         result = runner.invoke(
             cli.app,
             [
@@ -1143,24 +1294,40 @@ class TestWizard:
         )
         assert result.exit_code == 0 and "Upload skipped" in result.output
 
-    def test_tab(self, tmp_path, monkeypatch, pipe, tab, screen):
+    def test_tab(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        pipe: PipeInput,
+        tab: Callable[[str], None],
+        screen: Screen,
+    ) -> None:
         monkeypatch.chdir(tmp_path)
         (tmp_path / "moon timer.mp4").touch()
         styles = tmp_path / ".minis/timey/styles"
         styles.mkdir(parents=True)
         (styles / "frosted-orbit.json").touch()
         screen(live=True)
-        for prefix, options, expected in (
+        cases: tuple[tuple[str, dict[str, Any], str], ...] = (
             ("mine", {"suggestions": wizard._styles(), "paths": True}, "minecraft"),
-            ("frost", {"suggestions": wizard._styles(), "paths": True}, "frosted-orbit"),
+            (
+                "frost",
+                {"suggestions": wizard._styles(), "paths": True},
+                "frosted-orbit",
+            ),
             ("cent", {"choices": video.POSITIONS}, "centre"),
             (
                 "237",
-                {"choices": ["03-237 · 26 seats · Seminar"], "show_choices": False, "search": True},
+                {
+                    "choices": ["03-237 · 26 seats · Seminar"],
+                    "show_choices": False,
+                    "search": True,
+                },
                 "03-237 · 26 seats · Seminar",
             ),
             ("moo", {"paths": True}, "moon timer.mp4"),
-        ):
+        )
+        for prefix, options, expected in cases:
             tab(prefix)
             assert terminal.ask("Choose", **options) == expected
         pipe.send_text("An icy moon with carved numbers\n")
@@ -1212,12 +1379,20 @@ class TestWizard:
             "output-collision",
         ],
     )
-    def test_guards(self, tmp_path, monkeypatch, args, runner):
+    def test_guards(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, args: list[str], runner: CliRunner
+    ) -> None:
         monkeypatch.chdir(tmp_path)
         result = runner.invoke(cli.app, ["timey", *args])
         assert result.exit_code == 2 and "Traceback" not in result.output
 
-    def test_preview(self, tmp_path, monkeypatch, runner, tty):
+    def test_preview(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+    ) -> None:
         assert (
             "--start-gap"
             in Text.from_ansi(runner.invoke(cli.app, ["timey", "--help"]).output).plain
@@ -1225,18 +1400,20 @@ class TestWizard:
         monkeypatch.setattr(wizard, "sys", tty)
         monkeypatch.setattr(wizard, "require_ffmpeg", lambda: None)
         monkeypatch.setattr(
-            wizard, "download", lambda *args, **kwargs: (tmp_path / "source.mp4", "Minecraft")
+            wizard,
+            "download",
+            Mock(return_value=(tmp_path / "source.mp4", "Minecraft")),
         )
-        renders = []
+        renders: list[tuple[video.Timer, dict[str, Any]]] = []
 
-        def render(source, output, timer, **kwargs):
+        def render(source: Path, output: Path, timer: video.Timer, **kwargs: Any):
             renders.append((timer, kwargs))
             output.parent.mkdir(parents=True, exist_ok=True)
             output.touch()
 
         monkeypatch.setattr(wizard, "render", render)
         monkeypatch.setattr(
-            wizard, "upload", lambda *args, **kwargs: pytest.fail("upload was declined")
+            wizard, "upload", Mock(side_effect=AssertionError("upload was declined"))
         )
         result = runner.invoke(
             cli.app,
@@ -1249,17 +1426,27 @@ class TestWizard:
         assert renders[1][0] == timey.Timer(seconds=3, start_gap=2, end_gap=4, style="minecraft")
         assert not list(tmp_path.glob(".timey-*"))
 
-    def test_upload(self, tmp_path, monkeypatch, runner, tty):
+    def test_upload(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+    ) -> None:
         monkeypatch.setattr(wizard, "sys", tty)
         monkeypatch.setattr(wizard, "require_ffmpeg", lambda: None)
         monkeypatch.setattr(
-            wizard, "download", lambda *args, **kwargs: (tmp_path / "source.mp4", "Minecraft")
+            wizard,
+            "download",
+            Mock(return_value=(tmp_path / "source.mp4", "Minecraft")),
         )
+
+        def render(source: Path, output: Path, timer: video.Timer, **kwargs: Any) -> None:
+            output.touch()
+
+        monkeypatch.setattr(wizard, "render", render)
         monkeypatch.setattr(
-            wizard, "render", lambda source, output, timer, **kwargs: output.touch()
-        )
-        monkeypatch.setattr(
-            wizard, "upload", lambda *args, **kwargs: pytest.fail("upload was declined")
+            wizard, "upload", Mock(side_effect=AssertionError("upload was declined"))
         )
         output, details, description = (
             tmp_path / name for name in ("timer.mp4", "details.json", "description.txt")
@@ -1320,31 +1507,41 @@ class TestWizard:
         assert data["status"]["license"] == "creativeCommon"
         assert output.exists() and "Upload skipped" in result.output
 
-    def test_music(self, tmp_path, monkeypatch, runner, art, tty, screen):
+    def test_music(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        art: dict[str, Any],
+        tty: SimpleNamespace,
+        screen: Screen,
+    ) -> None:
         console, _ = screen()
         monkeypatch.setattr(wizard, "CONSOLE", console)
         monkeypatch.setattr(wizard, "sys", tty)
         monkeypatch.setattr(wizard, "require_ffmpeg", lambda: None)
-        monkeypatch.setattr(wizard, "reference", lambda *args, **kwargs: None)
-        monkeypatch.setattr(wizard, "choose_designer", lambda value: value)
-        data, downloads, renders = art, [], []
+        monkeypatch.setattr(wizard, "reference", Mock(return_value=None))
+        monkeypatch.setattr(wizard, "choose_designer", str)
+        data = art
+        downloads: list[tuple[str, dict[str, Any]]] = []
+        renders: list[tuple[video.Timer, dict[str, Any]]] = []
 
-        def download(source, directory, **kwargs):
+        def download(source: str, directory: Path, **kwargs: Any):
             downloads.append((source, kwargs))
             return tmp_path / ("music.m4a" if kwargs.get("audio") else "game.mp4"), "Hollow Knight"
 
         monkeypatch.setattr(wizard, "download", download)
-        monkeypatch.setattr(
-            wizard, "design", lambda *args, **kwargs: (data, tmp_path / "custom.json")
-        )
-        monkeypatch.setattr(wizard, "resolve_font", lambda *args, **kwargs: "")
+        monkeypatch.setattr(wizard, "design", Mock(return_value=(data, tmp_path / "custom.json")))
+        monkeypatch.setattr(wizard, "resolve_font", Mock(return_value=""))
+
+        def render(source: Path, output: Path, timer: video.Timer, **kwargs: Any) -> None:
+            renders.append((timer, kwargs))
+            output.touch()
+
         monkeypatch.setattr(
             wizard,
             "render",
-            lambda source, output, timer, **kwargs: (
-                renders.append((timer, kwargs)),
-                output.touch(),
-            ),
+            render,
         )
         result = runner.invoke(
             cli.app,
@@ -1378,23 +1575,35 @@ class TestWizard:
 class TestRender:
     @pytest.mark.parametrize(
         "error,cancelled,fails",
-        [(EPIPE, False, False), (EINVAL, True, False), (EINVAL, False, True), (EIO, True, True)],
+        [
+            (EPIPE, False, False),
+            (EINVAL, True, False),
+            (EINVAL, False, True),
+            (EIO, True, True),
+        ],
         ids=["closed", "cancelled", "invalid", "io"],
     )
-    def test_pipe(self, tmp_path, monkeypatch, error, cancelled, fails):
+    def test_pipe(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        error: Exception | None,
+        cancelled: bool,
+        fails: bool,
+    ) -> None:
         stopped = threading.Event()
         if cancelled:
             stopped.set()
         monkeypatch.setattr(video, "Event", lambda: stopped)
         process = Mock(stdout=BytesIO(), wait=Mock(return_value=0), poll=Mock(return_value=0))
         process.stdin.close.side_effect = OSError(error, "closed pipe")
-        monkeypatch.setattr(video.subprocess, "Popen", Mock(return_value=process))
+        monkeypatch.setattr(subprocess, "Popen", Mock(return_value=process))
         with pytest.raises(OSError) if fails else nullcontext():
             video._encode(["ffmpeg"], tmp_path, 1, "Timer", None, iter([b"frame"]))
         process.stdin.close.assert_called_once()
         assert not any(thread.name == "timey-overlay" for thread in threading.enumerate())
 
-    def test_timing(self, tmp_path, clip):
+    def test_timing(self, tmp_path: Path, clip: Clip) -> None:
         source = clip(
             "source.mp4",
             "color=c=black:s=320x180:r=24,geq=lum='20+150*N/143':cb=128:cr=128",
@@ -1405,7 +1614,7 @@ class TestRender:
         timer = timey.Timer(seconds=7, start_gap=1, end_gap=1, motion=False, loop_blend=0)
         still, output = tmp_path / "preview.png", tmp_path / "timer.mp4"
         video.render(source, still, timer, start=3, preview=True, height=480)
-        assert Image.open(still).getpixel((5, 5))[0] > 75
+        assert cast(tuple[int, int, int], Image.open(still).getpixel((5, 5)))[0] > 75
         video.render(source, output, timer, start=3, height=480)
         assert video._inspect(output)[2:][0]
         assert video._inspect(output)[3] == pytest.approx(9, abs=0.05)
@@ -1428,11 +1637,15 @@ class TestRender:
                 check=True,
                 capture_output=True,
             )
-            assert Image.open(image).getpixel((5, 5))[0] > 75
+            assert cast(tuple[int, int, int], Image.open(image).getpixel((5, 5)))[0] > 75
         details = output.with_suffix(".youtube.json")
         details.write_text(
             json.dumps({
-                "snippet": {"title": "Timestamped timer", "description": "", "tags": ["timer"]},
+                "snippet": {
+                    "title": "Timestamped timer",
+                    "description": "",
+                    "tags": ["timer"],
+                },
                 "status": {
                     "privacyStatus": "private",
                     "selfDeclaredMadeForKids": False,
@@ -1468,12 +1681,16 @@ class TestRender:
         with pytest.raises(MiniError, match="overwrite the video"):
             youtube.prepare(output, output)
         video.render(
-            source, tmp_path / "smooth.mp4", replace(timer, loop_blend=0.6), start=3, height=480
+            source,
+            tmp_path / "smooth.mp4",
+            replace(timer, loop_blend=0.6),
+            start=3,
+            height=480,
         )
         assert video._inspect(tmp_path / "smooth.mp4")[3] == pytest.approx(9, abs=0.05)
         assert not list(tmp_path.glob(".thumbnail-*")) and not list(tmp_path.glob(".timey-*"))
 
-    def test_export(self, tmp_path, clip):
+    def test_export(self, tmp_path: Path, clip: Clip) -> None:
         source = clip(
             "source.mp4",
             "color=c=navy:s=640x360:r=30",
@@ -1494,7 +1711,7 @@ class TestRender:
         assert float(
             next(item for item in streams if item["codec_type"] == "video")["duration"]
         ) == pytest.approx(4, abs=0.04)
-        crops = []
+        crops: list[bytes] = []
         x, y, scale = timey.placement(timer, 640, 360)
         for second in (0.1, 1.1, 2.1, 3.1):
             png = subprocess.run(
@@ -1528,7 +1745,7 @@ class TestRender:
         with pytest.raises(MiniError, match="overwrite"):
             timey.render(source, output, timer)
 
-        def cancel(*args):
+        def cancel(*args: Any):
             if args[1].startswith("Rendering the timer"):
                 raise KeyboardInterrupt
 
@@ -1538,7 +1755,7 @@ class TestRender:
         assert not list(tmp_path.glob(".timey-*"))
         assert not any(thread.name == "timey-overlay" for thread in threading.enumerate())
 
-    def test_loop(self, tmp_path, clip):
+    def test_loop(self, tmp_path: Path, clip: Clip) -> None:
         source = clip(
             "twenty.mp4",
             "color=c=black:s=320x180:r=24,"
@@ -1550,13 +1767,20 @@ class TestRender:
         animated, still, hard = (
             tmp_path / name for name in ("animated.mp4", "still.mp4", "hard.mp4")
         )
-        stages = []
+        stages: list[str] = []
         timey.render(
-            source, animated, timer, fps=24, progress=lambda done, stage: stages.append(stage)
+            source,
+            animated,
+            timer,
+            fps=24,
+            progress=lambda done, stage: stages.append(stage),
         )
         timey.render(source, still, replace(timer, motion=False), fps=24)
         timey.render(
-            source, hard, replace(timer, style="minimal", motion=False, loop_blend=0), fps=24
+            source,
+            hard,
+            replace(timer, style="minimal", motion=False, loop_blend=0),
+            fps=24,
         )
         assert any("Smoothing the loop" in stage for stage in stages)
         assert timey.probe(animated) == (320, 180, False)
@@ -1576,7 +1800,7 @@ class TestRender:
             text=True,
         ).stdout
         assert float(duration) == pytest.approx(63, abs=0.04)
-        jumps = []
+        jumps: list[float] = []
         for output in (animated, hard):
             pixels = subprocess.run(
                 [
@@ -1598,7 +1822,7 @@ class TestRender:
             jumps.append(max(abs(a - b) for a, b in zip(pixels, pixels[1:])))
         assert jumps[0] < 30 and jumps[1] > 150
 
-        def frame(output):
+        def frame(output: Path):
             png = subprocess.run(
                 [
                     "ffmpeg",
@@ -1635,11 +1859,11 @@ class TestRender:
             y + round(234 * scale) - 10,
         ))
         assert max(ImageStat.Stat(centre).mean) < 2
-        assert max(high for low, high in delta.getextrema()) > 10
+        assert max(high for _, high in cast(tuple[tuple[int, int], ...], delta.getextrema())) > 10
 
         old = animated.read_bytes()
 
-        def cancel(done, stage):
+        def cancel(done: float | None, stage: str):
             if stage.startswith("Smoothing the loop"):
                 raise KeyboardInterrupt
 
@@ -1647,7 +1871,7 @@ class TestRender:
             timey.render(source, animated, timer, force=True, progress=cancel)
         assert animated.read_bytes() == old and not list(tmp_path.glob(".timey-*"))
 
-    def test_audio(self, tmp_path, clip):
+    def test_audio(self, tmp_path: Path, clip: Clip) -> None:
         source = clip("source.mp4", "color=s=320x180:r=30", audio=True)
         music = tmp_path / "music.wav"
         subprocess.run(
@@ -1667,10 +1891,10 @@ class TestRender:
             capture_output=True,
         )
         timer = timey.Timer(seconds=3, start_gap=0, end_gap=1)
-        measured = []
+        measured: list[list[float]] = []
         for mix, volume in ((False, 1), (True, 1), (False, 0.5)):
             output = tmp_path / f"{mix}-{volume}.mp4"
-            progress = []
+            progress: list[tuple[float | None, str]] = []
             video.render(
                 source,
                 output,
@@ -1727,7 +1951,17 @@ class TestRender:
             video.render(source, tmp_path / "invalid.mp4", timer, music=tmp_path / "missing.wav")
         silent = tmp_path / "silent.mp4"
         subprocess.run(
-            ["ffmpeg", "-v", "error", "-i", str(source), "-c:v", "copy", "-an", str(silent)],
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-i",
+                str(source),
+                "-c:v",
+                "copy",
+                "-an",
+                str(silent),
+            ],
             check=True,
             capture_output=True,
         )

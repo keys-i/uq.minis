@@ -7,7 +7,7 @@ import math
 import re
 import shutil
 import subprocess
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator, Sequence
 from dataclasses import dataclass, replace
 from errno import EINVAL, EPIPE
 from io import BytesIO
@@ -15,6 +15,8 @@ from itertools import chain, islice, repeat
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs, urlsplit
 
 from uq_minis.assets import ROOT as ASSETS
@@ -22,19 +24,34 @@ from uq_minis.core.common import MiniError, ensure_outputs
 from uq_minis.minis.timey import cache as media_cache
 from uq_minis.minis.timey.style import validate as validate_style
 
-try:
-    from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
-except ImportError:
-    Image = ImageChops = ImageDraw = ImageFilter = ImageFont = None
+if TYPE_CHECKING:
+    from PIL import Image as Image
+    from PIL import ImageChops as ImageChops
+    from PIL import ImageDraw as ImageDraw
+    from PIL import ImageFilter as ImageFilter
+    from PIL import ImageFont as ImageFont
+else:
+    try:
+        from PIL import Image as Image
+        from PIL import ImageChops as ImageChops
+        from PIL import ImageDraw as ImageDraw
+        from PIL import ImageFilter as ImageFilter
+        from PIL import ImageFont as ImageFont
+    except ImportError:
+        Image = ImageChops = ImageDraw = ImageFilter = ImageFont = None
 
-try:
+if TYPE_CHECKING:
     from yt_dlp import YoutubeDL
-    from yt_dlp.utils import DownloadError
-except ImportError:
-    YoutubeDL = None
-    DownloadError = MiniError
+    from yt_dlp.utils import DownloadError as DownloadError
+else:
+    try:
+        from yt_dlp import YoutubeDL
+        from yt_dlp.utils import DownloadError as DownloadError
+    except ImportError:
+        YoutubeDL = None
+        DownloadError = MiniError
 
-STYLES = frozendict({
+STYLES = MappingProxyType({
     "temple-run": (
         "Weathered temple stone, emerald gems and cracked gold numerals",
         "8EE62C",
@@ -72,7 +89,7 @@ STYLES = frozendict({
         "sans",
     ),
 })
-FONTS = frozendict({
+FONTS = MappingProxyType({
     "temple-run": "skranji",
     "minecraft": "pressstart2p",
     "subway-surfers": "bungee",
@@ -123,7 +140,7 @@ class Timer:
     label: str = ""
     accent: str = ""
     font: str = ""
-    artwork: dict | None = None
+    artwork: dict[str, Any] | None = None
     size: float = 2.4
     motion: bool = True
     loop_blend: float = 0.6
@@ -188,33 +205,40 @@ def youtube_url(value: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
-def search(query: str) -> list[dict]:
+def search(query: str) -> list[dict[str, Any]]:
     """Read five video results without downloading media or following result links"""
     if not query.strip() or len(query) > 200:
         raise MiniError("Search with between 1 and 200 characters")
-    if YoutubeDL is None:
+    if not YoutubeDL:
         raise MiniError("Use uv run --extra timey mini timey to enable YouTube search")
     try:
-        with YoutubeDL({
-            "quiet": True,
-            "no_warnings": True,
-            "extract_flat": True,
-            "skip_download": True,
-            "socket_timeout": 10,
-            "retries": 1,
-            "extractor_retries": 1,
-            "playlistend": 5,
-        }) as client:
-            data = client.extract_info(f"ytsearch5:{query.strip()}", download=False)
+        with YoutubeDL(
+            cast(
+                Any,
+                {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "extract_flat": True,
+                    "skip_download": True,
+                    "socket_timeout": 10,
+                    "retries": 1,
+                    "extractor_retries": 1,
+                    "playlistend": 5,
+                },
+            )
+        ) as client:
+            data: Any = client.extract_info(f"ytsearch5:{query.strip()}", download=False)
     except DownloadError as exc:
         raise MiniError(f"YouTube search failed: {exc}") from exc
     if data is not None and not isinstance(data, dict):
         raise MiniError("YouTube returned malformed search results; try again")
-    results = []
-    seen = set()
-    for entry in islice((data or {}).get("entries", []) or [], 10):
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    payload = cast(dict[str, Any], data or {})
+    for entry in islice(payload.get("entries", []) or [], 10):
         if not isinstance(entry, dict):
             continue
+        entry = cast(dict[str, Any], entry)
         id = entry.get("id", "")
         if not isinstance(id, str) or not re.fullmatch(r"[\w-]{11}", id, flags=re.ASCII):
             continue
@@ -227,7 +251,9 @@ def search(query: str) -> list[dict]:
         seconds = entry.get("duration")
         length = (
             clock(round(seconds))
-            if type(seconds) in {int, float} and 0 < seconds < 10**8
+            if isinstance(seconds, (int, float))
+            and not isinstance(seconds, bool)
+            and 0 < seconds < 10**8
             else "duration unavailable"
         )
         results.append({
@@ -273,9 +299,12 @@ def download(
         cached = media_cache.find(cache, key, start, seconds, directory)
         if cached:
             if progress:
-                progress(1, f"{'Music' if audio else 'Background'} ready · cache hit · {cached[1]}")
+                progress(
+                    1,
+                    f"{'Music' if audio else 'Background'} ready · cache hit · {cached[1]}",
+                )
             return cached
-    if YoutubeDL is None:
+    if not YoutubeDL:
         raise MiniError("Run with uv run --extra timey mini timey to enable YouTube downloads")
 
     noun = "music" if audio else "background"
@@ -286,7 +315,7 @@ def download(
             f"Grokking the {'music video' if audio else 'video'} · reading YouTube metadata",
         )
 
-    def update(data: dict) -> None:
+    def update(data: dict[str, Any]) -> None:
         if progress and data["status"] == "downloading":
             transferred.clear()
             size = data.get("total_bytes") or data.get("total_bytes_estimate")
@@ -306,7 +335,7 @@ def download(
             transferred.set()
             progress(None, f"Stitching the {noun} · checking downloaded streams")
 
-    def postprocess(data: dict) -> None:
+    def postprocess(data: dict[str, Any]) -> None:
         if progress and data["status"] == "started":
             transferred.set()
             progress(
@@ -314,7 +343,10 @@ def download(
                 f"Stitching the {noun} · {data.get('postprocessor', 'merging streams')}",
             )
 
-    options = {
+    def match(info: dict[str, Any], *, incomplete: bool = False) -> str | None:
+        return "Live streams cannot be used as timer backgrounds" if info.get("is_live") else None
+
+    options: dict[str, Any] = {
         "format": "bestaudio/best" if audio else f"bv*[height<={height}]+ba/b[height<={height}]",
         "outtmpl": str(directory / "source.%(ext)s"),
         "merge_output_format": "mp4",
@@ -329,30 +361,32 @@ def download(
         "progress_hooks": [update],
         "postprocessor_hooks": [postprocess],
         "js_runtimes": {name: {} for name in ("deno", "node") if shutil.which(name)},
-        "match_filter": lambda info, *, incomplete=False: (
-            "Live streams cannot be used as timer backgrounds" if info.get("is_live") else None
-        ),
+        "match_filter": match,
     }
-    stopped, length, failures = Event(), [seconds], []
+    stopped = Event()
+    length: list[int | float | None] = [seconds]
+    failures: list[Exception] = []
     progress_file = directory / "download.log"
     watcher = None
+    monitor: Callable[[], None] | None = None
     if seconds is not None or start:
 
-        def section(info, ydl):
+        def section(info: dict[str, Any], ydl: YoutubeDL):
             available = info.get("duration")
             if available and start >= available:
                 raise MiniError("Video start must be before the end of the source video")
             length[0] = (
                 min(seconds or available - start, available - start) if available else seconds
             )
-            if not length[0]:
+            total = length[0]
+            if not total:
                 raise MiniError("Set a download length for a source with an unknown duration")
             if progress:
                 progress(
                     None,
-                    f"Downloading {noun} · from {clock(start)}, {clock(round(length[0]))} of media",
+                    f"Downloading {noun} · from {clock(start)}, {clock(round(total))} of media",
                 )
-            return [{"start_time": start, "end_time": start + length[0]}]
+            return [{"start_time": start, "end_time": start + total}]
 
         options["download_ranges"] = section
         # yt-dlp's ranged FFmpeg downloads only fire a hook at completion
@@ -366,7 +400,8 @@ def download(
         }
 
         def track() -> None:
-            state, position = {}, 0
+            state: dict[str, str] = {}
+            position = 0
             while not stopped.wait(0.15):
                 if not progress_file.exists():
                     continue
@@ -387,10 +422,12 @@ def download(
                             size = max(0, int(state.get("total_size", 0)))
                         except ValueError:
                             continue
-                        detail = f"{clock(round(seconds_done))} / {clock(round(length[0]))} · {size / 1048576:.1f} MiB · {state.get('speed', '?')} speed"
+                        total = length[0]
+                        assert total is not None
+                        detail = f"{clock(round(seconds_done))} / {clock(round(total))} · {size / 1048576:.1f} MiB · {state.get('speed', '?')} speed"
                         if progress and not transferred.is_set():
                             progress(
-                                min(1, seconds_done / length[0]),
+                                min(1, seconds_done / total),
                                 f"Downloading {noun} · {detail}",
                             )
 
@@ -400,8 +437,10 @@ def download(
             except Exception as exc:
                 failures.append(exc)
 
+        monitor = watch
+
     try:
-        with YoutubeDL(options) as downloader:
+        with YoutubeDL(cast(Any, options)) as downloader:
             info = downloader.extract_info(url, download=False, process=False)
             if not info or info.get("is_live"):
                 raise MiniError("Choose a completed YouTube video, rather than a live stream")
@@ -414,9 +453,13 @@ def download(
                 downloader.params.pop("download_ranges", None)
                 downloader.params.pop("external_downloader_args", None)
                 if progress:
-                    progress(None, f"Downloading {noun} · whole clip, up to 8 concurrent fragments")
+                    progress(
+                        None,
+                        f"Downloading {noun} · whole clip, up to 8 concurrent fragments",
+                    )
             if progress and downloader.params.get("download_ranges"):
-                watcher = Thread(target=watch, name="timey-download")
+                assert monitor is not None
+                watcher = Thread(target=monitor, name="timey-download")
                 watcher.start()
             info = downloader.process_ie_result(info, download=True)
     except DownloadError as exc:
@@ -440,7 +483,10 @@ def download(
             media_cache.save(cache, key, paths[0], title, start, seconds, complete)
         except OSError:
             if progress:
-                progress(None, "Cache unavailable · using the completed download for this render")
+                progress(
+                    None,
+                    "Cache unavailable · using the completed download for this render",
+                )
     if progress:
         progress(
             1,
@@ -535,7 +581,7 @@ PIXELS = (
 )
 
 
-def _font(kind: str, size: int, custom: str = ""):
+def _font(kind: str, size: int, custom: str = "") -> ImageFont.FreeTypeFont:
     names = {
         "serif": (
             "/System/Library/Fonts/Supplemental/Georgia Bold.ttf",
@@ -561,7 +607,10 @@ def _font(kind: str, size: int, custom: str = ""):
                 raise MiniError(
                     "Cannot read the custom font; choose a valid TTF, OTF or TTC file"
                 ) from None
-    return ImageFont.load_default(size=size)
+    font = ImageFont.load_default(size=size)
+    if not isinstance(font, ImageFont.FreeTypeFont):
+        raise MiniError("Timer fonts need Pillow with FreeType support")
+    return font
 
 
 def placement(timer: Timer, width: int, height: int) -> tuple[int, int, float]:
@@ -582,11 +631,19 @@ def placement(timer: Timer, width: int, height: int) -> tuple[int, int, float]:
     return x, y, scale
 
 
-def _pixels(ink, digits: str, centre: int, top: int, pixel: int, colour: str, shadow: str) -> None:
+def _pixels(
+    ink: ImageDraw.ImageDraw,
+    digits: str,
+    centre: int,
+    top: int,
+    pixel: int,
+    colour: str,
+    shadow: str,
+) -> None:
     """Draw crisp bitmap numbers with one shadow pass before the foreground"""
     widths = [1 if char == ":" else 5 for char in digits]
     left = centre - (sum(widths) + 2 * (len(digits) - 1)) * pixel // 2
-    cells = []
+    cells: list[tuple[int, int]] = []
     for char in digits:
         rows = "0/1/0/0/1/0/0" if char == ":" else PIXELS[int(char)]
         for row, bits in enumerate(rows.split("/")):
@@ -600,7 +657,7 @@ def _pixels(ink, digits: str, centre: int, top: int, pixel: int, colour: str, sh
         ink.rectangle((a, b, a + pixel - 1, b + pixel - 1), fill=colour)
 
 
-def _shapes(draw, artwork: dict) -> None:
+def _shapes(draw: ImageDraw.ImageDraw, artwork: dict[str, Any]) -> None:
     """Draw only validated vector primitives on the transparent panel"""
     for shape in artwork["shapes"]:
         points = [(round(x * 2), round(y * 2)) for x, y in shape["points"]]
@@ -617,11 +674,12 @@ def _shapes(draw, artwork: dict) -> None:
             draw.rectangle(points, fill=colour)
 
 
-def _temple_digits(height: int = 124) -> dict:
+def _temple_digits(height: int = 124) -> dict[str, Image.Image]:
     """Slice the bundled numeral atlas once, preserving the colon's vertical position"""
     with Image.open((ASSETS / "timey/art") / "digits.png") as source:
         atlas = source.convert("RGBA")
-    mask = atlas.getchannel("A").point(lambda value: 255 if value >= 128 else 0)
+    # Pillow overloads reference NumPy, which is not required for tuple sizes and lookup tables
+    mask = atlas.getchannel("A").point([255 if value >= 128 else 0 for value in range(256)])  # pyright: ignore[reportUnknownMemberType]
     columns = mask.getprojection()[0]
     starts = [i for i, value in enumerate(columns) if value and (i == 0 or not columns[i - 1])]
     ends = [
@@ -631,20 +689,23 @@ def _temple_digits(height: int = 124) -> dict:
     ]
     if len(starts) != 11:
         raise MiniError("The Temple Run numeral artwork is damaged; reinstall Timey")
-    _, top, _, bottom = mask.getbbox()
-    glyphs = {}
+    bounds = mask.getbbox()
+    if bounds is None:
+        raise MiniError("The Temple Run numeral artwork is damaged; reinstall Timey")
+    _, top, _, bottom = bounds
+    glyphs: dict[str, Image.Image] = {}
     for char, left, right in zip("0123456789:", starts, ends):
         glyph = atlas.crop((left - 3, top - 3, right + 3, bottom + 3))
-        glyphs[char] = glyph.resize(
+        glyphs[char] = glyph.resize(  # pyright: ignore[reportUnknownMemberType]
             (max(1, round(glyph.width / glyph.height * height * 1.35)), height),
             Image.Resampling.LANCZOS,
         )
     return glyphs
 
 
-def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> Iterator[bytes]:
+def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> Generator[bytes]:
     """Stream small transparent PNGs at one frame per second with constant memory"""
-    if Image is None:
+    if not Image:
         raise MiniError("Use uv run --extra timey mini timey to enable timer artwork")
     accent, base, kind = STYLES.get(timer.style, STYLES["minimal"])[1:]
     artwork = timer.artwork
@@ -670,10 +731,12 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
     plate = Image.new("RGBA", (1080, 468))
     draw = ImageDraw.Draw(plate)
 
-    def rect(box, colour):
+    def rect(
+        box: tuple[float, float, float, float], colour: str | tuple[int, int, int, int]
+    ) -> None:
         draw.rectangle(tuple(round(value * 2) for value in box), fill=colour)
 
-    def poly(points, colour):
+    def poly(points: Sequence[tuple[float, float]], colour: str) -> None:
         draw.polygon([(round(a * 2), round(b * 2)) for a, b in points], fill=colour)
 
     if not artwork and timer.style not in {"glass", "temple-run"}:
@@ -684,7 +747,7 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
         rect((left, top, right, bottom), artwork["bar"]["background"])
     elif temple:
         with Image.open((ASSETS / "timey/art") / "plate.png") as stone:
-            texture = stone.convert("RGBA").resize(panel_size, Image.Resampling.LANCZOS)
+            texture = stone.convert("RGBA").resize(panel_size, Image.Resampling.LANCZOS)  # pyright: ignore[reportUnknownMemberType]
         draw.rounded_rectangle((210, 384, 870, 397), radius=5, fill="#10170B")
         draw.line((214, 398, 866, 398), fill="#9B9C70", width=1)
     elif timer.style == "minecraft":
@@ -765,9 +828,9 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
         draw.rounded_rectangle((0, 0, 1060, 448), radius=24, fill=(22, 27, 32, 232))
         rect((0, 18, 4, 206), accent)
         rect((34, 184, 496, 187), "#4A5157")
-    label_spec = artwork["text"]["label"] if artwork else None
-    timer_spec = artwork["text"]["timer"] if artwork else None
-    caption_spec = artwork["text"]["caption"] if artwork else None
+    label_spec: dict[str, Any] = artwork["text"]["label"] if artwork else {}
+    timer_spec: dict[str, Any] = artwork["text"]["timer"] if artwork else {}
+    caption_spec: dict[str, Any] = artwork["text"]["caption"] if artwork else {}
     label_font = _font(kind, label_spec["size"] * 2 if artwork else 24 if temple else 36, font)
     caption_font = _font(kind, caption_spec["size"] * 2 if artwork else 30 if temple else 26, font)
     # Keep custom labels inside the panel even when the chosen font has wide glyphs
@@ -778,7 +841,7 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
     ):
         label = label[:-2] + "…"
     draw.text(
-        tuple(round(n * 2) for n in label_spec["point"])
+        (round(label_spec["point"][0] * 2), round(label_spec["point"][1] * 2))
         if artwork
         else (540, 182)
         if temple
@@ -795,6 +858,7 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
         stroke_fill=label_spec["outline"] if artwork else base,
     )
     centre = timer_spec["point"][0] if artwork else 270 if temple else 265
+    digit_font: ImageFont.FreeTypeFont | None = None
     if glyphs:
         advance = max(glyph.width for glyph in glyphs.values()) + round(18 * scale / 2)
         colon = glyphs[":"].width + round(12 * scale / 2)
@@ -822,7 +886,10 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
         advance = max(digit_font.getlength(char) for char in "0123456789")
         colon = digit_font.getlength(":")
 
-    def lettering(ink, digits, point, **options):
+    def lettering(
+        ink: ImageDraw.ImageDraw, digits: str, point: tuple[float, float], **options: Any
+    ) -> None:
+        assert digit_font is not None
         # Fixed numeral cells keep the countdown steady even with proportional display fonts
         left = point[0] - sum(colon if char == ":" else advance for char in digits) / 2
         for char in digits:
@@ -881,7 +948,7 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
                 )
             elif not glyphs:
                 point = (
-                    tuple(round(n * 2) for n in timer_spec["point"])
+                    (round(timer_spec["point"][0] * 2), round(timer_spec["point"][1] * 2))
                     if artwork
                     else (540, digit_top)
                     if temple
@@ -929,7 +996,7 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
                         width=2,
                     )
                 ink.text(
-                    tuple(round(n * 2) for n in caption_spec["point"])
+                    (round(caption_spec["point"][0] * 2), round(caption_spec["point"][1] * 2))
                     if artwork
                     else (540, 392)
                     if temple
@@ -983,7 +1050,7 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
                     ),
                     fill=accent,
                 )
-            canvas = canvas.resize(
+            canvas = canvas.resize(  # pyright: ignore[reportUnknownMemberType]
                 panel_size,
                 Image.Resampling.NEAREST
                 if timer.style == "minecraft" or artwork and artwork["font"] == "pixel"
@@ -997,7 +1064,11 @@ def frames(timer: Timer, width: int, height: int, *, preview: bool = False) -> I
                     step = colon if char == ":" else advance
                     glyph = glyphs[char]
                     canvas.alpha_composite(
-                        glyph, (left + (step - glyph.width) // 2, round(digit_top * scale / 2))
+                        glyph,
+                        (
+                            round(left + (step - glyph.width) // 2),
+                            round(digit_top * scale / 2),
+                        ),
                     )
                     left += step
             if texture is not None:
@@ -1018,7 +1089,8 @@ def _encode(
     images: Iterator[bytes] | None = None,
 ) -> None:
     """Run native encoding with bounded logs, real progress and cancellation cleanup"""
-    stopped, failures = Event(), []
+    stopped = Event()
+    failures: list[Exception] = []
     with (work / "error.log").open("w+b") as errors:
         process = subprocess.Popen(
             argv,
@@ -1027,7 +1099,10 @@ def _encode(
             stderr=errors,
         )
 
+        assert process.stdout is not None
+
         def feed() -> None:
+            assert images is not None and process.stdin is not None
             try:
                 for image in images:
                     if stopped.is_set():
@@ -1049,7 +1124,7 @@ def _encode(
         if writer:
             writer.start()
         try:
-            state = {}
+            state: dict[str, str] = {}
             if progress:
                 progress(0, f"{title} · starting FFmpeg")
             for line in process.stdout:
@@ -1169,19 +1244,29 @@ def _loop(
 
 def _surface(first: bytes, timer: Timer, work: Path) -> tuple[Path, Path]:
     """Make a rounded blur mask and an edge-only highlight from the panel silhouette"""
+    gems: Image.Image | None = None
     with Image.open(BytesIO(first)) as panel:
         alpha = panel.getchannel("A")
         temple = timer.style == "temple-run" and not timer.artwork
         if temple:
             red, green, _, _ = panel.split()
-            gems = ImageChops.subtract(green, red).point(lambda value: min(255, value * 4))
+            gems = ImageChops.subtract(green, red).point([  # pyright: ignore[reportUnknownMemberType]
+                min(255, value * 4) for value in range(256)
+            ])  # pyright: ignore[reportUnknownMemberType]
             gems = ImageChops.multiply(gems, alpha)
             # Only the gems catch light; the live progress strip must not leave a ghost
             ImageDraw.Draw(gems).rectangle(
-                (panel.width * 0.1, panel.height * 0.2, panel.width * 0.9, panel.height),
+                (
+                    panel.width * 0.1,
+                    panel.height * 0.2,
+                    panel.width * 0.9,
+                    panel.height,
+                ),
                 fill=0,
             )
-    mask = alpha.point(lambda value: 255 if value >= (32 if timer.style == "glass" else 128) else 0)
+    mask = alpha.point([  # pyright: ignore[reportUnknownMemberType]
+        255 if value >= (32 if timer.style == "glass" else 128) else 0 for value in range(256)
+    ])  # pyright: ignore[reportUnknownMemberType]
     mask_path, edge_path = work / "mask.png", work / "edge.png"
     mask.save(mask_path)
     inset = max(1, round(mask.height / 100))
@@ -1194,7 +1279,7 @@ def _surface(first: bytes, timer: Timer, work: Path) -> tuple[Path, Path]:
         mask.height + inset,
     ))
     edge = ImageChops.subtract(mask, eroded)
-    if temple:
+    if gems is not None:
         edge = ImageChops.lighter(edge, gems)
     # Custom artwork can contain holes; keep any animated light outside the text area
     ink = ImageDraw.Draw(edge)

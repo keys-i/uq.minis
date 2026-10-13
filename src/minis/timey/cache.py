@@ -35,7 +35,13 @@ def find(root: Path, key: str, start: int, seconds: int | None, work: Path):
 
 
 def save(
-    root: Path, key: str, source: Path, title: str, start: int, seconds: int | None, complete: bool
+    root: Path,
+    key: str,
+    source: Path,
+    title: str,
+    start: int,
+    seconds: int | None,
+    complete: bool,
 ):
     """Describe a completed clip for atomic storage under the shared cache budgets"""
     suffix = hashlib.sha256(f"{start}:{seconds}".encode()).hexdigest()[:16]

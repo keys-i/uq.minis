@@ -6,10 +6,11 @@ import json
 import math
 import shutil
 import sys
+from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import quote_plus
 
 import typer
@@ -20,6 +21,7 @@ from uq_minis.core import (
     CONSOLE,
     STATE,
     MiniError,
+    Preview,
     activity,
     application,
     ask,
@@ -82,14 +84,15 @@ def _media(message: str, default: str = "", *, optional: bool = False) -> str:
             return value
         if value.startswith(("/", "./", "../", "~")):
             CONSOLE.print(
-                "This local path does not exist; choose a file or enter search words", style="error"
+                "This local path does not exist; choose a file or enter search words",
+                style="error",
             )
             default = value
             continue
         try:
             with activity("Searching YouTube") as update:
                 results = search(value)
-                previews = {}
+                previews: dict[str, Preview] = {}
                 for index, result in enumerate(results):
                     previews[result["url"]] = thumbnail(result)
                     update((index + 1) / len(results), "Reading thumbnails")
@@ -115,20 +118,23 @@ class _Studio:
     def __init__(self, timer: Timer):
         self.timer = timer
 
-    def samples(self, field: str, values) -> dict:
+    def samples(self, field: str, values: Iterable[str]) -> dict[str, Preview]:
         """Prepare images once so browsing never renders or downloads anything"""
         return {
             value: overlay(replace(self.timer, **{field: value}), value or "Theme default")
             for value in values
         }
 
-    def choose(self, field: str, message: str, choices: dict, *, free: bool = False) -> str:
+    def choose(
+        self, field: str, message: str, choices: dict[str, Any], *, free: bool = False
+    ) -> str:
         """Preview listed choices and review a typed colour before applying it"""
         previews = self.samples(field, choices)
         while True:
             value = ask(
                 message,
-                **{"suggestions" if free else "choices": choices},
+                choices=() if free else choices,
+                suggestions=choices if free else (),
                 default=getattr(self.timer, field),
                 previews=previews,
                 search=True,
@@ -157,7 +163,8 @@ class _Studio:
         except MiniError as exc:
             problem(exc)
             CONSOLE.print(
-                "Using the small offline font shelf; specimen links still work", style="muted"
+                "Using the small offline font shelf; specimen links still work",
+                style="muted",
             )
             available = None
         families = find_fonts(families=available)
@@ -193,7 +200,8 @@ class _Studio:
                 ):
                     matches = find_fonts(value, available)
                     family = next(
-                        (name for name in matches if name.casefold() == value.casefold()), None
+                        (name for name in matches if name.casefold() == value.casefold()),
+                        None,
                     )
                     if family is None:
                         if not matches:
@@ -207,7 +215,10 @@ class _Studio:
                             "back": "Change your search words",
                         })
                         family = ask(
-                            "Choose a font", choices=choices, previews=previews, ignore_case=True
+                            "Choose a font",
+                            choices=choices,
+                            previews=previews,
+                            ignore_case=True,
                         )
                         if family == "back":
                             default = value
@@ -251,7 +262,7 @@ def _saved_style(value: str) -> Path | None:
     return None
 
 
-def _metadata(context: dict, directory: Path, designer: str) -> dict:
+def _metadata(context: dict[str, Any], directory: Path, designer: str) -> dict[str, Any]:
     """Use a signed-in agent when available, otherwise a factual timer-settings draft"""
     agent = (
         choose_designer(designer)
@@ -266,16 +277,16 @@ def _upload_details(
     path: Path,
     title: str,
     *,
-    context: dict | None = None,
+    context: dict[str, Any] | None = None,
     metadata: bool | None = None,
     first_frame: bool | None = None,
     designer: str = "auto",
-    sample=None,
+    sample: Preview | None = None,
 ) -> None:
     """Ask the YouTube questions and save an editable upload draft"""
     ensure_outputs([path], force=False)
     CONSOLE.print("YouTube details", style="heading")
-    snippet = {"title": title, "description": "", "tags": ["timer", "countdown"]}
+    snippet: dict[str, Any] = {"title": title, "description": "", "tags": ["timer", "countdown"]}
     if metadata is None:
         metadata = confirm("Generate a searchable title, description and tags?", default=True)
     if metadata:
@@ -327,13 +338,13 @@ def _upload_details(
     )
     while choice == "custom":
         try:
-            path = Path(thumbnail).expanduser()
-            if confirm("Use this thumbnail?", default=True, preview=picture(path, path.name)):
+            image = Path(thumbnail).expanduser()
+            if confirm("Use this thumbnail?", default=True, preview=picture(image, image.name)):
                 break
         except MiniError as exc:
             problem(exc)
         thumbnail = ask("Custom thumbnail PNG/JPEG", paths=True, required=True)
-    data = {
+    data: dict[str, Any] = {
         "snippet": {
             "title": title,
             "description": description,
@@ -476,7 +487,8 @@ def run(
     motion: Annotated[
         bool,
         typer.Option(
-            "--motion/--no-motion", help="Smooth digit changes and subtle animated edges."
+            "--motion/--no-motion",
+            help="Smooth digit changes and subtle animated edges.",
         ),
     ] = True,
     loop_blend: Annotated[
@@ -486,7 +498,8 @@ def run(
         ),
     ] = 0.6,
     label: Annotated[
-        str, typer.Option(help="Optional short text above the timer (blank by default).")
+        str,
+        typer.Option(help="Optional short text above the timer (blank by default)."),
     ] = "",
     accent: Annotated[
         str, typer.Option(help="Override the theme's accent with a hex colour.")
@@ -546,7 +559,8 @@ def run(
         ),
     ] = None,
     metadata_instructions: Annotated[
-        str, typer.Option(help="Purpose, audience or wording for generated YouTube metadata.")
+        str,
+        typer.Option(help="Purpose, audience or wording for generated YouTube metadata."),
     ] = "",
     first_frame: Annotated[
         bool | None,
@@ -628,7 +642,15 @@ def run(
                 atomic_json(details, data)
         if not interactive and not yes:
             raise typer.BadParameter("Use --yes to confirm an unattended upload")
-        _send(video, details, client_secrets, token, yes=yes, interactive=interactive, force=force)
+        _send(
+            video,
+            details,
+            client_secrets,
+            token,
+            yes=yes,
+            interactive=interactive,
+            force=force,
+        )
         return
     if preview and upload:
         raise typer.BadParameter("A PNG preview cannot be uploaded as a video")
@@ -654,7 +676,7 @@ def run(
                 seconds=duration(length),
                 start_gap=duration(start_gap),
                 end_gap=duration(end_gap),
-                style=style if style in STYLES else "minimal",
+                style=style if style is not None and style in STYLES else "minimal",
                 position=position,
                 accent=accent,
                 size=size,
@@ -677,7 +699,7 @@ def run(
             studio.timer = replace(studio.timer, style=style)
         if style == "custom" and not instructions:
             instructions = ask("Describe how the overlay should look")
-        if instructions or style not in {None, "auto", *STYLES} and not _saved_style(style):
+        if instructions or style not in {"auto", *STYLES} and not _saved_style(style):
             designer = ask("Style designer", choices=["auto", "codex", "claude"], default=designer)
         if customise or confirm(
             "Customise the overlay placement, text, colour or audio?", default=False
@@ -703,7 +725,9 @@ def run(
             )
             font = studio.font(font)
             music = _media(
-                "Music link, file or search words (blank to keep original)", music, optional=True
+                "Music link, file or search words (blank to keep original)",
+                music,
+                optional=True,
             )
             if music:
                 music_volume = number("Music volume (0–2)", default=music_volume)
@@ -718,7 +742,7 @@ def run(
                 default=False,
             )
     artwork, brief = None, instructions
-    if style not in {None, "auto", *STYLES}:
+    if style is not None and style not in {"auto", *STYLES}:
         saved = _saved_style(style)
         if saved:
             artwork = read_style(saved)
@@ -736,11 +760,12 @@ def run(
         designer = choose_designer(designer)
     if not math.isfinite(music_volume) or not 0 <= music_volume <= 2:
         raise typer.BadParameter("Music volume must be between 0 and 2")
+    assert length is not None
     timer = Timer(
         duration(length),
         duration(start_gap or "5s"),
         duration(end_gap or "5s"),
-        style if style in STYLES else "minimal",
+        style if style is not None and style in STYLES else "minimal",
         position,
         label,
         accent,
@@ -768,7 +793,10 @@ def run(
             raise typer.BadParameter("An unattended upload requires --details and --yes")
         details = details or output.with_suffix(".youtube.json")
         details = details.expanduser().absolute()
-        if details.is_symlink() or details in {output, output.with_suffix(".thumbnail.jpg")}:
+        if details.is_symlink() or details in {
+            output,
+            output.with_suffix(".thumbnail.jpg"),
+        }:
             raise MiniError(
                 "Upload details must have their own file path, separate from the video and thumbnail"
             )
@@ -840,7 +868,9 @@ def run(
         }
         if source.lstrip().lower().startswith(("http://", "https://")):
             context["source_url"] = youtube_url(source)
-        if upload and not details.exists():
+        if upload:
+            assert details is not None
+        if upload and details is not None and not details.exists():
             _upload_details(
                 details,
                 f"{clock(timer.seconds)} {timer.style} timer",
@@ -850,8 +880,8 @@ def run(
                 designer=designer,
                 sample=frame(video, timer, start=local_start) if video.is_file() else None,
             )
-        elif metadata or first_frame is not None and details:
-            data = (
+        elif details is not None and (metadata or first_frame is not None):
+            data: dict[str, Any] = (
                 read_details(details)
                 if details.exists()
                 else {
@@ -981,4 +1011,13 @@ def run(
         if data.get("thumbnail"):
             CONSOLE.print(f"Thumbnail: {data['thumbnail']}", markup=False)
     if upload:
-        _send(output, details, client_secrets, token, yes=yes, interactive=interactive, force=force)
+        assert details is not None
+        _send(
+            output,
+            details,
+            client_secrets,
+            token,
+            yes=yes,
+            interactive=interactive,
+            force=force,
+        )

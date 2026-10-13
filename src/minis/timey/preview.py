@@ -3,18 +3,26 @@
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any, cast
 
 import httpx
 from rich.text import Text
 
 from uq_minis.core.art import Preview, image
 from uq_minis.core.common import MiniError
-from uq_minis.minis.timey.video import Image, Timer, frames, placement, reference, youtube_url
+from uq_minis.minis.timey.video import (
+    Image,
+    Timer,
+    frames,
+    placement,
+    reference,
+    youtube_url,
+)
 
 
 def picture(source: Path | bytes, description: str) -> Preview:
     """Decode a small image and keep its terminal sample in memory"""
-    if Image is None:
+    if not Image:
         raise MiniError("Use uv run --extra timey mini timey to enable image previews")
     try:
         if isinstance(source, bytes) and len(source) > 8 * 1024 * 1024:
@@ -27,17 +35,19 @@ def picture(source: Path | bytes, description: str) -> Preview:
             original.thumbnail((40, 32), Image.Resampling.LANCZOS)
             sample = original.convert("RGB")
             rows = [
-                [sample.getpixel((x, y)) for x in range(sample.width)] for y in range(sample.height)
+                [cast(tuple[int, int, int], sample.getpixel((x, y))) for x in range(sample.width)]
+                for y in range(sample.height)
             ]
     except (OSError, Image.DecompressionBombError) as exc:
         raise MiniError(f"Cannot preview this image: {exc}") from exc
     return image(rows, description)
 
 
-def thumbnail(result: dict) -> Preview:
+def thumbnail(result: dict[str, Any]) -> Preview:
     """Fetch only YouTube's bounded thumbnail for a validated video ID"""
     description = f"{result['title']} · {result['length']}"
     id = youtube_url(result["url"]).partition("v=")[2]
+    data = bytearray()
     try:
         for size in ("sddefault", "hqdefault"):
             with httpx.stream("GET", f"https://i.ytimg.com/vi/{id}/{size}.jpg", timeout=5) as reply:
@@ -58,9 +68,11 @@ def thumbnail(result: dict) -> Preview:
     return preview
 
 
-def overlay(timer: Timer, description: str, *, background=None, first: bool = False) -> Preview:
+def overlay(
+    timer: Timer, description: str, *, background: Image.Image | None = None, first: bool = False
+) -> Preview:
     """Use the exported overlay on a neutral landscape sample"""
-    if Image is None:
+    if not Image:
         raise MiniError("Use uv run --extra timey mini timey to enable timer previews")
     background = (
         background.convert("RGBA")

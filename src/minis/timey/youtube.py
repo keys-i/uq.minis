@@ -6,29 +6,49 @@ import json
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
+from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any, Protocol, cast
 
 from uq_minis.core.common import MiniError, atomic_json, ensure_outputs
 from uq_minis.minis.timey.style import generate
 from uq_minis.minis.timey.video import clock, reference, require_ffmpeg
 
+# Google's client creates discovery resources dynamically; type credentials at that boundary
 try:
-    from google.auth.exceptions import GoogleAuthError
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from googleapiclient.discovery import build
-    from googleapiclient.errors import HttpError
-    from googleapiclient.http import MediaFileUpload
-    from httplib2 import HttpLib2Error
-    from oauthlib.oauth2 import OAuth2Error
+    GoogleAuthError = import_module("google.auth.exceptions").GoogleAuthError
+    Request = import_module("google.auth.transport.requests").Request
+    Credentials = import_module("google.oauth2.credentials").Credentials
+    InstalledAppFlow = import_module("google_auth_oauthlib.flow").InstalledAppFlow
+    build = import_module("googleapiclient.discovery").build
+    HttpError = import_module("googleapiclient.errors").HttpError
+    MediaFileUpload = import_module("googleapiclient.http").MediaFileUpload
+    HttpLib2Error = import_module("httplib2").HttpLib2Error
+    OAuth2Error = import_module("oauthlib.oauth2").OAuth2Error
 except ImportError:
     build = None
 
+
+class OAuth(Protocol):
+    """The saved credential contract used by resumable uploads"""
+
+    expired: bool
+    valid: bool
+    refresh_token: str | None
+
+    def refresh(self, request: object) -> None:
+        """Refresh the access token through Google's transport"""
+        ...
+
+    def to_json(self) -> str:
+        """Serialise the private credential for the next upload"""
+        ...
+
+
 SCOPE = "https://www.googleapis.com/auth/youtube.upload"
 THUMBNAIL_LIMIT = 50 * 1024 * 1024
-METADATA = {
+METADATA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "title": {"type": "string", "minLength": 1, "maxLength": 100},
@@ -44,7 +64,13 @@ METADATA = {
 }
 
 
-def metadata(context: dict, directory: Path, *, agent: str | None = None, progress=None) -> dict:
+def metadata(
+    context: dict[str, Any],
+    directory: Path,
+    *,
+    agent: str | None = None,
+    progress: Callable[[float | None, str], None] | None = None,
+) -> dict[str, Any]:
     """Draft factual, editable search metadata without promising distribution or ranking"""
     seconds = context.get("countdown_seconds")
     if seconds is not None and (
@@ -78,7 +104,7 @@ def metadata(context: dict, directory: Path, *, agent: str | None = None, progre
         tags = []
     if context.get("source_url"):
         description += f"\n\nBackground source: {context['source_url']}"
-    snippet = {"title": title, "description": description, "tags": tags}
+    snippet: dict[str, Any] = {"title": title, "description": description, "tags": tags}
     if agent:
         prompt = (
             "Write an accurate YouTube title, description and 3–8 relevant tags using only the supplied facts. "
@@ -105,7 +131,7 @@ def metadata(context: dict, directory: Path, *, agent: str | None = None, progre
             progress=progress,
             task="Writing your YouTube metadata",
         )
-        if not isinstance(snippet, dict) or set(snippet) != set(METADATA["properties"]):
+        if set(snippet) != set(METADATA["properties"]):
             raise MiniError("Metadata agent returned missing or unsupported fields")
     validate({
         "snippet": snippet,
@@ -120,7 +146,7 @@ def metadata(context: dict, directory: Path, *, agent: str | None = None, progre
     return snippet
 
 
-def prepare(video: Path, details: Path, *, force: bool = False) -> dict:
+def prepare(video: Path, details: Path, *, force: bool = False) -> dict[str, Any]:
     """Resolve a first-frame thumbnail into an editable draft before upload confirmation"""
     if details.expanduser().resolve() == video.expanduser().resolve():
         raise MiniError("Upload details must not overwrite the video")
@@ -148,7 +174,7 @@ def prepare(video: Path, details: Path, *, force: bool = False) -> dict:
     return data
 
 
-def read_details(path: Path) -> dict:
+def read_details(path: Path) -> dict[str, Any]:
     """Read a bounded upload draft with friendly errors for missing or malformed files"""
     try:
         if path.expanduser().stat().st_size > 64 * 1024:
@@ -160,13 +186,15 @@ def read_details(path: Path) -> dict:
     return data
 
 
-def validate(data: dict) -> dict:
+def validate(data: object) -> dict[str, Any]:
     """Validate the editable upload draft before opening a browser or sending video data"""
     if not isinstance(data, dict):
         raise MiniError("Upload details must be a JSON object")
+    data = cast(dict[str, Any], data)
     snippet, status = data.get("snippet", {}), data.get("status", {})
     if not isinstance(snippet, dict) or not isinstance(status, dict):
         raise MiniError("Upload snippet and status must be JSON objects")
+    snippet, status = cast(dict[str, Any], snippet), cast(dict[str, Any], status)
     title, description = snippet.get("title", ""), snippet.get("description", "")
     if (
         not isinstance(title, str)
@@ -183,9 +211,10 @@ def validate(data: dict) -> dict:
         raise MiniError("YouTube description must be at most 5000 UTF-8 bytes without < or >")
     tags = snippet.get("tags", [])
     if not isinstance(tags, list) or any(
-        not isinstance(tag, str) or not tag.strip() for tag in tags
+        not isinstance(tag, str) or not tag.strip() for tag in cast(list[object], tags)
     ):
         raise MiniError("Tags must be a list of non-empty strings")
+    tags = cast(list[str], tags)
     if sum(len(tag) + (2 if " " in tag else 0) for tag in tags) + max(0, len(tags) - 1) > 500:
         raise MiniError(
             "YouTube tags must fit within 500 characters including separators and quotes"
@@ -227,7 +256,7 @@ def validate(data: dict) -> dict:
             raise MiniError(
                 "Scheduled uploads must be private with a future publishAt including timezone"
             )
-    body = {
+    body: dict[str, Any] = {
         "snippet": {
             "title": title.strip(),
             "description": description,
@@ -286,15 +315,17 @@ def upload(
         raise MiniError("Thumbnail must be an existing PNG or JPEG under 50 MiB")
     if token.is_symlink() or token.parent.is_symlink():
         raise MiniError("The private YouTube token path must not be a symlink")
-    if build is None:
+    if not build:
         raise MiniError(
             "Use uv run --extra timey mini timey --upload-only to enable YouTube uploads"
         )
     if progress:
         progress(None, "Connecting to YouTube · checking saved sign-in")
     try:
-        credentials = (
-            Credentials.from_authorized_user_file(str(token), [SCOPE]) if token.exists() else None
+        credentials: OAuth | None = (
+            cast(OAuth, Credentials.from_authorized_user_file(str(token), [SCOPE]))
+            if token.exists()
+            else None
         )
         if credentials and credentials.expired and credentials.refresh_token:
             if progress:
@@ -307,9 +338,12 @@ def upload(
                 )
             flow = InstalledAppFlow.from_client_secrets_file(str(secrets), [SCOPE])
             if progress:
-                progress(None, "Connecting to YouTube · finish Google sign-in in your browser")
+                progress(
+                    None,
+                    "Connecting to YouTube · finish Google sign-in in your browser",
+                )
             try:
-                credentials = flow.run_local_server(port=0, timeout_seconds=300)
+                credentials = cast(OAuth | None, flow.run_local_server(port=0, timeout_seconds=300))
             except AttributeError as exc:
                 if exc.name != "replace" or exc.obj is not None:
                     raise
