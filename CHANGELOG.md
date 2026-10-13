@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.33.0
+
+- Keep the familiar two-column interface with a 55% mascot / 45% content split, adaptive sculptures up to 128 × 96 dots, alternating habitat-coloured rows and a subtle selection highlight
+- Preserve textured natural fur with flag colours in highlights and surroundings; improve surface lighting, marine flukes, side-profile faces and ground shadows
+- Animate at 12 frames per second with planted footsteps, delayed ear and tail settling, body breathing, swaying foliage, swimming wakes, dust and reactions in nearby plants
+- Make animals glance when hovered, reveal interaction hints and keep pointer targets attached across movement and terminal sizes; retain pause, reduced-motion and monochrome views
+- Rebuild all 50 species as compressed movement assets, reducing bundled artwork from 31 MB to about 5 MB while retaining editable geometry and bounded lazy caches
+- Check movement, high-resolution rendering and pointer maps across the species catalogue; remove inherited virtual-environment warnings from isolated type checks
+
+Requires Python 3.15+
+
+[Development changes](https://github.com/keys-i/uq.minis/compare/v0.32.0...v0.33.0)
+
 ## v0.32.0
 
 - Enforce strict basedpyright across source, tools, tests and the terminal artwork generator, with zero errors or warnings
