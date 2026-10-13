@@ -38,6 +38,9 @@ def _types() -> int:
     """Check the current wheel without replacing the interactive environment"""
     directory = ROOT / ".cache/types"
     python = directory / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    env = dict(os.environ)
+    env.pop("VIRTUAL_ENV", None)
+    env["UV_PROJECT_ENVIRONMENT"] = str(directory)
     return run(
         [
             "uv",
@@ -52,7 +55,7 @@ def _types() -> int:
             str(python),
             "--warnings",
         ],
-        env={**os.environ, "UV_PROJECT_ENVIRONMENT": str(directory)},
+        env=env,
     )
 
 

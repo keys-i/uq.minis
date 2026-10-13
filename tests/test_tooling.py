@@ -128,7 +128,8 @@ class TestDev:
 
 
 @pytest.mark.parametrize("status", [0, 7])
-def test_types(commands: Mock, status: int) -> None:
+def test_types(commands: Mock, monkeypatch: pytest.MonkeyPatch, status: int) -> None:
+    monkeypatch.setenv("VIRTUAL_ENV", "interactive")
     commands.return_value = status
     assert script._types() == status
     commands.assert_called_once()
@@ -137,4 +138,5 @@ def test_types(commands: Mock, status: int) -> None:
     assert "basedpyright" in checked and "--warnings" in checked
     directory = str(script.ROOT / ".cache/types")
     assert commands.call_args.kwargs["env"]["UV_PROJECT_ENVIRONMENT"] == directory
+    assert "VIRTUAL_ENV" not in commands.call_args.kwargs["env"]
     assert checked[checked.index("--pythonpath") + 1].startswith(directory)
