@@ -4,12 +4,13 @@ import os
 import random
 import sys
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import partial
 from math import cos, pi
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, TextIO
 
 import typer
 from rich import box
@@ -24,14 +25,17 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from rich.prompt import Confirm, FloatPrompt, InvalidResponse, Prompt
+from rich.prompt import Confirm, FloatPrompt, InvalidResponse, Prompt, PromptBase
 from rich.table import Table
-from rich.text import Text
+from rich.text import Text, TextType
 from rich.theme import Theme
 from typer import rich_utils
 from typer._click.exceptions import ClickException
 
-from uq_minis.core.art import Habitat, Preview, _habitats, blend
+from uq_minis.core.art import Habitat, Preview, blend, habitats
+
+if TYPE_CHECKING:
+    from prompt_toolkit.completion import Completer
 
 COLOURS = {
     "accent": "#ffb66f",
@@ -63,13 +67,13 @@ CONSOLE = Console(theme=THEME, highlight=False)
 ERROR = Console(stderr=True, theme=THEME, highlight=False)
 
 
-_HABITAT = ContextVar("mini_habitat", default=None)
+_HABITAT: ContextVar[Habitat | None] = ContextVar("mini_habitat", default=None)
 _MENU = ContextVar("mini_menu", default=False)
-_RECENT = ContextVar("mini_answers", default=())
-_DRAFT = ContextVar("mini_draft", default=None)
+_RECENT: ContextVar[tuple[str, ...]] = ContextVar("mini_answers", default=())
+_DRAFT: ContextVar[dict[str, str | float] | None] = ContextVar("mini_draft", default=None)
 _RESTORE = ContextVar("mini_restore", default=False)
-_STILL = False
-_POKES = {}
+still = False
+_POKES: dict[str, int] = {}
 
 
 class Back(Exception):
@@ -98,13 +102,13 @@ def _marquee(text: str, width: int, elapsed: float) -> str:
 
 
 def _look() -> Habitat:
-    return _HABITAT.get() or _habitats()["numbat"]
+    return _HABITAT.get() or habitats()["numbat"]
 
 
 @contextmanager
-def habitat(name: str, *, menu: bool = True):
+def habitat(name: str, *, menu: bool = True) -> Generator[None]:
     """Apply a mini's look and restore it after completion, errors or cancellation"""
-    look = _habitats()[name]
+    look = habitats()[name]
     token = _HABITAT.set(look)
     navigation = _MENU.set(menu)
     answers = _RECENT.set(())
@@ -168,7 +172,7 @@ def table(*headers: str, title: str | None = None) -> Table:
 
 
 @contextmanager
-def activity(title: str, *, show: bool = True):
+def activity(title: str, *, show: bool = True) -> Generator[Callable[[float | None, str], None]]:
     """Show real progress, unknown-duration stages and useful redirected logs"""
     with Progress(
         SpinnerColumn("dots", style="accent"),
@@ -182,7 +186,7 @@ def activity(title: str, *, show: bool = True):
         refresh_per_second=8,
     ) as progress:
         task = progress.add_task(title, total=None)
-        previous = ["", -1]
+        previous: list[str | int] = ["", -1]
 
         def update(done: float | None, stage: str) -> None:
             fraction = max(0, min(1, done)) if done is not None else None
@@ -209,7 +213,9 @@ def activity(title: str, *, show: bool = True):
         yield update
 
 
-def application(*, theme: str = "numbat", add_completion: bool = False, **options) -> typer.Typer:
+def application(
+    *, theme: str = "numbat", add_completion: bool = False, **options: Any
+) -> typer.Typer:
     """Create a command app with the shared presentation and exception settings"""
     app = typer.Typer(
         add_completion=add_completion,
@@ -217,7 +223,7 @@ def application(*, theme: str = "numbat", add_completion: bool = False, **option
         pretty_exceptions_show_locals=False,
         **options,
     )
-    app.habitat = theme
+    setattr(app, "habitat", theme)
     return app
 
 
@@ -232,10 +238,16 @@ def recover(error: Exception, arguments: Sequence[str]) -> list[str]:
     import shlex
 
     problem(error)
-    CONSOLE.print("Your answers are kept for review · nothing retries automatically", style="muted")
+    CONSOLE.print(
+        "Your answers are kept for review · nothing retries automatically",
+        style="muted",
+    )
     choice = ask(
         "What next?",
-        choices={"edit": "Review saved answers and rerun", "menu": "Back to the mini menu"},
+        choices={
+            "edit": "Review saved answers and rerun",
+            "menu": "Back to the mini menu",
+        },
         default="menu",
         show_choices=False,
     )
@@ -257,42 +269,73 @@ def recover(error: Exception, arguments: Sequence[str]) -> list[str]:
     return [argument for argument in arguments if argument != "--yes"]
 
 
-class _Input:
+class _Input[T: (str, bool, float)](PromptBase[T]):
     """Keep keyboard input and presentation shared across prompt types"""
 
-    completer = None
+    completer: Completer | None = None
+    labels: Mapping[str, str] = {}
+    previews: Mapping[str, Preview] = {}
+    preview: Preview | None = None
+    preview_default = ""
+    required = False
+    described = False
+    reaction = False
 
-    def get_input(self, console, question, password, stream=None):
+    # Rich's classmethod fallback also works through a stateful instance override
+    def get_input(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, console: Console, prompt: TextType, password: bool, stream: TextIO | None = None
+    ) -> str:
         """Use the active terminal session or Rich's ordinary input fallback"""
-        from prompt_toolkit import prompt
+        question = Text.from_markup(prompt) if isinstance(prompt, str) else prompt
+        from prompt_toolkit import prompt as read_input
         from prompt_toolkit.application import get_app, get_app_session
         from prompt_toolkit.filters import Condition
+        from prompt_toolkit.formatted_text import StyleAndTextTuples
         from prompt_toolkit.input import DummyInput, PipeInput
-        from prompt_toolkit.key_binding import KeyBindings
+        from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
         from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit, Window
         from prompt_toolkit.layout.containers import VerticalAlign
         from prompt_toolkit.layout.controls import FormattedTextControl
         from prompt_toolkit.layout.menus import CompletionsMenuControl
-        from prompt_toolkit.mouse_events import MouseEventType
+        from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
         from prompt_toolkit.output import ColorDepth
         from prompt_toolkit.styles import Style
 
         input = get_app_session().input
-        if (
+        plain = (
             stream is not None
             or isinstance(input, DummyInput)
             or os.getenv("TERM") == "dumb"
             or not console.is_terminal
             and not isinstance(input, PipeInput)
+        )
+
+        def roomy() -> bool:
+            size = get_app_session().output.get_size()
+            return (
+                min(console.width, size.columns) >= 80
+                and size.rows >= 24
+                and console.encoding.lower().startswith("utf")
+            )
+
+        look = _look()
+        if (
+            console.is_terminal
+            and console.width >= 44
+            and console.encoding.lower().startswith("utf")
+            and (plain or not roomy())
         ):
+            console.print(look.picture(), end="")
+            console.print(Text(look.name, style="bold"))
+            console.print(Text(f"{look.status} · {look.country}\n{look.place}\n"))
+        if plain:
             if not getattr(self, "described", False):
                 if preview := getattr(self, "preview", None):
                     console.print(Text(preview.description))
                 for key, preview in getattr(self, "previews", {}).items():
                     console.print(Text(f"{key} · {preview.description}"))
                 self.described = True
-            return super().get_input(console, question, password, stream=stream)
-        look = _look()
+            return super().get_input(console, prompt, password, stream=stream)
         status = {
             "vulnerable": ("#9ee59a", "#77d7e3"),
             "endangered": ("#ffae77", "#f4d66b"),
@@ -300,7 +343,7 @@ class _Input:
             "extinct": ("#c6adff", "#8dbefa"),
         }[look.status.partition(" · ")[0]]
         allowed = os.getenv("MINI_MOTION", "1") != "0" and not console.no_color
-        moving = allowed and not _STILL
+        moving = allowed and not still
         started = time.monotonic()
         reacting = getattr(self, "reaction", False)
         action = "peek" if reacting else "idle"
@@ -313,14 +356,14 @@ class _Input:
         helping = False
         hot = ""
         pressed = ""
-        bubble = 0
+        bubble = 0.0
         blurb = ""
         menu = _MENU.get()
         bindings = KeyBindings()
-        shown = {}
-        touches = {}
+        shown: dict[str, tuple[str, float]] = {}
+        touches: dict[str, list[str]] = {}
 
-        def caption(value, width=40, slot="picture"):
+        def caption(value: str, width: int = 40, slot: str = "picture") -> str:
             now = time.monotonic()
             if slot not in shown or shown[slot][0] != value:
                 shown[slot] = (value, now)
@@ -331,29 +374,31 @@ class _Input:
         class Choices(CompletionsMenuControl):
             """Scroll the selected completion while keeping native input and pointer behaviour"""
 
-            def create_content(self, width, height):
+            def create_content(self, width: int, height: int):
                 """Use the actual menu width after terminal layout and resizing"""
                 content = super().create_content(width, height)
                 original = content.get_line
                 state = get_app().current_buffer.complete_state
 
-                def line(index):
+                def line(index: int) -> StyleAndTextTuples:
                     if state and index == state.complete_index:
                         choice = state.completions[index]
                         text = caption(choice.display_text, max(1, width - 2), "choice")
                         style = f"class:completion-menu.completion.current {choice.style} {choice.selected_style}"
                         return [(style, " " + set_cell_size(text, max(1, width - 2)) + " ")]
                     return [
-                        (style + f" class:row{index % 2}", text, *handler)
-                        for style, text, *handler in original(index)
+                        (item[0] + f" class:row{index % 2}", item[1], item[2])
+                        if len(item) == 3
+                        else (item[0] + f" class:row{index % 2}", item[1])
+                        for item in original(index)
                     ]
 
                 content.get_line = line
                 return content
 
-        def command(name):
+        def command(name: str) -> None:
             nonlocal helping, moving, hot, pressed
-            global _STILL
+            global still
             hot = pressed = ""
             if name == "menu" and menu:
                 get_app().exit(exception=Back())
@@ -361,8 +406,8 @@ class _Input:
             if name == "keys":
                 helping = not helping
             elif name == "motion" and allowed:
-                _STILL = not _STILL
-                moving = not _STILL
+                still = not still
+                moving = not still
                 get_app().refresh_interval = 1 / 16 if moving or bubble else 0
             get_app().invalidate()
 
@@ -371,23 +416,23 @@ class _Input:
             "?",
             filter=Condition(lambda: not get_app().current_buffer.text and not password),
         )
-        def shortcuts(event):
+        def shortcuts(event: KeyPressEvent) -> None:
             command("keys")
 
         @bindings.add("escape", filter=Condition(lambda: menu or helping))
         @bindings.add("escape", "left", filter=Condition(lambda: menu))
-        def back(event):
+        def back(event: KeyPressEvent) -> None:
             command("keys" if helping else "menu")
 
         @bindings.add("escape", "m")
-        def motion(event):
+        def motion(event: KeyPressEvent) -> None:
             command("motion")
 
         @bindings.add("c-space")
-        def complete(event):
+        def complete(event: KeyPressEvent) -> None:
             event.current_buffer.start_completion(select_first=False)
 
-        def button(name, event):
+        def button(name: str, event: MouseEvent) -> None:
             nonlocal hot, pressed
             if event.event_type == MouseEventType.MOUSE_MOVE:
                 hot = name
@@ -398,7 +443,7 @@ class _Input:
                 return
             get_app().invalidate()
 
-        def shortcuts_text():
+        def shortcuts_text() -> StyleAndTextTuples:
             return [
                 ("class:question", "  Keyboard shortcuts\n\n"),
                 (
@@ -413,15 +458,6 @@ class _Input:
                 ("", f"  {_key('Alt+M')}   pause motion\n" if allowed else ""),
                 ("", f"  {_key('Ctrl+C')}  cancel\n\n  ? / {_key('Alt+H')}  shortcuts"),
             ]
-
-        def roomy():
-            size = get_app_session().output.get_size()
-            return (
-                min(console.width, size.columns) >= 80
-                and size.rows >= 24
-                and console.encoding.lower().startswith("utf")
-                and not console.no_color
-            )
 
         def portrait():
             nonlocal action, acted, deadline, state, hover, last, hot, pressed, drawn, bubble
@@ -462,8 +498,14 @@ class _Input:
                 else:
                     pose, frame = "breathe", int(now * 8) % 16
             drawn = (frame, pose)
-            fragments = []
-            picture = look.picture(frame, pose) if not preview else preview.picture
+            fragments: StyleAndTextTuples = []
+            picture = (
+                look.picture(frame, pose)
+                if not preview
+                else Text(preview.description)
+                if console.no_color
+                else preview.picture
+            )
             if preview and cell_len(preview.description) > 40:
                 picture = Text()
                 for index, line in enumerate(preview.picture.split("\n", allow_blank=True)):
@@ -520,7 +562,8 @@ class _Input:
                     fragments.append((f"class:place fg:{colour}", f"\n  {look.place}\n"))
             return fragments
 
-        def touch(event):
+        def touch(mouse_event: MouseEvent) -> None:
+            event = mouse_event
             nonlocal action, acted, deadline, state, hover, bubble, blurb
             if helping:
                 return
@@ -544,9 +587,11 @@ class _Input:
                     state = "look" if chosen else "listen" if buffer.text else "idle"
                     poses = getattr(
                         look,
-                        {"ears": "head_moves", "pet": "body_moves", "object": "object_moves"}[
-                            region
-                        ],
+                        {
+                            "ears": "head_moves",
+                            "pet": "body_moves",
+                            "object": "object_moves",
+                        }[region],
                     ).split()
                     previous = touches.setdefault(region, [])
                     unused = [pose for pose in poses if pose not in previous]
@@ -571,7 +616,7 @@ class _Input:
                     hover = ""
                     get_app().invalidate()
 
-        def footer():
+        def footer() -> StyleAndTextTuples:
             buffer = get_app().current_buffer
             chosen = buffer.complete_state and buffer.complete_state.current_completion
             action = "enter to choose" if chosen else "enter"
@@ -580,6 +625,8 @@ class _Input:
             if hover:
                 action = hover
             elif chosen:
+                assert buffer.complete_state is not None
+                assert buffer.complete_state.complete_index is not None
                 count = len(buffer.complete_state.completions)
                 action += f" · {buffer.complete_state.complete_index + 1}/{count}"
             return [
@@ -590,7 +637,7 @@ class _Input:
             ]
 
         def nav():
-            fragments = []
+            fragments: StyleAndTextTuples = []
             buttons = {"menu": ("← menu", "esc")} if menu else {}
             buttons["keys"] = ("keys", "?")
             if allowed:
@@ -619,13 +666,14 @@ class _Input:
             app.erase_when_done = True
             original = app.layout.container
             # The native input otherwise expands to the full portrait height
+            assert isinstance(original, (HSplit, Window))
             original.height = lambda: max(
                 6 if self.completer else 0,
                 2
                 + min(
                     6,
-                    len(get_app().current_buffer.complete_state.completions)
-                    if get_app().current_buffer.complete_state
+                    len(state.completions)
+                    if (state := get_app().current_buffer.complete_state)
                     else 0,
                 ),
             )
@@ -635,7 +683,7 @@ class _Input:
             portrait_control = FormattedTextControl(portrait)
             portrait_control.mouse_handler = touch
 
-            def recent():
+            def recent() -> StyleAndTextTuples:
                 answers = _RECENT.get()
                 return [
                     (
@@ -696,7 +744,7 @@ class _Input:
         rows = [
             blend(COLOURS["surface"], colour, 0.22) for colour in (look.primary, look.secondary)
         ]
-        answer = prompt(
+        answer = read_input(
             [("class:question", question.plain)],
             completer=self.completer,
             complete_while_typing=True,
@@ -743,7 +791,7 @@ class _Input:
             console.print(Text(label))
         return answer
 
-    def process_response(self, value):
+    def process_response(self, value: str) -> T:
         """Keep validated recent answers beside the next question"""
         answer = super().process_response(value)
         if getattr(self, "required", False) and not answer:
@@ -755,21 +803,21 @@ class _Input:
         self.reaction = False
         return answer
 
-    def on_validate_error(self, value, error):
+    def on_validate_error(self, value: str, error: InvalidResponse) -> None:
         """React once while keeping Rich's validation message visible"""
         self.reaction = True
         super().on_validate_error(value, error)
 
 
-class _Prompt(_Input, Prompt):
+class _Prompt(_Input[str], Prompt):  # pyright: ignore[reportIncompatibleMethodOverride]
     """Validate choices and required answers through Rich"""
 
 
-class _Confirm(_Input, Confirm):
+class _Confirm(_Input[bool], Confirm):  # pyright: ignore[reportIncompatibleMethodOverride]
     """Keep yes/no validation with the shared input controls"""
 
 
-class _Number(_Input, FloatPrompt):
+class _Number(_Input[float], FloatPrompt):  # pyright: ignore[reportIncompatibleMethodOverride]
     """Keep number validation with the shared input controls"""
 
 
@@ -809,7 +857,7 @@ def ask(
     if _RESTORE.get():
         saved = (_DRAFT.get() or {}).get(f"› {message}", default)
         if not choices or saved in choices:
-            default = saved
+            default = str(saved)
     question = _Prompt(
         f"[accent]›[/accent] {message}",
         console=CONSOLE,
@@ -818,12 +866,12 @@ def ask(
         case_sensitive=not ignore_case,
         show_default=bool(default),
     )
-    completers = []
+    completers: list[Completer] = []
     if choices or suggestions:
         values = choices or suggestions
         completers.append(
             WordCompleter(
-                values,
+                list(values),
                 WORD=True,
                 ignore_case=ignore_case,
                 match_middle=search,
@@ -860,5 +908,7 @@ def confirm(message: str, *, default: bool = False, preview: Preview | None = No
 def number(message: str, *, default: float) -> float:
     """Read a numeric answer with the shared console and Rich validation"""
     if _RESTORE.get():
-        default = (_DRAFT.get() or {}).get(f"› {message}", default)
+        saved = (_DRAFT.get() or {}).get(f"› {message}", default)
+        if isinstance(saved, float):
+            default = saved
     return _Number.ask(f"[accent]›[/accent] {message}", console=CONSOLE, default=default)

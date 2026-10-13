@@ -95,13 +95,13 @@ class Habitat:
 
     def seconds(self, pose: str) -> float:
         """Let each routine finish at the shared eight-frame cadence"""
-        return len(_poses(self.animal)[pose]) / 8
+        return len(poses(self.animal)[pose]) / 8
 
     def region(self, frame: int, pose: str, x: int, y: int) -> str | None:
         """Keep pointer targets attached to the animal and object as they move"""
         rows = self.hit.splitlines()
         if pose != "idle":
-            frames = _poses(self.animal)[pose]
+            frames = poses(self.animal)[pose]
             rows = frames[min(frame, len(frames) - 1)]["hit"].splitlines()
         if 0 <= y < len(rows) and 2 <= x < len(rows[y]) + 2:
             return {"1": "ears", "2": "pet", "3": "object"}.get(rows[y][x - 2])
@@ -110,7 +110,7 @@ class Habitat:
     @cache
     def colours(self) -> tuple[tuple[str, ...], ...]:
         """Keep fur, markings, foliage and water distinct under the same light"""
-        palettes = []
+        palettes: list[tuple[str, ...]] = []
         for colour in (
             self.fur,
             "#f8f1e3",
@@ -126,7 +126,7 @@ class Habitat:
             )
             shadow = blend(colour, "#000000", 0.65)
             stops = (shadow, colour, light)
-            palette = []
+            palette: list[str] = []
             for level in range(8):
                 position = level / 7 * 2
                 lower = min(int(position), 1)
@@ -142,7 +142,7 @@ class Habitat:
         picture = Text()
         drawing = {"art": self.art, "shade": self.shade, "tone": self.tone}
         if pose != "idle":
-            sequence = _poses(self.animal)[pose]
+            sequence = poses(self.animal)[pose]
             drawing = sequence[min(frame, len(sequence) - 1)]
         light = (0, 0, 1, 1, 1, 0, 0, -1, -1, -1, 0, 0, 1, 1, 0, 0)[frame % 16]
         for row, shades, tones in zip(
@@ -155,14 +155,15 @@ class Habitat:
             for dot, depth, tone in zip(row.ljust(len(shades)), shades, tones, strict=True):
                 level = int(depth) + (light if pose != "idle" and tone in "345" else 0)
                 picture.append(
-                    dot, colours[int(tone)][min(7, max(0, level))] if dot != " " else None
+                    dot,
+                    colours[int(tone)][min(7, max(0, level))] if dot != " " else None,
                 )
             picture.append("\n")
         return picture
 
 
 @cache
-def _habitats() -> dict[str, Habitat]:
+def habitats() -> dict[str, Habitat]:
     """Load the small bundled forest once, after a mini is opened"""
     path = files("uq_minis.assets").joinpath("terminal/forest.toml")
     return {
@@ -172,7 +173,7 @@ def _habitats() -> dict[str, Habitat]:
 
 
 @lru_cache(maxsize=6)
-def _poses(animal: str) -> dict:
+def poses(animal: str) -> dict[str, list[dict[str, str]]]:
     """Load an animal's movement only when its portrait is shown"""
     path = files("uq_minis.assets").joinpath(f"terminal/{animal}.toml")
     return tomllib.loads(path.read_text())

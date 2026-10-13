@@ -3,21 +3,40 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
+import random
 import shutil
 import subprocess
 import sys
+import time
+from collections.abc import Callable, Sequence
 from io import StringIO
+from operator import itemgetter
 from pathlib import Path
 from threading import Timer
 from types import ModuleType, SimpleNamespace
+from typing import Any, Protocol
 from unittest.mock import MagicMock, Mock
 
+import httpx
 import prompt_toolkit
 import pytest
-from prompt_toolkit.application import create_app_session, get_app, get_app_session
+from playwright.sync_api import Browser
+from prompt_toolkit.application import Application, create_app_session, get_app, get_app_session
+from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.data_structures import Size
-from prompt_toolkit.input import create_pipe_input
-from prompt_toolkit.layout import Layout, Window, menus
+from prompt_toolkit.formatted_text import StyleAndTextTuples, to_formatted_text
+from prompt_toolkit.input import PipeInput, create_pipe_input
+from prompt_toolkit.layout import (
+    ConditionalContainer,
+    Container,
+    HSplit,
+    Layout,
+    VSplit,
+    Window,
+    menus,
+)
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.output import DummyOutput
 from rich.console import Console
@@ -30,16 +49,63 @@ from uq_minis.cli import timey as wizard
 from uq_minis.core import cache, mini, terminal
 from uq_minis.core.forms import FormProfile
 from uq_minis.minis.scrappy import scraper
-from uq_minis.minis.timey import preview, style, video
+from uq_minis.minis.timey import video
 from uq_minis.worker import event as worker
 from uq_minis.worker import mail, outlook, service
 from uq_minis_tools.scripts import script
 
+type Frames = list[list[str]]
+
+
+class Canvas(Protocol):
+    def __call__(
+        self,
+        width: int = 80,
+        rows: int = 24,
+        no_color: bool = False,
+        reply: tuple[str, str] | None = None,
+    ) -> Frames: ...
+
+
+class Screen(Protocol):
+    def __call__(
+        self, *, width: int = 80, live: bool = False, no_color: bool = False
+    ) -> tuple[Console, StringIO]: ...
+
+
+class Keys(Protocol):
+    def __call__(self, *texts: str, interval: float = 0.1) -> None: ...
+
+
+class Clip(Protocol):
+    def __call__(
+        self,
+        name: str,
+        source: str,
+        seconds: float = 1,
+        *,
+        audio: bool = False,
+        options: Sequence[str] = (),
+    ) -> Path: ...
+
+
+def columns(app: SimpleNamespace) -> VSplit:
+    root = app.layout.container
+    assert isinstance(root, ConditionalContainer) and isinstance(root.content, HSplit)
+    row = root.content.children[0]
+    assert isinstance(row, VSplit)
+    return row
+
+
+def parts(container: Container) -> StyleAndTextTuples:
+    assert isinstance(container, Window) and isinstance(container.content, FormattedTextControl)
+    return to_formatted_text(container.content.text)
+
 
 @pytest.fixture
-def fontlist(monkeypatch):
+def fontlist(monkeypatch: pytest.MonkeyPatch):
     families = {"Open Sans": "Sans Serif", "Noto Sans Devanagari": "Sans Serif"}
-    monkeypatch.setattr(wizard, "catalogue", lambda directory: families)
+    monkeypatch.setattr(wizard, "catalogue", Mock(return_value=families))
     return families
 
 
@@ -49,10 +115,10 @@ def runner():
 
 
 @pytest.fixture
-def pipe(monkeypatch):
+def pipe(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setattr(terminal, "_POKES", {})
-    monkeypatch.setattr(terminal, "_STILL", False)
+    monkeypatch.setattr(terminal, "still", False)
     with (
         create_pipe_input() as input,
         create_app_session(input=input, output=DummyOutput()),
@@ -65,14 +131,14 @@ def pipe(monkeypatch):
 
 
 @pytest.fixture
-def entry(monkeypatch):
+def entry(monkeypatch: pytest.MonkeyPatch):
     prompt = Mock(return_value="first")
     monkeypatch.setattr(prompt_toolkit, "prompt", prompt)
     return prompt
 
 
 @pytest.fixture
-def cursor(monkeypatch):
+def cursor(monkeypatch: pytest.MonkeyPatch):
     buffer = SimpleNamespace(
         text="",
         complete_state=SimpleNamespace(
@@ -87,16 +153,16 @@ def cursor(monkeypatch):
         exit=Mock(),
     )
     clock = Mock(return_value=0)
-    monkeypatch.setattr(terminal.time, "monotonic", clock)
+    monkeypatch.setattr(time, "monotonic", clock)
     monkeypatch.setattr(prompt_toolkit.application, "get_app", lambda: app)
     monkeypatch.setattr(menus, "get_app", lambda: app)
-    monkeypatch.setattr(terminal.random, "uniform", lambda *args: 3)
-    monkeypatch.setattr(terminal.random, "choice", lambda choices: choices[0])
+    monkeypatch.setattr(random, "uniform", Mock(return_value=3))
+    monkeypatch.setattr(random, "choice", itemgetter(0))
     return buffer, clock, app
 
 
 @pytest.fixture
-def videos(monkeypatch):
+def videos(monkeypatch: pytest.MonkeyPatch):
     client = MagicMock()
     client.__enter__.return_value = client
     client.extract_info.return_value = {
@@ -108,7 +174,7 @@ def videos(monkeypatch):
 
 
 @pytest.fixture
-def thumbnails(monkeypatch):
+def thumbnails(monkeypatch: pytest.MonkeyPatch):
     from io import BytesIO
 
     with BytesIO() as buffer:
@@ -117,20 +183,20 @@ def thumbnails(monkeypatch):
     reply = MagicMock()
     reply.__enter__.return_value = reply
     reply.iter_bytes.return_value = [payload]
-    monkeypatch.setattr(preview.httpx, "stream", Mock(return_value=reply))
+    monkeypatch.setattr(httpx, "stream", Mock(return_value=reply))
     return reply
 
 
 @pytest.fixture
-def canvas(pipe, screen, monkeypatch):
-    frames = []
-    response = None
+def canvas(pipe: PipeInput, screen: Screen, monkeypatch: pytest.MonkeyPatch):
+    frames: Frames = []
+    response: tuple[str, str] | None = None
     native = prompt_toolkit.prompt
 
-    def draw(*args, **kwargs):
-        app = None
+    def draw(*args: Any, **kwargs: Any) -> str:
+        app: Application[str] | None = None
 
-        def sample(app):
+        def sample(app: Application[str]):
             nonlocal response
             view = app.renderer.last_rendered_screen
             if view:
@@ -149,10 +215,12 @@ def canvas(pipe, screen, monkeypatch):
         def ready():
             nonlocal app
             app = get_app()
+            assert app.loop is not None
             kwargs["pre_run"]()
             app.after_render += sample
+            current = app
             app.loop.set_exception_handler(
-                lambda loop, context: app.exit(exception=context["exception"])
+                lambda loop, context: current.exit(exception=context["exception"])
             )
 
         try:
@@ -163,7 +231,12 @@ def canvas(pipe, screen, monkeypatch):
 
     monkeypatch.setattr(prompt_toolkit, "prompt", draw)
 
-    def setup(width=80, rows=24, no_color=False, reply=None):
+    def setup(
+        width: int = 80,
+        rows: int = 24,
+        no_color: bool = False,
+        reply: tuple[str, str] | None = None,
+    ):
         nonlocal response
         response = reply
         screen(width=width, live=True, no_color=no_color)
@@ -179,10 +252,10 @@ def canvas(pipe, screen, monkeypatch):
 
 
 @pytest.fixture
-def keys(pipe):
-    timers = []
+def keys(pipe: PipeInput):
+    timers: list[Timer] = []
 
-    def send(*texts, interval=0.1):
+    def send(*texts: str, interval: float = 0.1) -> None:
         for index, text in enumerate(texts):
             timer = Timer(0.05 + index * interval, pipe.send_text, args=(text,))
             timers.append(timer)
@@ -194,24 +267,25 @@ def keys(pipe):
 
 
 @pytest.fixture
-def tab(pipe, monkeypatch):
-    pending = []
+def tab(pipe: PipeInput, monkeypatch: pytest.MonkeyPatch):
+    pending: list[str] = []
     prompt = prompt_toolkit.prompt
 
-    def complete(*args, **kwargs):
+    def complete(*args: Any, **kwargs: Any) -> str:
         if not pending:
             return prompt(*args, **kwargs)
         prefix = pending.pop(0)
         before = kwargs.get("pre_run")
-        handles = []
+        handles: list[Any] = []
 
-        def select(buffer):
+        def select(buffer: Buffer):
             if buffer.text == prefix and buffer.complete_state:
                 buffer.on_completions_changed -= select
                 pipe.send_text("\t\n")
 
         def ready():
             app = get_app()
+            assert app.loop is not None
             app.current_buffer.on_completions_changed += select
             handles.append(app.current_buffer)
             handles.append(
@@ -222,7 +296,7 @@ def tab(pipe, monkeypatch):
             )
             if before:
                 before()
-            pipe.send_text(prefix)
+            pipe.send_text(prefix or "\x00")
 
         try:
             return prompt(*args, **{**kwargs, "pre_run": ready})
@@ -233,15 +307,15 @@ def tab(pipe, monkeypatch):
 
     monkeypatch.setattr(prompt_toolkit, "prompt", complete)
 
-    def send(prefix):
+    def send(prefix: str):
         pending.append(prefix)
 
     return send
 
 
 @pytest.fixture
-def screen(monkeypatch):
-    def make(*, width=80, live=False, no_color=False):
+def screen(monkeypatch: pytest.MonkeyPatch):
+    def make(*, width: int = 80, live: bool = False, no_color: bool = False):
         monkeypatch.setenv("TERM", "xterm-256color")
         output = StringIO()
         console = Console(
@@ -356,7 +430,7 @@ title = "Sample Event Pack"
 
 
 @pytest.fixture
-def checkout(tmp_path, monkeypatch):
+def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(mini, "ROOT", tmp_path)
     (tmp_path / "pyproject.toml").touch()
     (tmp_path / "src/minis").mkdir(parents=True)
@@ -364,7 +438,7 @@ def checkout(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def paths(tmp_path, monkeypatch):
+def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "movie night.toml").touch()
     (tmp_path / "events").mkdir()
@@ -390,7 +464,7 @@ def profile() -> FormProfile:
 
 
 @pytest.fixture
-def browser(monkeypatch):
+def browser(monkeypatch: pytest.MonkeyPatch):
     page = Mock(url=outlook.HOME)
     context = Mock(pages=[page])
     context.new_page.return_value = page
@@ -411,8 +485,8 @@ def browser(monkeypatch):
     session = MagicMock()
     session.__enter__.return_value = session.start.return_value = runtime
     api = ModuleType("playwright.sync_api")
-    api.Error = fakes.BrowserError
-    api.sync_playwright = Mock(return_value=session)
+    api.__dict__["Error"] = fakes.BrowserError
+    api.__dict__["sync_playwright"] = Mock(return_value=session)
     monkeypatch.setitem(sys.modules, api.__name__, api)
     return SimpleNamespace(page=page, context=context, instance=instance, runtime=runtime, api=api)
 
@@ -429,7 +503,7 @@ def chromium():
 
 
 @pytest.fixture
-def page(chromium):
+def page(chromium: Browser):
     with chromium.new_context() as context:
         context.route("**/*", lambda route: route.abort())
         page = context.new_page()
@@ -438,7 +512,7 @@ def page(chromium):
 
 
 @pytest.fixture
-def inbox(tmp_path):
+def inbox(tmp_path: Path):
     with worker.database(tmp_path / "agent") as db:
         box = outlook.Outlook(db, "rad@example.org")
         db.execute(
@@ -465,7 +539,7 @@ def inbox(tmp_path):
 
 
 @pytest.fixture
-def cached(tmp_path):
+def cached(tmp_path: Path):
     root = tmp_path / "cache"
     source = tmp_path / "payload.bin"
     source.write_bytes(b"completed")
@@ -476,40 +550,44 @@ def cached(tmp_path):
 
 @pytest.fixture
 def macos(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(service.platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(service.os, "getuid", lambda: 501, raising=False)
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(os, "getuid", lambda: 501, raising=False)
 
 
 @pytest.fixture
-def process(monkeypatch):
+def process(monkeypatch: pytest.MonkeyPatch):
     run = Mock(return_value=subprocess.CompletedProcess([], 0, "", ""))
-    monkeypatch.setattr(service.subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "run", run)
     return run
 
 
 @pytest.fixture
-def job(tmp_path, monkeypatch):
+def job(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     home = tmp_path / "home with spaces"
-    monkeypatch.setattr(service.Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(Path, "home", classmethod(Mock(return_value=home)))
     path = home / "Library/LaunchAgents/au.edu.uq.minis.agent.plist"
     path.parent.mkdir(parents=True)
     return path
 
 
 @pytest.fixture
-def watch(event_toml, tmp_path, monkeypatch):
+def watch(event_toml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     state = tmp_path / "agent"
     worker.watch(event_toml, event_id="42", since="2026-09-01", state_dir=state)
     mailbox = Mailbox()
-    notices = []
-    monkeypatch.setattr(mail, "token", lambda db: "test-token")
-    monkeypatch.setattr(mail, "Graph", lambda token: mailbox)
-    monkeypatch.setattr(service, "notify", lambda title, body: notices.append((title, body)))
+    notices: list[tuple[str, str]] = []
+    monkeypatch.setattr(mail, "token", Mock(return_value="test-token"))
+    monkeypatch.setattr(mail, "Graph", Mock(return_value=mailbox))
+
+    def notify(title: str, body: str) -> None:
+        notices.append((title, body))
+
+    monkeypatch.setattr(service, "notify", notify)
     return state, mailbox, notices
 
 
 @pytest.fixture
-def offerings(tmp_path, courses):
+def offerings(tmp_path: Path, courses: None):
     html, csv = tmp_path / "search.html", tmp_path / "links.csv"
     listing = '<h2 class="trigger"><a class="code">COMP3400</a><a class="title">Logic</a></h2><a href="/course.html?course_code=COMP3400">View all previous offerings</a>'
     html.write_text(listing + listing.replace("COMP3400", "CSSE2002"))
@@ -518,7 +596,7 @@ def offerings(tmp_path, courses):
 
 
 @pytest.fixture
-def draft():
+def draft() -> dict[str, Any]:
     return {
         "snippet": {"title": "Minecraft timer", "description": "", "tags": []},
         "status": {
@@ -588,7 +666,7 @@ def art():
 
 
 @pytest.fixture
-def designer(monkeypatch, art):
+def designer(monkeypatch: pytest.MonkeyPatch, art: dict[str, Any]):
     result = SimpleNamespace(
         calls=[],
         status=0,
@@ -597,9 +675,9 @@ def designer(monkeypatch, art):
             "claude": json.dumps({"structured_output": art}),
         },
     )
-    monkeypatch.setattr(style.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(shutil, "which", Mock(side_effect="/bin/{}".format))
 
-    def run(argv, **kwargs):
+    def run(argv: list[str], **kwargs: Any):
         from io import BytesIO
 
         result.calls.append(argv)
@@ -615,12 +693,12 @@ def designer(monkeypatch, art):
             stdin=BytesIO(), poll=lambda: result.status, returncode=result.status
         )
 
-    monkeypatch.setattr(style.subprocess, "Popen", run)
+    monkeypatch.setattr(subprocess, "Popen", run)
     return result
 
 
 @pytest.fixture
-def courses(tmp_path, monkeypatch):
+def courses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(scraper, "STATE", tmp_path / ".minis")
 
 
@@ -630,15 +708,15 @@ def tty():
 
 
 @pytest.fixture
-def module(tmp_path, monkeypatch):
+def module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(cli, "__file__", str(tmp_path / "cli/__init__.py"))
 
-    def add(name, run):
+    def add(name: str, run: Callable[..., object]):
         source = tmp_path / "minis" / name
         source.mkdir(parents=True)
         (source / "__init__.py").touch()
         result = ModuleType(f"uq_minis.minis.{name}")
-        result.run = run
+        result.__dict__["run"] = run
         monkeypatch.setitem(sys.modules, result.__name__, result)
         return result
 
@@ -646,19 +724,26 @@ def module(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def commands(monkeypatch):
+def commands(monkeypatch: pytest.MonkeyPatch):
     run = Mock(return_value=0)
     monkeypatch.setattr(script, "run", run)
     return run
 
 
 @pytest.fixture
-def clip(tmp_path):
+def clip(tmp_path: Path):
     pytest.importorskip("PIL.Image")
     if not all(shutil.which(tool) for tool in ("ffmpeg", "ffprobe")):
         pytest.skip("FFmpeg is an optional native video tool")
 
-    def make(name, source, seconds=1, *, audio=False, options=()):
+    def make(
+        name: str,
+        source: str,
+        seconds: float = 1,
+        *,
+        audio: bool = False,
+        options: Sequence[str] = (),
+    ):
         path = tmp_path / name
         argv = ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", source]
         if audio:

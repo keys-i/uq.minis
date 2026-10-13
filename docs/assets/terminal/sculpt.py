@@ -2,6 +2,7 @@
 
 import sys
 import tomllib
+from collections.abc import Iterable, Mapping
 from math import cos, pi, sin, sqrt
 from pathlib import Path
 
@@ -9,14 +10,16 @@ WIDTH, HEIGHT = 80, 64
 BITS = ((1, 8), (2, 16), (4, 32), (64, 128))
 ROOT = Path(__file__).parent
 FOREST = tomllib.loads((ROOT / "forest.toml").read_text())
+type Shape = tuple[float, float, float, float, float, float, float]
+type Model = dict[str, Shape]
 
 
-def shape(x, y, rx, ry, depth=0.15, front=0):
+def shape(x: float, y: float, rx: float, ry: float, depth: float = 0.15, front: float = 0) -> Shape:
     """Keep editable ellipsoid geometry in normalised habitat coordinates"""
     return x, y, rx, ry, depth, front, 0
 
 
-def surface(x, y, model):
+def surface(x: float, y: float, model: Shape) -> float | None:
     """Find the visible depth of a rotated ellipsoid"""
     cx, cy, rx, ry, depth, front, angle = model
     dx, dy = x - cx, y - cy
@@ -26,11 +29,15 @@ def surface(x, y, model):
     return front + depth * sqrt(1 - radius) if radius < 1 else None
 
 
-def draw(shapes, cuts):
+def draw(shapes: Mapping[str, Shape], cuts: Mapping[str, Shape]) -> dict[str, str]:
     """Bake braille dots, depth, materials and pointer targets from one model"""
-    pixels, regions, tones = [], [], []
+    pixels: list[list[float | None]] = []
+    regions: list[list[str]] = []
+    tones: list[list[str]] = []
     for row in range(HEIGHT):
-        depths, areas, materials = [], [], []
+        depths: list[float | None] = []
+        areas: list[str] = []
+        materials: list[str] = []
         for col in range(WIDTH):
             x, y = (col + 0.5) / WIDTH, (row + 0.5) / HEIGHT
             surfaces = [
@@ -69,9 +76,12 @@ def draw(shapes, cuts):
         pixels.append(depths)
         regions.append(areas)
         tones.append(materials)
-    result = {key: [] for key in ("art", "shade", "hit", "tone")}
+    result: dict[str, list[str]] = {key: [] for key in ("art", "shade", "hit", "tone")}
     for row in range(0, HEIGHT, 4):
-        glyphs, levels, targets, colours = [], [], [], []
+        glyphs: list[str] = []
+        levels: list[str] = []
+        targets: list[str] = []
+        colours: list[str] = []
         for col in range(0, WIDTH, 2):
             samples = [
                 (dy, dx)
@@ -86,7 +96,8 @@ def draw(shapes, cuts):
                 nx = -((pixels[yy][xx + 1] or z) - (pixels[yy][xx - 1] or z)) * WIDTH / 2
                 ny = -((pixels[yy + 1][xx] or z) - (pixels[yy - 1][xx] or z)) * HEIGHT / 2
                 brightness = 2 + 5 * max(
-                    0, (-0.6 * nx - 0.8 * ny + 1.2) / sqrt(nx * nx + ny * ny + 1) / sqrt(2.44)
+                    0,
+                    (-0.6 * nx - 0.8 * ny + 1.2) / sqrt(nx * nx + ny * ny + 1) / sqrt(2.44),
                 )
             levels.append(str(min(7, max(0, round(brightness)))))
             for field, output in ((regions, targets), (tones, colours)):
@@ -104,7 +115,7 @@ def draw(shapes, cuts):
 
 
 # Model the silhouette and markings before applying movement
-animals = {}
+animals: dict[str, tuple[Model, Model]] = {}
 for name in FOREST:
     shapes = {
         "body": shape(0.48, 0.68, 0.23, 0.13, 0.20),
@@ -123,7 +134,7 @@ for name in FOREST:
         "nose": shape(0.09, 0.54, 0.015, 0.015, 0.02, 0.24),
         "prop": shape(0.83, 0.89, 0.12, 0.04, 0.06),
     }
-    cuts = {}
+    cuts: Model = {}
     if name == "numbat":
         shapes["tail"] = shape(0.77, 0.57, 0.13, 0.16, 0.13)
         shapes["facewhite"] = shape(0.21, 0.51, 0.075, 0.014, 0.015, 0.24)
@@ -252,7 +263,12 @@ for name in FOREST:
                 shapes["tail"] = shape(0.72, 0.68, 0.12, 0.055, 0.08)
                 for n in range(8):
                     shapes[f"dark{n}"] = shape(
-                        0.40 + n * 0.036, 0.64 + 0.07 * sin(n), 0.013, 0.009, 0.014, 0.24
+                        0.40 + n * 0.036,
+                        0.64 + 0.07 * sin(n),
+                        0.013,
+                        0.009,
+                        0.014,
+                        0.24,
                     )
             else:
                 shapes["beak1"] = shape(0.21, 0.36, 0.045, 0.036, 0.04, 0.17)
@@ -521,7 +537,12 @@ for name in FOREST:
         else:
             for n in range(12):
                 shapes[f"dark{n}"] = shape(
-                    0.37 + (n % 6) * 0.06, 0.62 + (n // 6) * 0.085, 0.013, 0.012, 0.02, 0.22
+                    0.37 + (n % 6) * 0.06,
+                    0.62 + (n // 6) * 0.085,
+                    0.013,
+                    0.012,
+                    0.02,
+                    0.22,
                 )
             if name == "lynx":
                 shapes["tail"] = shape(0.76, 0.70, 0.055, 0.033, 0.05)
@@ -575,7 +596,15 @@ for name in FOREST:
             "prop": shape(0.85, 0.88, 0.10, 0.027, 0.04),
             "propleaf": shape(0.85, 0.855, 0.085, 0.020, 0.03),
         }
-    elif name in ("orangutan", "gorilla", "bonobo", "lemur", "aye", "tamarin", "macaque"):
+    elif name in (
+        "orangutan",
+        "gorilla",
+        "bonobo",
+        "lemur",
+        "aye",
+        "tamarin",
+        "macaque",
+    ):
         shapes = {
             "body": shape(0.49, 0.62, 0.15, 0.20, 0.22),
             "head": shape(0.38, 0.32, 0.105, 0.10, 0.18, 0.05),
@@ -734,12 +763,33 @@ for name in FOREST:
             for row in range(3):
                 for col in range(4):
                     shapes[f"dark{row}{col}"] = shape(
-                        0.37 + col * 0.075, 0.52 + row * 0.075, 0.028, 0.008, 0.013, 0.24
+                        0.37 + col * 0.075,
+                        0.52 + row * 0.075,
+                        0.028,
+                        0.008,
+                        0.013,
+                        0.24,
                     )
             shapes["propflower"] = shape(0.85, 0.80, 0.05, 0.045, 0.04)
-    water = name in ("seacow", "vaquita", "whale", "dolphin", "gharial", "axolotl", "turtle")
+    water = name in (
+        "seacow",
+        "vaquita",
+        "whale",
+        "dolphin",
+        "gharial",
+        "axolotl",
+        "turtle",
+    )
     grass = name in ("bustard", "florican", "horse", "tahr")
-    if water or name in ("mink", "otter", "auk", "melomys", "paddlefish", "crayfish", "penguin"):
+    if water or name in (
+        "mink",
+        "otter",
+        "auk",
+        "melomys",
+        "paddlefish",
+        "crayfish",
+        "penguin",
+    ):
         for n in range(3):
             shapes[f"scenewater{n}"] = shape(0.23 + n * 0.3, 0.94, 0.10, 0.005, 0.01, -0.12)
     if water:
@@ -798,7 +848,10 @@ for name in FOREST:
     x, y, rx, ry, depth, front, _ = shapes["eye1"]
     shapes["eye1"] = shape(x, y, rx * 1.45, ry * 1.45, depth, front)
     x, y, rx, ry, depth, front, _ = shapes["eyelight"]
-    dot = ((round(x * WIDTH - 0.5) + 0.5) / WIDTH, (round(y * HEIGHT - 0.5) + 0.5) / HEIGHT)
+    dot = (
+        (round(x * WIDTH - 0.5) + 0.5) / WIDTH,
+        (round(y * HEIGHT - 0.5) + 0.5) / HEIGHT,
+    )
     if surface(*dot, shapes["eyelight"]) is None:
         # Keep sub-pixel eye glints visible on the fixed braille grid
         shapes["eyelight"] = shape(x, y, max(rx, 0.009), max(ry, 0.011), depth, front)
@@ -825,7 +878,7 @@ for name in FOREST:
     animals[name] = shapes, cuts
 
 
-def pose(name, shapes, cuts, action, phase):
+def pose(name: str, shapes: Model, cuts: Model, action: str, phase: float) -> dict[str, str]:
     """Move attached features around joints before sampling the whole sculpture"""
     original = shapes | cuts
     moved = dict(original)
@@ -834,7 +887,9 @@ def pose(name, shapes, cuts, action, phase):
         strength = sin(phase * pi) ** 0.6
     action = action.partition("-")[2] or action
 
-    def move(keys, dx=0, dy=0, sx=1, sy=1):
+    def move(
+        keys: Iterable[str], dx: float = 0, dy: float = 0, sx: float = 1, sy: float = 1
+    ) -> None:
         for key in keys:
             if key in moved:
                 x, y, rx, ry, depth, front, angle = moved[key]
@@ -848,7 +903,7 @@ def pose(name, shapes, cuts, action, phase):
                     angle,
                 )
 
-    def turn(keys, pivot, angle):
+    def turn(keys: Iterable[str], pivot: tuple[float, float], angle: float) -> None:
         angle *= strength
         for key in keys:
             if key in moved:
@@ -897,9 +952,18 @@ def pose(name, shapes, cuts, action, phase):
     if action == "blink" and name == "bee":
         turn(("ear1", "antenna1"), (0.25, 0.43), -0.4)
     if action in ("look", "listen", "peek"):
-        turn(head, pivot, 0.10 if action == "look" else 0.07 if action == "listen" else -0.12)
+        turn(
+            head,
+            pivot,
+            0.10 if action == "look" else 0.07 if action == "listen" else -0.12,
+        )
     elif action == "ears":
-        for key, angle in (("ear1", -0.30), ("ear2", 0.25), ("horn1", -0.08), ("horn2", -0.08)):
+        for key, angle in (
+            ("ear1", -0.30),
+            ("ear2", 0.25),
+            ("horn1", -0.08),
+            ("horn2", -0.08),
+        ):
             if key in moved:
                 x, y, _, ry, *_ = moved[key]
                 turn((key,), (x, y + ry), angle)
@@ -920,13 +984,25 @@ def pose(name, shapes, cuts, action, phase):
         move([key for key in shapes if key.startswith("sceneleaf")], dx=0.008)
     elif action in ("wander", "stalk", "prowl", "amble", "waddle"):
         move(body, dx=-0.12, dy=-0.016 * cos(phase * 6 * pi))
-        turn(("paw1", "foot1"), (0.31 - 0.12 * strength, 0.72), 0.30 * sin(phase * 8 * pi))
-        turn(("paw2", "foot2"), (0.64 - 0.12 * strength, 0.72), -0.25 * sin(phase * 8 * pi))
+        turn(
+            ("paw1", "foot1"),
+            (0.31 - 0.12 * strength, 0.72),
+            0.30 * sin(phase * 8 * pi),
+        )
+        turn(
+            ("paw2", "foot2"),
+            (0.64 - 0.12 * strength, 0.72),
+            -0.25 * sin(phase * 8 * pi),
+        )
         turn(("tail",), (0.66 - 0.12 * strength, 0.68), 0.20 * sin(phase * 4 * pi))
         if name == "auk":
             move(("paw1",), dx=0.04, dy=-0.025 * sin(phase * 8 * pi))
     elif action in ("forage", "probe", "browse", "sniff", "dig"):
-        turn(head, pivot, -0.18 - 0.09 * sin(phase * 8 * pi) if name != "saola" else -0.85)
+        turn(
+            head,
+            pivot,
+            -0.18 - 0.09 * sin(phase * 8 * pi) if name != "saola" else -0.85,
+        )
         move(("paw1",), dx=0.04, dy=-0.04 * sin(phase * 10 * pi))
         move(("tail",), dy=-0.04)
         if name == "solenodon" and action == "dig":
@@ -938,7 +1014,11 @@ def pose(name, shapes, cuts, action, phase):
             (0.43 - 0.08 * strength, 0.50 - 0.10 * strength),
             -0.9 * sin(phase * 8 * pi),
         )
-        turn(("paw2",), (0.51 - 0.08 * strength, 0.50 - 0.10 * strength), 0.9 * sin(phase * 8 * pi))
+        turn(
+            ("paw2",),
+            (0.51 - 0.08 * strength, 0.50 - 0.10 * strength),
+            0.9 * sin(phase * 8 * pi),
+        )
     elif action in ("slide", "swim"):
         move(body, dx=-0.10 - 0.045 * sin(phase * 2 * pi), dy=0.065)
         turn(head, pivot, -0.12)
@@ -971,7 +1051,11 @@ def pose(name, shapes, cuts, action, phase):
     elif action in ("retreat", "climb", "hop"):
         move(body, dx=0.07 * phase, dy=-0.05 * sin(phase * pi))
         turn(head, pivot, 0.15 * sin(phase * 6 * pi))
-        turn(("paw1", "foot1"), (0.31 + 0.07 * phase * strength, 0.72), 0.35 * sin(phase * 6 * pi))
+        turn(
+            ("paw1", "foot1"),
+            (0.31 + 0.07 * phase * strength, 0.72),
+            0.35 * sin(phase * 6 * pi),
+        )
     elif action in ("earturn", "inspect", "sniffrock", "root"):
         turn(head, pivot, 0.22 * sin(phase * 6 * pi))
         turn(("tail",), (0.64, 0.70), -0.2 * sin(phase * 4 * pi))
@@ -988,7 +1072,11 @@ def pose(name, shapes, cuts, action, phase):
         turn(head, pivot, -0.45 * sin(phase * 4 * pi))
         turn(("paw1",), (0.51, 0.52), -0.15)
     elif action in ("bound", "scamper", "scuttle"):
-        move(body, dx=-0.11, dy=-0.09 * abs(sin(phase * 4 * pi)) if name == "potoroo" else 0)
+        move(
+            body,
+            dx=-0.11,
+            dy=-0.09 * abs(sin(phase * 4 * pi)) if name == "potoroo" else 0,
+        )
         turn(("paw1", "foot1"), (0.33, 0.74), 0.4 * sin(phase * 10 * pi))
         turn(("paw2", "foot2"), (0.61, 0.78), -0.35 * sin(phase * 10 * pi))
         move(("tail",), dy=0.035 * sin(phase * 8 * pi))
@@ -1008,7 +1096,11 @@ def pose(name, shapes, cuts, action, phase):
         turn(head, (0.30, 0.69), -0.12)
     elif action in ("cruise", "finroll", "turn", "eddy"):
         move(body, dx=-0.08 * sin(phase * pi), dy=-0.08 * sin(phase * 2 * pi))
-        turn(("tail", "tailupper", "taillower"), (0.71, 0.54), 0.35 * sin(phase * 10 * pi))
+        turn(
+            ("tail", "tailupper", "taillower"),
+            (0.71, 0.54),
+            0.35 * sin(phase * 10 * pi),
+        )
         turn(("paw1", "paw2"), (0.53, 0.54), 0.20 * sin(phase * 8 * pi))
         if action in ("turn", "eddy"):
             turn(body, (0.52, 0.54), 0.18 * sin(phase * 2 * pi))
@@ -1055,7 +1147,11 @@ def pose(name, shapes, cuts, action, phase):
     elif action in ("branchwalk", "bamboobite", "tailwrap", "pawclean"):
         move(body, dx=-0.09 if action == "branchwalk" else 0)
         turn(head, pivot, -0.20 * sin(phase * 4 * pi))
-        turn(("tail", "dark0", "dark1", "dark2", "dark3"), (0.66, 0.72), 0.32 * sin(phase * 6 * pi))
+        turn(
+            ("tail", "dark0", "dark1", "dark2", "dark3"),
+            (0.66, 0.72),
+            0.32 * sin(phase * 6 * pi),
+        )
         if action == "tailwrap":
             move(("tail",), dx=-0.04, sy=1.35)
         else:
@@ -1180,7 +1276,11 @@ def pose(name, shapes, cuts, action, phase):
         "splash",
     ):
         if action in ("soar", "leapdisplay", "branchhop"):
-            move(body, dx=-0.06, dy=-0.16 if action == "soar" else -0.08 * abs(sin(phase * 4 * pi)))
+            move(
+                body,
+                dx=-0.06,
+                dy=-0.16 if action == "soar" else -0.08 * abs(sin(phase * 4 * pi)),
+            )
             turn(("paw1",), shapes["paw1"][:2], 0.6 * sin(phase * 8 * pi))
             turn(("paw2",), shapes["paw2"][:2], -0.4 * sin(phase * 8 * pi))
         elif action in ("doddle", "grassstride", "splash"):
@@ -1220,11 +1320,22 @@ def pose(name, shapes, cuts, action, phase):
         aquatic = action != "grounddig"
         travel = min(
             0.09,
-            max(0, min(shapes[key][0] - shapes[key][2] for key in body if key in shapes) - 0.015),
+            max(
+                0,
+                min(shapes[key][0] - shapes[key][2] for key in body if key in shapes) - 0.015,
+            ),
         )
-        move(body, dx=-travel * sin(phase * pi), dy=-0.07 * sin(phase * 2 * pi) if aquatic else 0)
+        move(
+            body,
+            dx=-travel * sin(phase * pi),
+            dy=-0.07 * sin(phase * 2 * pi) if aquatic else 0,
+        )
         turn(head, pivot, 0.13 * sin(phase * 4 * pi))
-        turn(("tail", "tailupper", "taillower"), shapes["body"][:2], 0.17 * sin(phase * 8 * pi))
+        turn(
+            ("tail", "tailupper", "taillower"),
+            shapes["body"][:2],
+            0.17 * sin(phase * 8 * pi),
+        )
         turn(("paw1", "foot1"), shapes["body"][:2], 0.18 * sin(phase * 8 * pi))
         turn(("paw2", "foot2"), shapes["body"][:2], -0.14 * sin(phase * 8 * pi))
         if action == "surface":
@@ -1276,16 +1387,16 @@ def pose(name, shapes, cuts, action, phase):
     return drawing
 
 
-def fields(values):
+def fields(values: Mapping[str, str]) -> str:
     """Keep drawings editable as multiline TOML values"""
     return "\n".join(f"{key} = '''\n{value}\n'''" for key, value in values.items())
 
 
-def bake(names=()):
+def bake(names: Iterable[str] = ()) -> None:
     """Rebuild artwork while preserving editable species metadata"""
     if missing := set(names) - animals.keys():
         raise SystemExit("Unknown species: " + ", ".join(sorted(missing)))
-    forest = []
+    forest: list[str] = []
     for name, (shapes, cuts) in animals.items():
         values = {
             key: value
@@ -1300,9 +1411,10 @@ def bake(names=()):
         )
         if names and name not in names:
             continue
-        frames = []
-        actions = dict.fromkeys(
-            ("blink", "look", "listen", "peek", "play", "ears", "pet", "object", "nap"), 8
+        frames: list[str] = []
+        actions: dict[str, int] = dict.fromkeys(
+            ("blink", "look", "listen", "peek", "play", "ears", "pet", "object", "nap"),
+            8,
         )
         actions["breathe"] = 16
         actions.update(dict.fromkeys(values["idle"].split()[:4], 32))
