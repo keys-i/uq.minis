@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
+from unittest.mock import Mock
 
 import httpx
 import pytest
 
-from tests.fakes import message
+from tests.fakes import Mailbox, message
 from uq_minis.core.common import MiniError
 from uq_minis.worker import db as storage
 from uq_minis.worker import event as worker
@@ -15,7 +18,12 @@ from uq_minis.worker import mail, service
 
 class TestWatcher:
     @pytest.mark.parametrize("return_to", [mail.RETURN_TO, "radhesh.goel@student.uq.edu.au"])
-    def test_workflow(self, watch, monkeypatch, return_to):
+    def test_workflow(
+        self,
+        watch: tuple[Path, Mailbox, list[tuple[str, str]]],
+        monkeypatch: pytest.MonkeyPatch,
+        return_to: str,
+    ) -> None:
         monkeypatch.setattr(mail, "RETURN_TO", return_to)
         state, box, notices = watch
         box.incoming = [
@@ -26,7 +34,12 @@ class TestWatcher:
         worker.poll(state_dir=state)
         assert not box.sent
         box.incoming.append(
-            message("request", request=True, thread="request", timestamp="2026-09-07T11:00:00Z")
+            message(
+                "request",
+                request=True,
+                thread="request",
+                timestamp="2026-09-07T11:00:00Z",
+            )
         )
         worker.poll(state_dir=state)
         assert worker.status(state_dir=state)[0]["state"] == "waiting_update"
@@ -43,7 +56,10 @@ class TestWatcher:
                 content="Your room is booked.",
             ),
             message(
-                "other-event", mail.CLUBS_SENDER, event_id="43", content="Your room is booked."
+                "other-event",
+                mail.CLUBS_SENDER,
+                event_id="43",
+                content="Your room is booked.",
             ),
         ])
         worker.poll(state_dir=state)
@@ -76,7 +92,7 @@ class TestWatcher:
         worker.poll(state_dir=state)
         assert len(notices) == 2 and box.sent == 1
 
-    def test_reconcile(self, watch):
+    def test_reconcile(self, watch: tuple[Path, Mailbox, list[tuple[str, str]]]) -> None:
         state, box, _ = watch
         box.incoming = [message("request", request=True, timestamp="2026-09-07T11:00:00Z")]
         box.fail_send = MiniError("Connection lost after server accepted send")
@@ -87,13 +103,18 @@ class TestWatcher:
         assert worker.status(state_dir=state)[0]["state"] == "waiting_update"
         assert box.sent == 1
 
-    def test_retry(self, watch):
+    def test_retry(self, watch: tuple[Path, Mailbox, list[tuple[str, str]]]) -> None:
         state, box, notices = watch
         draft_id = box.create_reply("request")
         old = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
         with worker.database(state) as db:
             worker._save(
-                db, "42", state="sending", request_id="request", draft_id=draft_id, send_started=old
+                db,
+                "42",
+                state="sending",
+                request_id="request",
+                draft_id=draft_id,
+                send_started=old,
             )
         worker.poll(state_dir=state)
         worker.poll(state_dir=state)
@@ -104,7 +125,9 @@ class TestWatcher:
         worker.poll(state_dir=state)
         assert box.sent == 1
 
-    def test_notify(self, watch, monkeypatch):
+    def test_notify(
+        self, watch: tuple[Path, Mailbox, list[tuple[str, str]]], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         state, box, notices = watch
         box.incoming = [
             message("request", request=True, timestamp="2026-09-07T11:00:00Z"),
@@ -119,12 +142,16 @@ class TestWatcher:
         monkeypatch.setattr(
             service,
             "notify",
-            lambda *args: (_ for _ in ()).throw(MiniError("Notifications unavailable")),
+            Mock(side_effect=MiniError("Notifications unavailable")),
         )
         with pytest.raises(MiniError, match="Notifications"):
             worker.poll(state_dir=state)
         assert worker.status(state_dir=state)[0]["state"] == "complete"
-        monkeypatch.setattr(service, "notify", lambda *args: notices.append(args))
+
+        def notify(title: str, body: str) -> None:
+            notices.append((title, body))
+
+        monkeypatch.setattr(service, "notify", notify)
         worker.poll(state_dir=state)
         assert len(notices) == 1 and box.sent == 1
 
@@ -161,10 +188,12 @@ class TestWatcher:
             "not-cancelled",
         ],
     )
-    def test_outcome(self, content, expected):
+    def test_outcome(self, content: str, expected: str) -> None:
         assert worker.booking_outcome(content) == expected
 
-    def test_lock(self, watch, event_toml):
+    def test_lock(
+        self, watch: tuple[Path, Mailbox, list[tuple[str, str]]], event_toml: Path
+    ) -> None:
         state, _, _ = watch
         with worker.database(state):
             with pytest.raises(MiniError, match="Another agent"):
@@ -179,18 +208,27 @@ class TestWatcher:
         worker.stop("42", state_dir=state)
         assert worker.status(state_dir=state)[0]["state"] == "stopped"
 
-    def test_history(self, watch, monkeypatch):
+    def test_history(
+        self, watch: tuple[Path, Mailbox, list[tuple[str, str]]], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         state, _, _ = watch
         with worker.database(state) as db:
             worker._save(
-                db, "42", state="complete", reply_id="reply", last_notice="reply", outcome="booked"
+                db,
+                "42",
+                state="complete",
+                reply_id="reply",
+                last_notice="reply",
+                outcome="booked",
             )
         monkeypatch.setattr(
-            worker, "_advance", lambda *args: pytest.fail("completed history must be skipped")
+            worker,
+            "_advance",
+            Mock(side_effect=AssertionError("completed history must be skipped")),
         )
         worker.poll(state_dir=state)
 
-    def test_threads(self, watch):
+    def test_threads(self, watch: tuple[Path, Mailbox, list[tuple[str, str]]]) -> None:
         state, box, _ = watch
         box.incoming = [
             message("request", request=True, timestamp="2026-09-07T11:00:00Z"),
@@ -221,11 +259,13 @@ class TestWatcher:
         worker.poll(state_dir=state)
         assert worker.status(state_dir=state)[0]["outcome"] == "changed"
 
-    def test_throttle(self, watch, monkeypatch):
+    def test_throttle(
+        self, watch: tuple[Path, Mailbox, list[tuple[str, str]]], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         state, box, notices = watch
-        calls = []
+        calls: list[str] = []
 
-        def throttled(since):
+        def throttled(since: str):
             calls.append(since)
             raise mail.GraphError(429, retry_after=3600)
 
@@ -237,26 +277,30 @@ class TestWatcher:
 
 
 class TestGraph:
-    def test_token(self, tmp_path, monkeypatch, capsys):
+    def test_token(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         import json
         import sys
 
         cache = SimpleNamespace(
-            has_state_changed=True, deserialize=lambda data: None, serialize=lambda: "rotated-cache"
+            has_state_changed=True,
+            deserialize=Mock(return_value=None),
+            serialize=lambda: "rotated-cache",
         )
 
         class App:
-            def __init__(self, client_id, **kwargs):
+            def __init__(self, client_id: str, **kwargs: Any):
                 assert (
                     kwargs["authority"]
                     == "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000002"
                 )
 
-            def get_accounts(self, username):
+            def get_accounts(self, username: str):
                 assert username == "rad@example.org"
                 return [{"username": username}]
 
-            def acquire_token_silent(self, scopes, account):
+            def acquire_token_silent(self, scopes: list[str], account: dict[str, Any]):
                 assert scopes == ["Mail.ReadWrite", "Mail.Send"]
                 return {"access_token": "private-test-token"}
 
@@ -280,12 +324,12 @@ class TestGraph:
         assert not capsys.readouterr().out
 
     @pytest.mark.parametrize("return_to", [mail.RETURN_TO, "radhesh.goel@student.uq.edu.au"])
-    def test_reply(self, monkeypatch, return_to):
+    def test_reply(self, monkeypatch: pytest.MonkeyPatch, return_to: str) -> None:
         monkeypatch.setattr(mail, "RETURN_TO", return_to)
-        calls = []
-        attachments = []
+        calls: list[httpx.Request] = []
+        attachments: list[dict[str, Any]] = []
 
-        def handler(request):
+        def handler(request: httpx.Request):
             import json
 
             calls.append(request)

@@ -7,16 +7,23 @@ import json
 import re
 from datetime import UTC, datetime
 from email import policy
+from email.message import MIMEPart
 from email.parser import BytesParser
 from email.utils import getaddresses, parsedate_to_datetime
 from html.parser import HTMLParser
 from pathlib import Path
+from sqlite3 import Connection, Row
+from types import TracebackType
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 from uuid import uuid4
 
 from uq_minis.core.common import MiniError
 
 from . import mail
+
+if TYPE_CHECKING:
+    pass
 
 HOME = "https://outlook.office.com/mail/"
 _MESSAGE_IDS = re.compile(r"<[^<>\s]+>")
@@ -25,17 +32,17 @@ _MESSAGE_IDS = re.compile(r"<[^<>\s]+>")
 class _Text(HTMLParser):
     def __init__(self, reply_only: bool):
         super().__init__(convert_charrefs=True)
-        self.parts = []
+        self.parts: list[str] = []
         self.skip = 0
         self.quoted = False
         self.reply_only = reply_only
 
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = {key: value or "" for key, value in attrs}
         if self.reply_only and (
             tag == "blockquote"
-            or attrs.get("id", "").casefold() == "divrplyfwd"
-            or "gmail_quote" in attrs.get("class", "")
+            or values.get("id", "").casefold() == "divrplyfwd"
+            or "gmail_quote" in values.get("class", "")
         ):
             self.quoted = True
         if tag in {"script", "style"}:
@@ -43,31 +50,33 @@ class _Text(HTMLParser):
         if tag in {"br", "p", "div", "li", "tr"}:
             self.parts.append("\n")
 
-    def handle_endtag(self, tag):
+    def handle_endtag(self, tag: str) -> None:
         if tag in {"script", "style"}:
             self.skip = max(0, self.skip - 1)
 
-    def handle_data(self, data):
+    def handle_data(self, data: str) -> None:
         if not self.skip and not self.quoted:
             self.parts.append(data)
 
 
-def _text(part, *, reply_only: bool = True) -> str:
+def _text(part: MIMEPart[Any, Any] | None, *, reply_only: bool = True) -> str:
     content = part.get_content() if part else ""
+    if not isinstance(content, str):
+        raise MiniError("Outlook exported a message without readable text")
     if part and part.get_content_type() == "text/html":
         parser = _Text(reply_only)
         parser.feed(content)
         content = "".join(parser.parts)
     # ponytail: unfamiliar quote formats require review; support ordinary Outlook/Gmail replies.
-    lines = []
+    lines: list[str] = []
     for line in content.splitlines():
-        if reply_only and re.match(r"\s*(?:From:|On .+wrote:|[-_]{5,}|>).*", line, re.I):
+        if reply_only and re.match(r"\s*(?:From:|On .+wrote:|[-_]{5,}|>).*", line, re.IGNORECASE):
             break
         lines.append(line.rstrip())
     return "\n".join(lines).strip()
 
 
-def parse_message(raw: bytes, url: str) -> dict:
+def parse_message(raw: bytes, url: str) -> dict[str, Any]:
     """Read identifiers, recipients and content from Outlook's downloaded EML"""
     message = BytesParser(policy=policy.default).parsebytes(raw)
     identity = str(message.get("Message-ID", "")).strip()
@@ -93,7 +102,7 @@ def parse_message(raw: bytes, url: str) -> dict:
     except (TypeError, ValueError, OverflowError) as exc:
         raise MiniError("Outlook exported a message without a usable sent date") from exc
 
-    def addresses(header):
+    def addresses(header: str) -> list[dict[str, dict[str, str]]]:
         return [
             {"emailAddress": {"address": address.casefold()}}
             for _, address in getaddresses([str(value) for value in message.get_all(header, [])])
@@ -105,10 +114,10 @@ def parse_message(raw: bytes, url: str) -> dict:
     references = _MESSAGE_IDS.findall(
         " ".join(str(message.get(name, "")) for name in ("References", "In-Reply-To"))
     )
-    attachments = []
+    attachments: list[dict[str, str | None]] = []
     for part in message.iter_attachments():
         data = part.get_payload(decode=True)
-        if data is None:
+        if not isinstance(data, bytes):
             raise MiniError("Outlook exported an unreadable attachment")
         attachments.append({
             "name": part.get_filename(),
@@ -150,7 +159,7 @@ def _url(value: str) -> str:
 
 
 def _same_return(
-    message: dict, event_id: str, filename: str, document: bytes, mailbox: str
+    message: dict[str, Any], event_id: str, filename: str, document: bytes, mailbox: str
 ) -> bool:
     return (
         message["subject"] == f"UQU Risk Assessment Return Ref ID: {event_id}"
@@ -167,7 +176,14 @@ def _same_return(
 class Outlook:
     """Use Outlook's search, EML export and compose controls without calling private APIs"""
 
-    def __init__(self, db, mailbox: str, *, username: str | None = None, interactive: bool = False):
+    def __init__(
+        self,
+        db: Connection,
+        mailbox: str,
+        *,
+        username: str | None = None,
+        interactive: bool = False,
+    ):
         """Bind one private browser profile to one worker database"""
         self.db, self.mailbox, self.interactive = db, mailbox, interactive
         self.username = username or mailbox
@@ -219,7 +235,12 @@ class Outlook:
             self.__exit__(type(exc), exc, exc.__traceback__)
             raise
 
-    def __exit__(self, kind, error, traceback):
+    def __exit__(
+        self,
+        kind: type[BaseException] | None,
+        error: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         """Close the browser and report UI failures without leaking page content"""
         try:
             if self.context:
@@ -237,10 +258,10 @@ class Outlook:
     def _verify_account(self) -> None:
         """Verify the registered username before reading or composing mail"""
         self.stage = "verifying your Outlook account"
-        self.page.get_by_role("button", name=re.compile(r"Account manager|Your account", re.I)).or_(
-            self.page.locator("#owa-me-control-container").get_by_role("button")
-        ).click()
-        self.page.get_by_text(re.compile(rf"^{re.escape(self.username)}$", re.I)).wait_for(
+        self.page.get_by_role(
+            "button", name=re.compile(r"Account manager|Your account", re.IGNORECASE)
+        ).or_(self.page.locator("#owa-me-control-container").get_by_role("button")).click()
+        self.page.get_by_text(re.compile(rf"^{re.escape(self.username)}$", re.IGNORECASE)).wait_for(
             state="visible"
         )
         self.page.keyboard.press("Escape")
@@ -253,7 +274,9 @@ class Outlook:
             .or_(self.page.get_by_role("combobox", name="Search", exact=True))
             .or_(
                 self.page.get_by_role(
-                    "combobox", name="Search for email, meetings, files and more.", exact=True
+                    "combobox",
+                    name="Search for email, meetings, files and more.",
+                    exact=True,
                 )
             )
         ).filter(visible=True)
@@ -280,10 +303,10 @@ class Outlook:
             self.page.get_by_role("menuitem", name=scope, exact=True).click()
         selected.wait_for(state="visible")
 
-    def _read(self) -> dict:
+    def _read(self) -> dict[str, Any]:
         self.stage = "exporting the selected message"
         # A conversation with multiple displayed messages is ambiguous; do not choose one by position.
-        bodies = self.page.get_by_role("document", name=re.compile("Message body", re.I))
+        bodies = self.page.get_by_role("document", name=re.compile("Message body", re.IGNORECASE))
         bodies.first.wait_for(state="visible")
         if bodies.count() != 1:
             raise MiniError("Set Outlook Mail → Layout → Show email as individual messages")
@@ -291,10 +314,10 @@ class Outlook:
         if not re.search(r"/id/[^/?#]+", urlsplit(url).path):
             raise MiniError("Outlook did not expose a link to the selected message")
         self.page.get_by_role("toolbar").get_by_role(
-            "button", name=re.compile(r"^(More actions|More items)$", re.I)
+            "button", name=re.compile(r"^(More actions|More items)$", re.IGNORECASE)
         ).click()
         export = self.page.get_by_role(
-            "menuitem", name=re.compile(r"^(Save as|Download|Download as EML)$", re.I)
+            "menuitem", name=re.compile(r"^(Save as|Download|Download as EML)$", re.IGNORECASE)
         )
         submenu = self.page.get_by_role("button", name="Download", exact=True)
         export.or_(submenu).first.wait_for(state="visible")
@@ -312,18 +335,19 @@ class Outlook:
             download.delete()
         return message
 
-    def _collect(self, query: str, folder: str | None = None) -> list[dict]:
+    def _collect(self, query: str, folder: str | None = None) -> list[dict[str, Any]]:
         self._search(query, folder)
         listing = self.page.get_by_role(
-            "listbox", name=re.compile("Message list|Search results", re.I)
+            "listbox", name=re.compile("Message list|Search results", re.IGNORECASE)
         )
         empty = self.page.get_by_text(
-            re.compile(r"^(No results|We didn't find anything)(?:\.|$)", re.I)
+            re.compile(r"^(No results|We didn't find anything)(?:\.|$)", re.IGNORECASE)
         )
         listing.or_(empty).first.wait_for(state="visible")
         if empty.is_visible():
             return []
-        seen, messages = set(), {}
+        seen: set[str] = set()
+        messages: dict[str, dict[str, Any]] = {}
         # ponytail: bounded UI scan; narrow --since if a sender has more than 50 screens of results.
         for _ in range(50):
             rows = listing.locator(
@@ -360,9 +384,9 @@ class Outlook:
             self.page.wait_for_timeout(500)
         raise MiniError("Outlook search exceeded 50 screens; narrow the watch's --since date")
 
-    def messages(self, since: str) -> list[dict]:
+    def messages(self, since: str) -> list[dict[str, Any]]:
         """Read only the two event correspondents and retain RFC thread references"""
-        found = []
+        found: list[dict[str, Any]] = []
         for sender in (mail.REQUEST_SENDER, mail.CLUBS_SENDER):
             for message in self._collect(f"from:{sender} received:>={since[:10]}"):
                 if message["from"]["emailAddress"]["address"] == sender and datetime.fromisoformat(
@@ -387,8 +411,8 @@ class Outlook:
             raise MiniError("Unknown browser draft")
         return row
 
-    def _returns(self, event) -> list[dict]:
-        matches = []
+    def _returns(self, event: Row) -> list[dict[str, Any]]:
+        matches: list[dict[str, Any]] = []
         query = f'subject:"UQU Risk Assessment Return Ref ID: {event["event_id"]}"'
         for message in self._collect(query, "Sent Items"):
             if message["subject"] != f"UQU Risk Assessment Return Ref ID: {event['event_id']}":
@@ -398,7 +422,11 @@ class Outlook:
             ) < datetime.fromisoformat(event["request_time"]):
                 continue
             if not _same_return(
-                message, event["event_id"], event["filename"], event["document"], self.mailbox
+                message,
+                event["event_id"],
+                event["filename"],
+                event["document"],
+                self.mailbox,
             ):
                 raise MiniError(
                     "An Outlook return has different recipients, body or attachment; inspect it"
@@ -410,7 +438,7 @@ class Outlook:
             )
         return matches
 
-    def message(self, identity: str) -> dict:
+    def message(self, identity: str) -> dict[str, Any]:
         """Reconcile sent mail by full content; never infer success from a missing draft"""
         if not identity.startswith("browser:"):
             row = self.db.execute(
@@ -433,11 +461,11 @@ class Outlook:
         self.stage = "preparing the risk-assessment reply"
         self.page.get_by_role("button", name="Reply", exact=True).click()
         subject = self.page.get_by_role(
-            "textbox", name=re.compile(r"^(Add a subject|Subject)$", re.I)
+            "textbox", name=re.compile(r"^(Add a subject|Subject)$", re.IGNORECASE)
         )
         if not subject.is_visible():
             self.page.get_by_role(
-                "button", name=re.compile(r"^(Reply options|More reply options)$", re.I)
+                "button", name=re.compile(r"^(Reply options|More reply options)$", re.IGNORECASE)
             ).click()
             self.page.get_by_role("menuitem", name="Edit subject", exact=True).click()
         subject.fill(f"UQU Risk Assessment Return Ref ID: {event_id}")
@@ -451,17 +479,20 @@ class Outlook:
             if name == "To":
                 field.fill(mail.RETURN_TO)
                 field.press("Enter")
-        body = self.page.get_by_role("textbox", name=re.compile(r"^Message body", re.I))
+        body = self.page.get_by_role("textbox", name=re.compile(r"^Message body", re.IGNORECASE))
         body.fill("")
         # Soft line breaks avoid the extra blank paragraphs produced by fill
         for index, line in enumerate(mail.BODY.splitlines()):
             if index:
                 body.press("Shift+Enter")
             self.page.keyboard.insert_text(line)
-        self.page.get_by_role("button", name=re.compile(r"^(Attach file|Attach)$", re.I)).click()
+        self.page.get_by_role(
+            "button", name=re.compile(r"^(Attach file|Attach)$", re.IGNORECASE)
+        ).click()
         with self.page.expect_file_chooser() as chooser:
             self.page.get_by_role(
-                "menuitem", name=re.compile(r"^(Browse this computer|Browse this device)$", re.I)
+                "menuitem",
+                name=re.compile(r"^(Browse this computer|Browse this device)$", re.IGNORECASE),
             ).click()
         chooser.value.set_files({
             "name": filename,
@@ -471,17 +502,18 @@ class Outlook:
             "buffer": document,
         })
         self.page.get_by_role(
-            "button", name=re.compile(rf"^Remove {re.escape(filename)}(?:$| attachment)", re.I)
+            "button",
+            name=re.compile(rf"^Remove {re.escape(filename)}(?:$| attachment)", re.IGNORECASE),
         ).wait_for(state="visible", timeout=60000)
         self.prepared = identity
         self._verify_compose(event)
 
-    def _verify_compose(self, event) -> None:
+    def _verify_compose(self, event: Row) -> None:
         """Require the exact visible fields and one finished attachment before Send"""
         subject = self.page.get_by_role(
-            "textbox", name=re.compile(r"^(Add a subject|Subject)$", re.I)
+            "textbox", name=re.compile(r"^(Add a subject|Subject)$", re.IGNORECASE)
         )
-        body = self.page.get_by_role("textbox", name=re.compile(r"^Message body", re.I))
+        body = self.page.get_by_role("textbox", name=re.compile(r"^Message body", re.IGNORECASE))
         if (
             subject.input_value() != f"UQU Risk Assessment Return Ref ID: {event['event_id']}"
             or body.inner_text().strip() != mail.BODY
@@ -498,7 +530,7 @@ class Outlook:
                     "Outlook's recipient picker layout is unsupported; no send was attempted"
                 )
             chips = picker.locator(".ms-PickerItem-root")
-            addresses = []
+            addresses: list[str] = []
             for chip in chips.all():
                 address = chip.get_attribute("data-email")
                 if not address:
@@ -511,7 +543,7 @@ class Outlook:
             ):
                 raise MiniError("Outlook's resolved recipients differ from the required return")
         attachments = self.page.get_by_role(
-            "button", name=re.compile(r"^Remove .+ attachment$", re.I)
+            "button", name=re.compile(r"^Remove .+ attachment$", re.IGNORECASE)
         )
         if (
             attachments.count() != 1

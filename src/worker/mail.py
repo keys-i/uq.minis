@@ -5,12 +5,19 @@ from __future__ import annotations
 import base64
 import json
 import re
+import sqlite3
+from collections.abc import Generator
 from contextlib import contextmanager
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlsplit
 
 import httpx
 
 from uq_minis.core.common import MiniError
+
+if TYPE_CHECKING:
+    from .outlook import Outlook
 
 SCOPES = ["Mail.ReadWrite", "Mail.Send"]
 GRAPH = "https://graph.microsoft.com/v1.0"
@@ -28,10 +35,10 @@ Radhesh"""
 
 
 @contextmanager
-def connect(db):
+def connect(db: sqlite3.Connection) -> Generator[Graph | Outlook]:
     """Open the selected mail backend for one poll"""
     row = db.execute("SELECT value FROM settings WHERE name = 'account'").fetchone()
-    config = json.loads(row[0]) if row else {}
+    config: dict[str, Any] = json.loads(row[0]) if row else {}
     if config.get("backend") == "browser":
         from .outlook import Outlook
 
@@ -55,10 +62,10 @@ class GraphError(MiniError):
         super().__init__(f"Microsoft Graph returned HTTP {status}")
 
 
-def token(db, *, interactive: bool = False) -> str:
+def token(db: sqlite3.Connection, *, interactive: bool = False) -> str:
     """Refresh the registered account's token and persist rotated credentials"""
     try:
-        import msal
+        msal = import_module("msal")
         import requests
     except ImportError as exc:
         raise MiniError("Install mail support with: uv sync --locked --extra agent") from exc
@@ -97,7 +104,10 @@ def token(db, *, interactive: bool = False) -> str:
         raise MiniError("Microsoft sign-in request failed; check the connection and retry") from exc
     finally:
         if cache.has_state_changed:
-            db.execute("INSERT OR REPLACE INTO settings VALUES ('tokens', ?)", (cache.serialize(),))
+            db.execute(
+                "INSERT OR REPLACE INTO settings VALUES ('tokens', ?)",
+                (cache.serialize(),),
+            )
 
 
 class Graph:
@@ -115,7 +125,7 @@ class Graph:
             trust_env=False,
         )
 
-    def request(self, method: str, path: str, **kwargs):
+    def request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         """Restrict bearer credentials to the Graph API, including pagination URLs"""
         url = path if path.startswith("https://") else GRAPH + path
         parsed = urlsplit(url)
@@ -136,12 +146,12 @@ class Graph:
             raise GraphError(response.status_code, max(30, int(delay)) if delay.isdigit() else 60)
         return response.json() if response.content else {}
 
-    def pages(self, path: str, **params):
+    def pages(self, path: str, **params: str) -> Generator[dict[str, Any]]:
         """Read every result page without interpreting server pagination tokens"""
         while path:
             page = self.request("GET", path, params=params or None)
             yield from page["value"]
-            path, params = page.get("@odata.nextLink"), {}
+            path, params = page.get("@odata.nextLink", ""), {}
 
     def messages(self, since: str):
         """Read metadata only for the two expected correspondents"""
@@ -228,4 +238,8 @@ def validate_account(client_id: str, tenant_id: str, mailbox: str) -> dict[str, 
         raise MiniError("Client ID and tenant ID must be UUIDs from your app registration") from exc
     if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", mailbox):
         raise MiniError("Use the sign-in address of your Microsoft 365 mailbox")
-    return {"client_id": client_id, "tenant_id": tenant_id, "mailbox": mailbox.casefold()}
+    return {
+        "client_id": client_id,
+        "tenant_id": tenant_id,
+        "mailbox": mailbox.casefold(),
+    }

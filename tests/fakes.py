@@ -3,6 +3,7 @@
 from copy import deepcopy
 from email.message import EmailMessage
 from types import SimpleNamespace
+from typing import Any
 
 from uq_minis.worker import mail
 
@@ -11,7 +12,7 @@ class BrowserError(Exception):
     """A browser failure without requiring the optional Playwright package"""
 
 
-def compose(filename="form.docx", *, ready=True, hidden=False):
+def compose(filename: str = "form.docx", *, ready: bool = True, hidden: bool = False):
     """Local compose controls with resolved recipients and file uploads"""
     recipient = mail.RETURN_TO if ready else mail.REQUEST_SENDER
     pickers = "".join(
@@ -61,18 +62,18 @@ def compose(filename="form.docx", *, ready=True, hidden=False):
 
 
 def message(
-    identity,
-    sender=mail.REQUEST_SENDER,
+    identity: str,
+    sender: str = mail.REQUEST_SENDER,
     *,
-    request=False,
-    event_id="42",
-    title="Sample Event",
-    thread="update",
-    timestamp="2026-09-07T12:01:00Z",
-    content=None,
+    request: bool = False,
+    event_id: str = "42",
+    title: str = "Sample Event",
+    thread: str = "update",
+    timestamp: str = "2026-09-07T12:01:00Z",
+    content: str | None = None,
 ):
     subject = f"Event Application Update{' Risk Assessment Request' if request else ''}  [Event ID: {event_id}] - {title}"
-    result = {
+    result: dict[str, Any] = {
         "id": identity,
         "from": {"emailAddress": {"address": sender}},
         "subject": subject,
@@ -89,30 +90,30 @@ def message(
 
 class Mailbox:
     def __init__(self):
-        self.incoming = []
-        self.drafts = {}
+        self.incoming: list[dict[str, Any]] = []
+        self.drafts: dict[str, dict[str, Any]] = {}
         self.created = 0
         self.sent = 0
-        self.attachments = []
-        self.fail_send = None
+        self.attachments: list[tuple[str, bytes]] = []
+        self.fail_send: Exception | None = None
         self.client = SimpleNamespace(close=lambda: None)
 
-    def messages(self, since):
+    def messages(self, since: str):
         return self.incoming
 
-    def create_reply(self, request_id):
+    def create_reply(self, request_id: str):
         self.created += 1
         identity = f"draft-{self.created}"
         self.drafts[identity] = {"id": identity, "isDraft": True}
         return identity
 
-    def message(self, identity):
+    def message(self, identity: str):
         return deepcopy(
             self.drafts.get(identity)
             or next(item for item in self.incoming if item["id"] == identity)
         )
 
-    def prepare(self, identity, event_id, filename, document):
+    def prepare(self, identity: str, event_id: str, filename: str, document: bytes):
         self.attachments.append((filename, document))
         self.drafts[identity].update(
             subject=f"UQU Risk Assessment Return Ref ID: {event_id}",
@@ -121,7 +122,7 @@ class Mailbox:
             bccRecipients=[],
         )
 
-    def send(self, identity):
+    def send(self, identity: str):
         self.sent += 1
         self.drafts[identity].update(isDraft=False, sentDateTime="2026-09-07T12:00:00Z")
         if self.fail_send:
@@ -143,7 +144,7 @@ def eml(*, message_id: str, sender: str, subject: str, body: str, to: str = "") 
     return message.as_bytes()
 
 
-def request() -> dict:
+def request() -> dict[str, Any]:
     return {
         "id": "<request@example>",
         "from": {"emailAddress": {"address": mail.REQUEST_SENDER}},

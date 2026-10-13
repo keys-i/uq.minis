@@ -8,6 +8,7 @@ import plistlib
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 from uq_minis.core.common import MiniError
 
@@ -47,12 +48,16 @@ def notify(title: str, message: str) -> None:
 
 
 def _owned(data: object) -> bool:
-    return (
-        isinstance(data, dict)
-        and data.get("Label") == _LABEL
-        and data.get("ProgramArguments", [])[1:6]
-        == ["-m", "uq_minis.cli", "--tool", "agent", "poll"]
-    )
+    if not isinstance(data, dict):
+        return False
+    data = cast(dict[str, Any], data)
+    return data.get("Label") == _LABEL and data.get("ProgramArguments", [])[1:6] == [
+        "-m",
+        "uq_minis.cli",
+        "--tool",
+        "agent",
+        "poll",
+    ]
 
 
 def _read_plist(path: Path) -> object:

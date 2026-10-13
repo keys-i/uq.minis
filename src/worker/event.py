@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+from sqlite3 import Connection, Row
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .outlook import Outlook
+
 import io
 import json
 import re
 from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from zipfile import BadZipFile, ZipFile
 
 from uq_minis.core.common import MiniError
@@ -59,7 +66,7 @@ def database(state_dir: Path):
         yield db
 
 
-def _save(db, event_id: str, **values) -> None:
+def _save(db: Connection, event_id: str, **values: _db.Value) -> None:
     _db.update(db, "events", "event_id", event_id, **values)
 
 
@@ -124,7 +131,7 @@ def watch(
     attachment: Path | None = None,
     since: str | None = None,
     state_dir: Path = DEFAULT_STATE,
-) -> dict:
+) -> dict[str, Any]:
     """Register an exact event ID and save a fixed copy of its risk form"""
     from uq_minis.core.risk_docx import build_form_document, load_event_config
 
@@ -171,7 +178,13 @@ def watch(
             raise MiniError("That Event ID is already registered; its saved form has not changed")
         db.execute(
             "INSERT INTO events (event_id,title,filename,document,since) VALUES (?,?,?,?,?)",
-            (event_id, config.title, filename, document, cutoff.isoformat().replace("+00:00", "Z")),
+            (
+                event_id,
+                config.title,
+                filename,
+                document,
+                cutoff.isoformat().replace("+00:00", "Z"),
+            ),
         )
     return {
         "event_id": event_id,
@@ -181,7 +194,7 @@ def watch(
     }
 
 
-def status(*, state_dir: Path = DEFAULT_STATE) -> list[dict]:
+def status(*, state_dir: Path = DEFAULT_STATE) -> list[dict[str, Any]]:
     """Return saved progress without credentials or attachment contents"""
     with database(state_dir) as db:
         rows = [
@@ -219,16 +232,18 @@ def retry_send(
         _save(db, event_id, state="draft", send_started=None, error="", last_notice="")
 
 
-def _sender(message: dict) -> str:
+def _sender(message: dict[str, Any]) -> str:
     return message.get("from", {}).get("emailAddress", {}).get("address", "").casefold()
 
 
-def _subject(message: dict):
-    subject = re.sub(r"^(?:(?:re|fw|fwd):\s*)+", "", message.get("subject", "").strip(), flags=re.I)
+def _subject(message: dict[str, Any]):
+    subject = re.sub(
+        r"^(?:(?:re|fw|fwd):\s*)+", "", message.get("subject", "").strip(), flags=re.IGNORECASE
+    )
     return _SUBJECT.fullmatch(subject)
 
 
-def _matches(message: dict, event, *, request: bool) -> bool:
+def _matches(message: dict[str, Any], event: Row, *, request: bool) -> bool:
     REQUEST_SENDER = mail.REQUEST_SENDER
 
     match = _subject(message)
@@ -244,20 +259,22 @@ def _matches(message: dict, event, *, request: bool) -> bool:
 
 def booking_outcome(content: str) -> str:
     """Recognize explicit booking statements and leave uncertain wording for review"""
-    outcomes = set()
+    outcomes: set[str] = set()
     # ponytail: conservative wording rules; unfamiliar replies stay open for human review.
     for sentence in re.split(r"(?<=[.!?])\s+|\n", content.casefold()):
         if (
             sentence.startswith(">")
             or "?" in sentence
             or re.search(
-                r"\b(if|once|pending|awaiting|could|may|might|will|would|please)\b", sentence
+                r"\b(if|once|pending|awaiting|could|may|might|will|would|please)\b",
+                sentence,
             )
             or not re.search(r"\b(room|venue|booking)\b", sentence)
         ):
             continue
         if re.search(
-            r"\b(not (?:been )?(?:booked|confirmed|available)|unable to book)\b", sentence
+            r"\b(not (?:been )?(?:booked|confirmed|available)|unable to book)\b",
+            sentence,
         ):
             outcomes.add("not_booked")
         elif re.search(
@@ -274,7 +291,7 @@ def booking_outcome(content: str) -> str:
     return next(iter(outcomes)) if len(outcomes) == 1 else "review"
 
 
-def _notice(db, event_id: str, key: str, message: str) -> None:
+def _notice(db: Connection, event_id: str, key: str, message: str) -> None:
     from .service import notify
 
     event = db.execute(
@@ -285,7 +302,7 @@ def _notice(db, event_id: str, key: str, message: str) -> None:
         _save(db, event_id, last_notice=key)
 
 
-def _record_sent(db, event, sent: dict) -> None:
+def _record_sent(db: Connection, event: Row, sent: dict[str, Any]) -> None:
     recipients = [
         item.get("emailAddress", {}).get("address", "").casefold()
         for item in sent.get("toRecipients", [])
@@ -298,10 +315,18 @@ def _record_sent(db, event, sent: dict) -> None:
     ):
         raise MiniError("The sent draft's subject or recipients changed; inspect it in Outlook")
     _time(sent["sentDateTime"])
-    _save(db, event["event_id"], state="waiting_update", sent_at=sent["sentDateTime"], error="")
+    _save(
+        db,
+        event["event_id"],
+        state="waiting_update",
+        sent_at=sent["sentDateTime"],
+        error="",
+    )
 
 
-def _advance(db, event, messages: list[dict], graph) -> None:
+def _advance(
+    db: Connection, event: Row, messages: list[dict[str, Any]], graph: mail.Graph | Outlook | None
+) -> None:
     CLUBS_SENDER, GraphError = mail.CLUBS_SENDER, mail.GraphError
 
     event_id = event["event_id"]
@@ -324,6 +349,7 @@ def _advance(db, event, messages: list[dict], graph) -> None:
         )
     event = db.execute("SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
     if event["state"] == "draft":
+        assert graph is not None
         draft_id = event["draft_id"]
         if not draft_id:
             draft_id = graph.create_reply(event["request_id"])
@@ -345,6 +371,7 @@ def _advance(db, event, messages: list[dict], graph) -> None:
             raise MiniError("Microsoft returned a message with no draft/send status")
     event = db.execute("SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
     if event["state"] == "sending":
+        assert graph is not None
         try:
             sent = graph.message(event["draft_id"])
         except GraphError as exc:
@@ -396,7 +423,7 @@ def _advance(db, event, messages: list[dict], graph) -> None:
             )
     event = db.execute("SELECT * FROM events WHERE event_id = ?", (event_id,)).fetchone()
     if event["state"] == "waiting_reply":
-        replies = []
+        replies: list[dict[str, Any]] = []
         for message in messages:
             match = _subject(message)
             if (
@@ -429,6 +456,7 @@ def _advance(db, event, messages: list[dict], graph) -> None:
             return
         reply = max(replies, key=lambda item: _time(item["receivedDateTime"]))
         if reply["id"] != event["reply_id"]:
+            assert graph is not None
             detail = graph.message(reply["id"])
             body = detail.get("uniqueBody", {})
             content = body.get("content", "").strip()
@@ -458,7 +486,7 @@ def _advance(db, event, messages: list[dict], graph) -> None:
         _notice(db, event_id, event["reply_id"], f"{label}. {event['details'][:300]}")
 
 
-def process(db) -> None:
+def process(db: Connection) -> None:
     """Advance registered events using one mailbox session"""
     events = db.execute(
         "SELECT * FROM events WHERE state != 'stopped' "

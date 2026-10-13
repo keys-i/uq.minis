@@ -3,6 +3,11 @@ from __future__ import annotations
 import os
 import plistlib
 import subprocess
+import sys
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+from unittest.mock import Mock
 
 import pytest
 
@@ -13,7 +18,7 @@ pytestmark = pytest.mark.usefixtures("macos")
 
 
 class TestService:
-    def test_notify(self, process):
+    def test_notify(self, process: Mock) -> None:
         service.notify('Title " ;', '$(whoami) \\ "')
         assert process.call_args.args[0] == [
             "/usr/bin/osascript",
@@ -25,9 +30,11 @@ class TestService:
         ]
         process.assert_called_once()
 
-    def test_install(self, tmp_path, monkeypatch, job, process):
+    def test_install(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, job: Path, process: Mock
+    ) -> None:
         state_dir = tmp_path / "state with spaces"
-        monkeypatch.setattr(service.sys, "executable", "/python with spaces/bin/python")
+        monkeypatch.setattr(sys, "executable", "/python with spaces/bin/python")
         path = service.install(state_dir, interval=2)
         assert path == job
         data = plistlib.loads(path.read_bytes())
@@ -58,7 +65,14 @@ class TestService:
         [(service.install, ("state",)), (service.uninstall, ())],
         ids=["install", "uninstall"],
     )
-    def test_foreign(self, tmp_path, job, process, operation, args):
+    def test_foreign(
+        self,
+        tmp_path: Path,
+        job: Path,
+        process: Mock,
+        operation: Callable[..., Any],
+        args: list[str],
+    ) -> None:
         original = plistlib.dumps({"Label": "com.example.other"})
         job.write_bytes(original)
         with pytest.raises(MiniError, match="unrelated"):
@@ -66,7 +80,7 @@ class TestService:
         assert job.read_bytes() == original
         process.assert_not_called()
 
-    def test_failure(self, tmp_path, job, process):
+    def test_failure(self, tmp_path: Path, job: Path, process: Mock) -> None:
         process.side_effect = [
             subprocess.CompletedProcess([], 0),
             subprocess.CalledProcessError(1, ["launchctl", "bootstrap"], "", "launch failed"),
@@ -74,21 +88,28 @@ class TestService:
         with pytest.raises(MiniError, match="launch failed"):
             service.install(tmp_path / "state")
 
-    def test_uninstall(self, tmp_path, job, process):
+    def test_uninstall(self, tmp_path: Path, job: Path, process: Mock) -> None:
         state_dir = tmp_path / "state"
         state_dir.mkdir()
         (state_dir / "seen.sqlite3").write_text("state")
         job.write_bytes(
             plistlib.dumps({
                 "Label": "au.edu.uq.minis.agent",
-                "ProgramArguments": ["python", "-m", "uq_minis.cli", "--tool", "agent", "poll"],
+                "ProgramArguments": [
+                    "python",
+                    "-m",
+                    "uq_minis.cli",
+                    "--tool",
+                    "agent",
+                    "poll",
+                ],
             })
         )
         service.uninstall()
         assert not job.exists()
         assert (state_dir / "seen.sqlite3").read_text() == "state"
 
-    def test_symlink(self, tmp_path, job, process):
+    def test_symlink(self, tmp_path: Path, job: Path, process: Mock) -> None:
         target = tmp_path / "other.plist"
         target.write_text("do not touch")
         job.symlink_to(target)

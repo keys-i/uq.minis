@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
 from uq_minis.core.common import MiniError
 
+type Value = str | int | float | bytes | None
+
 
 @contextmanager
-def database(state_dir: Path):
+def database(state_dir: Path) -> Generator[sqlite3.Connection]:
     """Protect state and serialize commands while allowing durable intermediate commits"""
     state_dir = state_dir.expanduser().absolute()
     if state_dir.is_symlink():
@@ -48,7 +51,7 @@ def database(state_dir: Path):
         guard.close()
 
 
-def setting(db, name: str, value: str | None = None) -> str | None:
+def setting(db: sqlite3.Connection, name: str, value: str | None = None) -> str | None:
     """Read or atomically replace a worker setting"""
     if value is not None:
         db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (name, value))
@@ -56,7 +59,7 @@ def setting(db, name: str, value: str | None = None) -> str | None:
     return row[0] if row else None
 
 
-def update(db, table: str, key: str, identity: str, **values) -> None:
+def update(db: sqlite3.Connection, table: str, key: str, identity: str, **values: Value) -> None:
     """Update internal table/column names with parameterized values"""
     if not all(name.isidentifier() for name in (table, key, *values)):
         raise MiniError("Invalid database identifier")

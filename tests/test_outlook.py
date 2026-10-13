@@ -9,10 +9,14 @@ from datetime import UTC, datetime, timedelta
 from email import policy
 from email.message import EmailMessage
 from email.parser import BytesParser
+from pathlib import Path
+from sqlite3 import Connection
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
+from playwright.sync_api import Page
 
 from tests import fakes
 from uq_minis.core.common import MiniError
@@ -23,7 +27,9 @@ from uq_minis.worker import event, mail, outlook, service
 class TestBrowser:
     @pytest.mark.parametrize("interactive", [False, True], ids=["poll", "login"])
     @pytest.mark.parametrize("new", [False, True], ids=["existing-page", "new-page"])
-    def test_open(self, inbox, browser, interactive, new):
+    def test_open(
+        self, inbox: outlook.Outlook, browser: SimpleNamespace, interactive: bool, new: bool
+    ) -> None:
         inbox.interactive = interactive
         if new:
             browser.context.pages = []
@@ -40,31 +46,45 @@ class TestBrowser:
         browser.runtime.stop.assert_called_once()
 
     @pytest.mark.parametrize("failure", ["launch", "account", "cancel"])
-    def test_cleanup(self, inbox, browser, monkeypatch, failure):
+    def test_cleanup(
+        self,
+        inbox: outlook.Outlook,
+        browser: SimpleNamespace,
+        monkeypatch: pytest.MonkeyPatch,
+        failure: str,
+    ) -> None:
         error = KeyboardInterrupt() if failure == "cancel" else fakes.BrowserError("private page")
         if failure == "launch":
             browser.runtime.chromium.launch_persistent_context.side_effect = error
         else:
             monkeypatch.setattr(inbox, "_verify_account", Mock(side_effect=error))
-        with pytest.raises(KeyboardInterrupt if failure == "cancel" else MiniError) as caught:
-            with inbox:
-                pytest.fail("must not open a failed session")
+        with (
+            pytest.raises(KeyboardInterrupt if failure == "cancel" else MiniError) as caught,
+            inbox,
+        ):
+            pytest.fail("must not open a failed session")
         assert "private page" not in str(caught.value)
         if failure != "launch":
             browser.context.close.assert_called_once()
         browser.runtime.stop.assert_called_once()
 
     @pytest.mark.parametrize("blocked", ["dependency", "symlink"])
-    def test_refuse(self, inbox, browser, monkeypatch, tmp_path, blocked):
+    def test_refuse(
+        self,
+        inbox: outlook.Outlook,
+        browser: SimpleNamespace,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        blocked: str,
+    ) -> None:
         if blocked == "dependency":
             import sys
 
             monkeypatch.setitem(sys.modules, "playwright.sync_api", None)
         else:
             (inbox.state_dir / "browser").symlink_to(tmp_path, target_is_directory=True)
-        with pytest.raises(MiniError, match="support|symlink"):
-            with inbox:
-                pytest.fail("must not start an unsafe browser")
+        with pytest.raises(MiniError, match="support|symlink"), inbox:
+            pytest.fail("must not start an unsafe browser")
         browser.api.sync_playwright.assert_not_called()
 
 
@@ -72,7 +92,9 @@ class TestUI:
     @pytest.mark.parametrize("search", ["Search", "Search for email, meetings, files and more."])
     @pytest.mark.parametrize("folder", [None, "Sent Items"], ids=["all", "sent"])
     @pytest.mark.parametrize("scope", ["All folders", "Current folder"])
-    def test_search(self, inbox, page, search, folder, scope):
+    def test_search(
+        self, inbox: outlook.Outlook, page: Page, search: str, folder: None | str, scope: str
+    ) -> None:
         inbox.page = page
         page.route(
             outlook.HOME,
@@ -100,7 +122,7 @@ class TestUI:
         ).is_visible()
 
     @pytest.mark.parametrize("account", ["Account manager", "Test User"])
-    def test_account(self, inbox, page, account):
+    def test_account(self, inbox: outlook.Outlook, page: Page, account: str) -> None:
         inbox.page = page
         page.set_content(
             '<div id="owa-me-control-container">'
@@ -111,7 +133,7 @@ class TestUI:
         assert page.get_by_text("rad@example.org", exact=True).is_visible()
 
     @pytest.mark.parametrize("actions", ["More actions", "More items"])
-    def test_export(self, inbox, page, actions):
+    def test_export(self, inbox: outlook.Outlook, page: Page, actions: str) -> None:
         inbox.page = page
         download = "data:message/rfc822;base64," + b64encode(fakes.sent(b"form")).decode()
         html = (
@@ -133,13 +155,14 @@ class TestUI:
         assert inbox._read()["id"] == "<sent@example>"
 
     @pytest.mark.parametrize("failure", ["conversation", "link"])
-    def test_export_refuse(self, inbox, page, failure):
+    def test_export_refuse(self, inbox: outlook.Outlook, page: Page, failure: str) -> None:
         inbox.page = page
         html = '<div role="document" aria-label="Message body">message</div>'
         page.route(
             "https://outlook.office.com/**",
             lambda route: route.fulfill(
-                content_type="text/html", body=html * (2 if failure == "conversation" else 1)
+                content_type="text/html",
+                body=html * (2 if failure == "conversation" else 1),
             ),
         )
         page.goto(outlook.HOME + ("id/test" if failure == "conversation" else ""))
@@ -147,7 +170,9 @@ class TestUI:
             inbox._read()
 
     @pytest.mark.parametrize("rows", ["empty", "unique", "duplicate"])
-    def test_collect(self, inbox, page, monkeypatch, rows):
+    def test_collect(
+        self, inbox: outlook.Outlook, page: Page, monkeypatch: pytest.MonkeyPatch, rows: str
+    ) -> None:
         inbox.page = page
         monkeypatch.setattr(inbox, "_search", Mock())
         read = Mock(return_value={"id": "test"})
@@ -171,13 +196,14 @@ class TestUI:
 
     @pytest.mark.parametrize("filename", ["form.docx", "form.pdf"])
     @pytest.mark.parametrize("hidden", [False, True], ids=["subject", "edit-subject"])
-    def test_prepare(self, inbox, page, filename, hidden):
+    def test_prepare(self, inbox: outlook.Outlook, page: Page, filename: str, hidden: bool) -> None:
         inbox.page = page
         inbox.db.execute("UPDATE events SET filename = ?", (filename,))
         page.route(
             "https://outlook.office.com/**",
             lambda route: route.fulfill(
-                content_type="text/html", body=fakes.compose(filename, ready=False, hidden=hidden)
+                content_type="text/html",
+                body=fakes.compose(filename, ready=False, hidden=hidden),
             ),
         )
         inbox.prepare("browser:local", "42", filename, b"form")
@@ -201,9 +227,15 @@ class TestUI:
                 "document.querySelector('.ms-PickerItem-root').dataset.email='other@example.org'",
                 "recipients",
             ),
-            ("document.querySelector('[aria-label=Cc]').value='pending@example.org'", "recipients"),
+            (
+                "document.querySelector('[aria-label=Cc]').value='pending@example.org'",
+                "recipients",
+            ),
             ("document.querySelector('.ms-PickerItem-root').remove()", "recipients"),
-            ("document.querySelector('.ms-BasePicker-text').className='unknown'", "unsupported"),
+            (
+                "document.querySelector('.ms-BasePicker-text').className='unknown'",
+                "unsupported",
+            ),
             ("document.querySelector('#attachments').innerHTML=''", "attachments"),
             (
                 "document.querySelector('#attachments').append(document.querySelector('#attachments button').cloneNode(true))",
@@ -226,7 +258,7 @@ class TestUI:
             "upload",
         ],
     )
-    def test_refuse(self, inbox, page, change, error):
+    def test_refuse(self, inbox: outlook.Outlook, page: Page, change: str, error: str) -> None:
         inbox.page, inbox.prepared = page, "browser:local"
         page.set_content(fakes.compose())
         page.evaluate(change)
@@ -235,7 +267,7 @@ class TestUI:
         assert page.evaluate("window.sends") == 0
 
     @pytest.mark.parametrize("saved", [True, False], ids=["saved-intent", "no-intent"])
-    def test_send(self, inbox, page, saved):
+    def test_send(self, inbox: outlook.Outlook, page: Page, saved: bool) -> None:
         inbox.page, inbox.prepared = page, "browser:local"
         page.set_content(fakes.compose())
         if not saved:
@@ -253,7 +285,7 @@ class TestUI:
 
 
 class TestOutlook:
-    def test_parse(self):
+    def test_parse(self) -> None:
         raw = fakes.eml(
             message_id="<clubs@example>",
             sender="Clubs <clubs@uqu.com.au>",
@@ -264,7 +296,11 @@ class TestOutlook:
 
         assert parsed["id"] == "<clubs@example>"
         assert parsed["from"]["emailAddress"]["address"] == "clubs@uqu.com.au"
-        assert parsed["references"] == ["<request@example>", "<update@example>", "<update@example>"]
+        assert parsed["references"] == [
+            "<request@example>",
+            "<update@example>",
+            "<update@example>",
+        ]
         assert parsed["uniqueBody"]["content"] == "Your room booking is confirmed."
         assert parsed["body"]["content"].endswith("> old text")
 
@@ -280,7 +316,7 @@ class TestOutlook:
         ],
         ids=["identity", "timestamp", "sent-date", "timezone", "sender", "senders"],
     )
-    def test_malformed(self, change, error):
+    def test_malformed(self, change: dict[str, Any], error: str) -> None:
         raw = fakes.eml(
             message_id="<test@example>",
             sender=mail.CLUBS_SENDER,
@@ -304,10 +340,13 @@ class TestOutlook:
         ],
         ids=["blockquote", "outlook", "gmail"],
     )
-    def test_html(self, quote):
+    def test_html(self, quote: str) -> None:
         message = BytesParser(policy=policy.default).parsebytes(
             fakes.eml(
-                message_id="<test@example>", sender=mail.CLUBS_SENDER, subject="Update", body=""
+                message_id="<test@example>",
+                sender=mail.CLUBS_SENDER,
+                subject="Update",
+                body="",
             )
         )
         message.replace_header("Received", "from mail.example; invalid date")
@@ -322,7 +361,7 @@ class TestOutlook:
         assert "hidden" not in parsed["body"]["content"]
         assert parsed["receivedDateTime"] == parsed["sentDateTime"]
 
-    def test_messages(self, inbox, monkeypatch):
+    def test_messages(self, inbox: outlook.Outlook, monkeypatch: pytest.MonkeyPatch) -> None:
         accepted = fakes.message("new", timestamp="2026-09-07T12:00:00+00:00")
         old = fakes.message("old", timestamp="2026-09-01T10:00:00+00:00")
         foreign = fakes.message("foreign", sender="other@example.org")
@@ -342,7 +381,9 @@ class TestOutlook:
             inbox.message("browser:unknown")
 
     @pytest.mark.parametrize("changed", ["subject", "before-request", "content"])
-    def test_reconcile(self, inbox, monkeypatch, changed):
+    def test_reconcile(
+        self, inbox: outlook.Outlook, monkeypatch: pytest.MonkeyPatch, changed: str
+    ) -> None:
         sent = outlook.parse_message(fakes.sent(b"form"), outlook.HOME + "id/sent")
         if changed == "subject":
             sent["subject"] = "Another return"
@@ -355,9 +396,12 @@ class TestOutlook:
             with pytest.raises(MiniError, match="different recipients, body or attachment"):
                 inbox.message("browser:local")
         else:
-            assert inbox.message("browser:local") == {"id": "browser:local", "isDraft": True}
+            assert inbox.message("browser:local") == {
+                "id": "browser:local",
+                "isDraft": True,
+            }
 
-    def test_return(self):
+    def test_return(self) -> None:
         document = b"risk-form"
         email = EmailMessage()
         email.set_content(mail.BODY)
@@ -367,7 +411,10 @@ class TestOutlook:
         email["Subject"] = "UQU Risk Assessment Return Ref ID: 42"
         email["Date"] = "Mon, 07 Sep 2026 12:00:00 +0000"
         email.add_attachment(
-            document, maintype="application", subtype="octet-stream", filename="form.docx"
+            document,
+            maintype="application",
+            subtype="octet-stream",
+            filename="form.docx",
         )
         parsed = outlook.parse_message(email.as_bytes(), "https://outlook.office.com/mail/id/sent")
 
@@ -375,7 +422,10 @@ class TestOutlook:
         assert parsed["attachments"] == [
             {"name": "form.docx", "sha256": hashlib.sha256(document).hexdigest()}
         ]
-        altered = {**parsed, "toRecipients": [{"emailAddress": {"address": "other@example.org"}}]}
+        altered = {
+            **parsed,
+            "toRecipients": [{"emailAddress": {"address": "other@example.org"}}],
+        }
         assert not outlook._same_return(altered, "42", "form.docx", document, "rad@example.org")
         altered = {**parsed, "body": {"content": mail.BODY + "\nextra"}}
         assert not outlook._same_return(altered, "42", "form.docx", document, "rad@example.org")
@@ -387,7 +437,7 @@ class TestOutlook:
         )
         assert not outlook._same_return(quoted, "42", "form.docx", document, "rad@example.org")
 
-    def test_draft(self, tmp_path):
+    def test_draft(self, tmp_path: Path) -> None:
         state = tmp_path / "agent"
         document = b"risk-form"
         with event.database(state) as db:
@@ -413,7 +463,7 @@ class TestOutlook:
             identity = box.create_reply("<request@example>")
             assert identity.startswith("browser:")
             db.execute("UPDATE events SET draft_id = ? WHERE event_id = '42'", (identity,))
-            box._collect = lambda *args: []
+            box._collect = Mock(return_value=[])
             assert box.message(identity) == {"id": identity, "isDraft": True}
 
             sent = outlook.parse_message(
@@ -423,32 +473,32 @@ class TestOutlook:
                 "UPDATE events SET state = 'sending', send_started = ? WHERE event_id = '42'",
                 ("2026-09-07T11:30:00+00:00",),
             )
-            box._collect = lambda *args: [sent]
+            box._collect = Mock(return_value=[sent])
             assert box.message(identity)["id"] == "<sent@example>"
 
-            box._collect = lambda *args: [sent, sent]
+            box._collect = Mock(return_value=[sent, sent])
             with pytest.raises(MiniError, match="Multiple matching"):
                 box.message(identity)
-            unthreaded = {**sent, "references": []}
-            box._collect = lambda *args: [unthreaded]
+            unthreaded: dict[str, Any] = {**sent, "references": []}
+            box._collect = Mock(return_value=[unthreaded])
             assert box.message(identity) == {"id": identity, "isDraft": True}
 
-    def test_retry(self, event_toml, tmp_path, monkeypatch):
+    def test_retry(self, event_toml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         state = tmp_path / "agent"
         event.watch(event_toml, event_id="42", since="2026-09-01", state_dir=state)
 
         class BrowserUI:
             def __init__(self):
                 self.sent = self.attempt = 0
-                self.prepared = []
+                self.prepared: list[tuple[str, str, str, bytes]] = []
 
-            def messages(self, since):
+            def messages(self, since: str):
                 return [fakes.request()]
 
-            def create_reply(self, request_id):
+            def create_reply(self, request_id: str):
                 return "browser:local"
 
-            def message(self, identity):
+            def message(self, identity: str):
                 if identity == "browser:local" and self.sent:
                     return {
                         "id": "<sent@example>",
@@ -461,10 +511,10 @@ class TestOutlook:
                     }
                 return {"id": identity, "isDraft": True}
 
-            def prepare(self, *args):
+            def prepare(self, *args: Any):
                 self.prepared.append(args)
 
-            def send(self, identity):
+            def send(self, identity: str):
                 self.attempt += 1
                 if self.attempt == 1:
                     raise MiniError("browser closed while sending")
@@ -473,11 +523,11 @@ class TestOutlook:
         ui = BrowserUI()
 
         @contextmanager
-        def connect(db):
+        def connect(db: Connection):
             yield ui
 
         monkeypatch.setattr(mail, "connect", connect)
-        monkeypatch.setattr(service, "notify", lambda *args: None)
+        monkeypatch.setattr(service, "notify", Mock(return_value=None))
         event.poll(state_dir=state)
         assert event.status(state_dir=state)[0]["state"] == "sending"
         event.poll(state_dir=state)
@@ -496,17 +546,24 @@ class TestOutlook:
         assert ui.attempt == 2
         assert event.status(state_dir=state)[0]["state"] == "waiting_update"
 
-    def test_login(self, tmp_path, monkeypatch):
-        opened = []
+    def test_login(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        opened: list[tuple[str, str | None, bool]] = []
 
         class Browser:
-            def __init__(self, db, mailbox, *, username=None, interactive=False):
+            def __init__(
+                self,
+                db: Connection,
+                mailbox: str,
+                *,
+                username: str | None = None,
+                interactive: bool = False,
+            ):
                 opened.append((mailbox, username, interactive))
 
             def __enter__(self):
                 return self
 
-            def __exit__(self, *args):
+            def __exit__(self, *args: Any):
                 return False
 
         monkeypatch.setattr(outlook, "Outlook", Browser)
@@ -514,7 +571,7 @@ class TestOutlook:
         event.login(mailbox="RAD@EXAMPLE.ORG", username="s123@uq.edu.au", state_dir=state)
         assert opened == [("rad@example.org", "s123@uq.edu.au", True)]
         with event.database(state) as db:
-            assert json.loads(storage.setting(db, "account")) == {
+            assert json.loads(storage.setting(db, "account") or "{}") == {
                 "backend": "browser",
                 "mailbox": "rad@example.org",
                 "username": "s123@uq.edu.au",
@@ -522,11 +579,17 @@ class TestOutlook:
         with pytest.raises(MiniError, match="another account"):
             event.login(mailbox="other@example.org", state_dir=state)
 
-    def test_booking(self, event_toml, tmp_path, monkeypatch):
+    def test_booking(
+        self, event_toml: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         state = tmp_path / "agent"
         event.watch(event_toml, event_id="42", state_dir=state)
-        notices = []
-        monkeypatch.setattr(service, "notify", lambda *args: notices.append(args))
+        notices: list[tuple[str, str]] = []
+
+        def notify(title: str, body: str) -> None:
+            notices.append((title, body))
+
+        monkeypatch.setattr(service, "notify", notify)
         reply = outlook.parse_message(
             fakes.eml(
                 message_id="<clubs@example>",
@@ -536,7 +599,7 @@ class TestOutlook:
             ),
             "https://outlook.office.com/mail/id/clubs",
         )
-        box = SimpleNamespace(message=lambda _: reply)
+        box = cast(mail.Graph, SimpleNamespace(message=Mock(return_value=reply)))
         with event.database(state) as db:
             event._save(
                 db,
@@ -573,6 +636,6 @@ class TestOutlook:
         ],
         ids=["office", "cloud", "suffix", "domain", "userinfo", "scheme", "path"],
     )
-    def test_url(self, url, valid):
+    def test_url(self, url: str, valid: bool) -> None:
         with nullcontext() if valid else pytest.raises(MiniError, match="mailbox link"):
             assert outlook._url(url) == url
