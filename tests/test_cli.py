@@ -1,23 +1,42 @@
 import json
+import random
+from collections.abc import Callable
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
+import typer
+from prompt_toolkit.input import PipeInput
 from rich.text import Text
 from typer import rich_utils
+from typer.testing import CliRunner
 
+from tests.fixtures import Keys
 from uq_minis import cli
 from uq_minis.cli import event
+from uq_minis.core import art, terminal
 from uq_minis.core.common import MiniError
 from uq_minis.minis import agent
 from uq_minis.minis import event as mini_event
 
 
 class TestCLI:
-    @pytest.mark.parametrize("error", [MiniError, OSError, cli.typer.BadParameter])
-    def test_recover(self, module, monkeypatch, runner, tty, pipe, keys, error):
-        from uq_minis.core import terminal
+    @pytest.mark.parametrize("error", [MiniError, OSError, typer.BadParameter])
+    def test_recover(
+        self,
+        module: Callable[[str, Callable[..., object]], ModuleType],
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+        pipe: PipeInput,
+        keys: Keys,
+        error: type[Exception],
+    ) -> None:
 
-        answers, approvals = [], []
+        answers: list[str] = []
+        approvals: list[bool] = []
 
         def run():
             answers.append(terminal.ask("Name", default="guest"))
@@ -35,8 +54,17 @@ class TestCLI:
         assert terminal._DRAFT.get() is None and not terminal._RESTORE.get()
 
     @pytest.mark.parametrize("action", ["menu\n", "\x1b[1;3D"])
-    def test_failed_back(self, module, monkeypatch, runner, tty, pipe, keys, action):
-        calls = []
+    def test_failed_back(
+        self,
+        module: Callable[[str, Callable[..., object]], ModuleType],
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+        pipe: PipeInput,
+        keys: Keys,
+        action: str,
+    ) -> None:
+        calls: list[bool] = []
 
         def run():
             calls.append(True)
@@ -49,7 +77,13 @@ class TestCLI:
         assert result.exit_code == 0, result.output
         assert calls == [True] and "Choose a tool" in result.output
 
-    def test_no_input(self, module, monkeypatch, runner, tty):
+    def test_no_input(
+        self,
+        module: Callable[[str, Callable[..., object]], ModuleType],
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+    ) -> None:
         def run(no_input: bool = False):
             raise MiniError("Needs a different source")
 
@@ -70,7 +104,15 @@ class TestCLI:
     )
     @pytest.mark.parametrize("selector", [[], ["--tool"]], ids=["direct", "option"])
     @pytest.mark.parametrize("coloured", [False, True], ids=["plain", "colour"])
-    def test_help(self, tool, option, selector, runner, monkeypatch, coloured):
+    def test_help(
+        self,
+        tool: str,
+        option: str,
+        selector: list[str],
+        runner: CliRunner,
+        monkeypatch: pytest.MonkeyPatch,
+        coloured: bool,
+    ) -> None:
         monkeypatch.delenv("NO_COLOR", raising=False)
         monkeypatch.setenv("TERM", "xterm-256color")
         monkeypatch.setattr(rich_utils, "FORCE_TERMINAL", coloured)
@@ -81,18 +123,18 @@ class TestCLI:
         assert "Choose a tool" not in result.output
 
     @pytest.mark.parametrize("tool", ["not-a-mini", "agents"])
-    def test_unknown(self, tool, runner):
+    def test_unknown(self, tool: str, runner: CliRunner) -> None:
         result = runner.invoke(cli.app, ["--tool", tool])
         assert result.exit_code == 2
         assert "unknown tool" in result.output
         assert "Traceback" not in result.output
 
-    def test_list(self, runner):
+    def test_list(self, runner: CliRunner) -> None:
         result = runner.invoke(cli.app, [])
         assert result.exit_code == 0, result.output
         assert "UQ minis" in result.output
 
-    def test_preview(self, event_toml, tmp_path, runner):
+    def test_preview(self, event_toml: Path, tmp_path: Path, runner: CliRunner) -> None:
         output = tmp_path / "output with spaces"
         result = runner.invoke(
             cli.app,
@@ -110,7 +152,12 @@ class TestCLI:
         assert [path.name for path in output.iterdir()] == ["sample-event.form.json"]
 
     @pytest.mark.parametrize("name", ["new_mini", "core", "completion"])
-    def test_generic(self, module, name, runner):
+    def test_generic(
+        self,
+        module: Callable[[str, Callable[..., object]], ModuleType],
+        name: str,
+        runner: CliRunner,
+    ) -> None:
         called: list[str] = []
 
         def run(value: str) -> None:
@@ -121,12 +168,19 @@ class TestCLI:
         assert result.exit_code == 0, result.output
         assert called == ["done"]
 
-    def test_menu(self, event_toml, monkeypatch, pipe, runner, tty):
+    def test_menu(
+        self,
+        event_toml: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        pipe: PipeInput,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+    ) -> None:
         terminal = tty
         monkeypatch.setattr(cli, "sys", terminal)
         monkeypatch.setattr(event, "sys", terminal)
-        visitor = Mock(return_value=cli._habitats()["huia"])
-        monkeypatch.setattr(cli.random, "choice", visitor)
+        visitor = Mock(return_value=art.habitats()["huia"])
+        monkeypatch.setattr(random, "choice", visitor)
         event_toml.write_text(event_toml.read_text().replace('mode = "both"\n', ""))
         pipe.send_text(f"event\n{event_toml}\nform\n")
         result = runner.invoke(cli.app, [])
@@ -135,14 +189,22 @@ class TestCLI:
         animals = visitor.call_args.args[0]
         assert len(animals) == 50
         assert len({pet.animal for pet in animals}) == 50
-        assert set(animals) == set(cli._habitats().values())
+        assert set(animals) == set(art.habitats().values())
         assert not visitor.call_args.kwargs
 
     @pytest.mark.parametrize("args", [[], ["new-mini"]], ids=["menu", "direct"])
-    def test_back(self, module, monkeypatch, runner, tty, pipe, keys, args):
-        from uq_minis.core import terminal
+    def test_back(
+        self,
+        module: Callable[[str, Callable[..., object]], ModuleType],
+        monkeypatch: pytest.MonkeyPatch,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+        pipe: PipeInput,
+        keys: Keys,
+        args: list[str],
+    ) -> None:
 
-        reached = []
+        reached: list[bool] = []
 
         def run():
             terminal.ask("Name", required=True)
@@ -172,13 +234,21 @@ class TestCLI:
             "missing-login-options",
         ],
     )
-    def test_invalid(self, event_toml, monkeypatch, args, error, runner, tty):
+    def test_invalid(
+        self,
+        event_toml: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        args: list[str],
+        error: str,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+    ) -> None:
         monkeypatch.chdir(event_toml.parent)
         monkeypatch.setattr(event, "sys", tty)
         monkeypatch.setattr(
             mini_event,
             "generate",
-            lambda *args, **kwargs: pytest.fail("must not generate"),
+            Mock(side_effect=AssertionError("must not generate")),
         )
         result = runner.invoke(cli.app, args)
         assert result.exit_code == 2, result.output
@@ -187,12 +257,20 @@ class TestCLI:
     @pytest.mark.parametrize("selector", [[], ["--tool"]], ids=["direct", "option"])
     @pytest.mark.parametrize("saved", [True, False], ids=["saved", "empty"])
     @pytest.mark.parametrize("as_json", [False, True], ids=["pretty", "json"])
-    def test_status(self, tmp_path, monkeypatch, selector, runner, saved, as_json):
+    def test_status(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        selector: list[str],
+        runner: CliRunner,
+        saved: bool,
+        as_json: bool,
+    ) -> None:
         rows = [{"event_id": "42", "title": "Sample Event", "state": "registered"}] if saved else []
         monkeypatch.setattr(
             agent,
             "status",
-            lambda **_: rows,
+            Mock(return_value=rows),
         )
         result = runner.invoke(
             cli.app,
@@ -214,7 +292,7 @@ class TestCLI:
             assert "Nothing to keep an eye on" in result.output
             assert "mini agent watch" in result.output
 
-    def test_watch(self, event_toml, tmp_path, runner):
+    def test_watch(self, event_toml: Path, tmp_path: Path, runner: CliRunner) -> None:
         state = tmp_path / "state"
         common = ["--state-dir", str(state)]
         watched = runner.invoke(
@@ -247,10 +325,17 @@ class TestCLI:
         ],
         ids=["agent", "scrappy"],
     )
-    def test_errors(self, tmp_path, monkeypatch, args, error, runner):
+    def test_errors(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        args: list[str],
+        error: str,
+        runner: CliRunner,
+    ) -> None:
         monkeypatch.chdir(tmp_path)
 
-        def unavailable(**_):
+        def unavailable(**_: Any):
             raise MiniError("agent state is unavailable")
 
         monkeypatch.setattr(agent, "status", unavailable)

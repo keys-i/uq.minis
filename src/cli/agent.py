@@ -19,10 +19,12 @@ app = application(theme="huia")
 def login(
     mailbox: Annotated[str, typer.Option(help="Actual Outlook email address.")],
     username: Annotated[
-        str | None, typer.Option(help="Browser sign-in address, if different from mailbox.")
+        str | None,
+        typer.Option(help="Browser sign-in address, if different from mailbox."),
     ] = None,
     backend: Annotated[
-        str | None, typer.Option(help="browser (default), or graph with app registration IDs.")
+        str | None,
+        typer.Option(help="browser (default), or graph with app registration IDs."),
     ] = None,
     client_id: Annotated[str | None, typer.Option(help="Microsoft app client ID.")] = None,
     tenant_id: Annotated[str | None, typer.Option(help="Microsoft tenant ID.")] = None,

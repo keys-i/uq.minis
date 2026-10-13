@@ -10,7 +10,15 @@ import typer
 from rich.text import Text
 
 from uq_minis.core.common import MiniError
-from uq_minis.core.terminal import CONSOLE, activity, application, ask, intro, recover, table
+from uq_minis.core.terminal import (
+    CONSOLE,
+    activity,
+    application,
+    ask,
+    intro,
+    recover,
+    table,
+)
 lazy from uq_minis.minis.scrappy import (
     export_details,
     export_links,
@@ -53,7 +61,7 @@ def _browse(offerings: Path) -> None:
 def _export(offerings: Path, output: Path, course: str | None, jobs: int, fresh: bool) -> None:
     with activity("Gathering your courses") as progress:
 
-        def update(done, total, message):
+        def update(done: int, total: int, message: str) -> None:
             progress(done / total if total else None, message)
 
         count = export_details(

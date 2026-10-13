@@ -46,7 +46,8 @@ def run(
         bool, typer.Option(help="Choose a venue by building, room number and capacity.")
     ] = False,
     rooms: Annotated[
-        Path | None, typer.Option(help="Custom room CSV for interactive venue selection.")
+        Path | None,
+        typer.Option(help="Custom room CSV for interactive venue selection."),
     ] = None,
 ) -> None:
     """Generate event form JSON, risk documents, or both"""
@@ -59,7 +60,12 @@ def run(
         if not interactive:
             raise typer.BadParameter("input is required; pass event.toml or a directory")
         input = Path(
-            ask("Event TOML or directory", default="event.toml", paths=True, required=True)
+            ask(
+                "Event TOML or directory",
+                default="event.toml",
+                paths=True,
+                required=True,
+            )
         )
     mode = "both" if form and risk else "form" if form else "risk" if risk else None
     try:

@@ -5,17 +5,19 @@ import importlib
 import random
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.text import Text
+from typer._click.core import Context, Parameter
 from typer._click.exceptions import ClickException
-from typer.core import TyperCommand
+from typer._click.shell_completion import CompletionItem
+from typer.core import TyperCommand, TyperGroup
 from typer.main import get_command
-from typer.models import CompletionItem, TyperPath
+from typer.models import TyperPath
 
 from uq_minis.cli.core import app as manage
-from uq_minis.core.art import _habitats
+from uq_minis.core.art import habitats
 from uq_minis.core.common import MiniError
 from uq_minis.core.terminal import (
     CONSOLE,
@@ -63,14 +65,16 @@ def tool_names(incomplete: str = "") -> list[str]:
 
 def command_names(incomplete: str = "") -> list[str]:
     """Complete management commands and direct mini names"""
-    names = [*get_command(manage).commands, *tool_names()]
+    command = get_command(manage)
+    assert isinstance(command, TyperGroup)
+    names = [*command.commands, *tool_names()]
     return [name for name in names if name.startswith(incomplete)]
 
 
 class MiniCommand(TyperCommand):
     """Typer dispatcher with completion for the selected mini"""
 
-    def get_params(self, ctx):
+    def get_params(self, ctx: Context):
         """Use generated shell setup for the built-in completion options"""
         from uq_minis.cli.completion import completion_callback
 
@@ -80,7 +84,9 @@ class MiniCommand(TyperCommand):
                 param.callback = completion_callback
         return params
 
-    def make_context(self, info_name, args, parent=None, **extra):
+    def make_context(
+        self, info_name: str | None, args: list[str], parent: Context | None = None, **extra: Any
+    ) -> Context:
         """Parse normally and expose the selected app during shell completion"""
         ctx = super().make_context(info_name, args, parent=parent, **extra)
         if ctx.resilient_parsing:
@@ -89,7 +95,7 @@ class MiniCommand(TyperCommand):
             forwarded = list(ctx.params.get("arguments") or [])
             if tool in names:
                 target = get_app(tool)
-            elif tool is None and forwarded and forwarded[0] in get_command(manage).commands:
+            elif tool is None and forwarded and forwarded[0] in set(command_names()) - set(names):
                 target = manage
             elif tool is None and forwarded and forwarded[0] in names:
                 target = get_app(forwarded.pop(0))
@@ -98,10 +104,15 @@ class MiniCommand(TyperCommand):
             # Let Typer complete the selected command without executing its callback
             command = get_command(target)
             for param in command.params:
-                if isinstance(param.type, TyperPath) and param._custom_shell_complete is None:
-                    param._custom_shell_complete = lambda ctx, param, value: [
-                        CompletionItem(path) for path in complete_path(value)
-                    ]
+                if (
+                    isinstance(param.type, TyperPath)
+                    and getattr(param, "_custom_shell_complete") is None
+                ):
+
+                    def paths(ctx: Context, param: Parameter, value: str) -> list[CompletionItem]:
+                        return [CompletionItem(path) for path in complete_path(value)]
+
+                    setattr(param, "_custom_shell_complete", paths)
             return command.make_context(info_name, forwarded, parent=parent, **extra)
         return ctx
 
@@ -142,7 +153,7 @@ def dispatch(
     names = tool_names()
     if tool is None and arguments:
         command, *forwarded = arguments
-        if command in get_command(manage).commands or command not in names:
+        if command not in names:
             manage(args=arguments, prog_name="mini")
             return
         tool, arguments = command, forwarded
@@ -178,7 +189,7 @@ def dispatch(
                 problem(exc)
                 raise typer.Exit(2) from exc
         intro("UQ minis", "Choose a tool")
-        choices = {}
+        choices: dict[str, str] = {}
         for name in names:
             source = Path(__file__).resolve().parents[1] / "minis" / name.replace("-", "_")
             about = ast.get_docstring(ast.parse((source / "__init__.py").read_text()))
@@ -191,7 +202,7 @@ def dispatch(
             CONSOLE.print("mini NAME --help for options", style="muted")
             return
         try:
-            animals = list(_habitats().values())
+            animals = list(habitats().values())
             visitor = random.choice(animals)
             with habitat(visitor.animal, menu=False):
                 tool = ask("Pick a mini", choices=choices, show_choices=False)

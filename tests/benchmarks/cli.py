@@ -26,7 +26,7 @@ def main() -> None:
     }
     with TemporaryDirectory(prefix="uq-minis-benchmark-") as directory:
         for name, args in cases.items():
-            samples = []
+            samples: list[float] = []
             for attempt in range(5):
                 output = ["-o", str(Path(directory) / str(attempt))] if name == "risk batch" else []
                 start = time.perf_counter()

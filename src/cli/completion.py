@@ -1,8 +1,10 @@
 """Generate shell completion from uv and Typer"""
 
 from pathlib import Path
+from typing import Any
 
 import typer
+from typer._click.core import Context, Parameter
 
 
 def zsh_script() -> str:
@@ -12,7 +14,7 @@ def zsh_script() -> str:
     import subprocess
     from importlib.metadata import distribution
 
-    from typer.completion import get_completion_script
+    from typer._completion_shared import get_completion_script
 
     uv = shutil.which("uv")
     if uv is None:
@@ -49,13 +51,14 @@ def zsh_script() -> str:
     return "\n".join(scripts)
 
 
-def completion_callback(ctx, param, value):
+def completion_callback(ctx: Context, param: Parameter, value: Any):
     """Show or install generated completion for the current shell"""
-    from typer.completion import _get_shell_name, install_callback, show_callback
+    from typer._completion_shared import _get_shell_name as shell_name  # pyright: ignore[reportPrivateUsage]
+    from typer.completion import install_callback, show_callback
 
     if not value or ctx.resilient_parsing:
         return value
-    shell = value if isinstance(value, str) else _get_shell_name()
+    shell = value if isinstance(value, str) else shell_name()
     if shell != "zsh":
         callback = install_callback if param.name == "install_completion" else show_callback
         return callback(ctx, param, value)

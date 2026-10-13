@@ -1,4 +1,10 @@
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 import pytest
+from prompt_toolkit.input import PipeInput
+from typer.testing import CliRunner
 
 from uq_minis import cli
 from uq_minis.cli import scrappy
@@ -12,18 +18,25 @@ COURSE = '<h1 id="course-title">Software (CSSE2002)</h1><p id="course-level">Und
 
 
 class TestCLI:
-    def test_help(self, runner):
+    def test_help(self, runner: CliRunner) -> None:
         result = runner.invoke(cli.app, ["scrappy", "--no-input"])
         assert result.exit_code == 0 and "details" in result.output
         assert "Neo4j" not in result.output
 
     @pytest.mark.parametrize("query,matches", [("logic", True), ("MATH", False)])
-    def test_search(self, offerings, query, matches, runner):
+    def test_search(self, offerings: Path, query: str, matches: bool, runner: CliRunner) -> None:
         result = runner.invoke(cli.app, ["scrappy", "list", str(offerings), "--query", query])
         assert result.exit_code == 0, result.output
         assert ("COMP3400" in result.output) is matches
 
-    def test_menu(self, tmp_path, monkeypatch, pipe, runner, tty):
+    def test_menu(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        pipe: PipeInput,
+        runner: CliRunner,
+        tty: SimpleNamespace,
+    ) -> None:
         html, offerings, output = (
             tmp_path / "search.html",
             tmp_path / "links.csv",
@@ -33,7 +46,7 @@ class TestCLI:
         scraper.export_links(offerings, html=html)
         html.write_text(LISTING.replace("COMP3400", "CSSE2002").replace("Logic", "Software"))
         monkeypatch.setattr(scrappy, "sys", tty)
-        monkeypatch.setattr(scraper, "fetch", lambda *args, **kwargs: COURSE)
+        monkeypatch.setattr(scraper, "fetch", Mock(return_value=COURSE))
         pipe.send_text("1\nback\n2\n3\nCSSE2002\n4\n5\n")
         result = runner.invoke(
             cli.app,
@@ -54,9 +67,17 @@ class TestCLI:
         assert "COMP3400" not in offerings.read_text()
 
     @pytest.mark.parametrize("course,exit_code", [("csse2002", 0), ("NONE0000", 2)])
-    def test_export(self, tmp_path, monkeypatch, offerings, course, exit_code, runner):
+    def test_export(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        offerings: Path,
+        course: str,
+        exit_code: int,
+        runner: CliRunner,
+    ) -> None:
         output = tmp_path / "one.csv"
-        monkeypatch.setattr(scraper, "fetch", lambda *args, **kwargs: COURSE)
+        monkeypatch.setattr(scraper, "fetch", Mock(return_value=COURSE))
         result = runner.invoke(
             cli.app,
             [

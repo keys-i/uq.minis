@@ -4,12 +4,17 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
+from types import ModuleType
+from typing import Any, Literal
+from unittest.mock import Mock
 
 import pytest
+import typer
 from typer._completion_classes import BashComplete
 from typer.main import get_command
+from typer.testing import CliRunner
 
 from uq_minis import cli
 from uq_minis.cli.completion import zsh_script
@@ -26,12 +31,19 @@ class TestCompletion:
         ],
         ids=["path", "choice"],
     )
-    def test_tab(self, paths, tab, prefix, options, expected):
+    def test_tab(
+        self,
+        paths: Path,
+        tab: Callable[[str], None],
+        prefix: str,
+        options: dict[str, Any],
+        expected: str,
+    ) -> None:
         tab(prefix)
         assert ask("Choose", **options) == expected
 
     @pytest.mark.skipif(not shutil.which("zsh"), reason="zsh is not installed")
-    def test_zsh(self, tmp_path):
+    def test_zsh(self, tmp_path: Path) -> None:
         root = Path(__file__).resolve().parents[1]
         generated = tmp_path / "completion.zsh"
         generated.write_text(zsh_script())
@@ -78,7 +90,15 @@ _mini_completion
         ],
         ids=["tool", "flag", "choice", "path", "direct", "direct-flag"],
     )
-    def test_generic(self, tmp_path, monkeypatch, module, args, incomplete, expected):
+    def test_generic(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        module: Callable[[str, Callable[..., object]], ModuleType],
+        args: list[str],
+        incomplete: str,
+        expected: list[str],
+    ) -> None:
         def run(source: Path, flavor: Literal["plain", "spicy"] = "plain"):
             pytest.fail("completion must not run the command")
 
@@ -88,11 +108,13 @@ _mini_completion
         completion = BashComplete(get_command(cli.app), {}, "mini", "_MINI_COMPLETE")
         assert [item.value for item in completion.get_completions(args, incomplete)] == expected
 
-    def test_install(self, tmp_path, monkeypatch, runner):
-        import typer.completion
+    def test_install(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    ) -> None:
+        import typer._completion_shared as completion
 
-        monkeypatch.setattr(typer.completion, "_get_shell_name", lambda: "zsh")
-        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr(completion, "_get_shell_name", lambda: "zsh")
+        monkeypatch.setattr(Path, "home", classmethod(Mock(return_value=tmp_path)))
         rc = tmp_path / ".zshrc"
         rc.write_text("# Existing shell configuration\n")
         shown = runner.invoke(cli.app, ["--show-completion"])
@@ -106,7 +128,7 @@ _mini_completion
         assert (tmp_path / ".zfunc/uq-minis.zsh").read_text() == shown.output
 
     @pytest.mark.parametrize("name", ["auth", "event", "scrappy", "timey"])
-    def test_imports(self, name):
+    def test_imports(self, name: str) -> None:
         subprocess.run(
             [
                 sys.executable,
@@ -128,13 +150,23 @@ assert not {"docx", "httpx", "playwright", "prompt_toolkit", "PIL", "yt_dlp", "g
     @pytest.mark.parametrize(
         "app,args,incomplete,expected",
         [
-            (cli.app, [], "", ["add", "rm", "list", "agent", "auth", "event", "scrappy", "timey"]),
+            (
+                cli.app,
+                [],
+                "",
+                ["add", "rm", "list", "agent", "auth", "event", "scrappy", "timey"],
+            ),
             (cli.app, [], "--t", ["--tool"]),
             (cli.app, ["--tool"], "ev", ["event"]),
             (cli.app, ["--tool", "event"], "--l", ["--layout", "--logo"]),
             (cli.app, ["--tool", "event", "--layout"], "f", ["form"]),
             (cli.app, ["--tool=event"], "--layout=f", ["form"]),
-            (cli.app, ["--tool", "event"], "--fo", ["--form", "--force", "--form-profile"]),
+            (
+                cli.app,
+                ["--tool", "event"],
+                "--fo",
+                ["--form", "--force", "--form-profile"],
+            ),
             (cli.app, ["--tool", "event"], "--pr", ["--preview"]),
             (cli.app, ["--tool", "auth", "--browser"], "ch", ["chromium", "chrome"]),
             (cli.app, ["event"], "--fo", ["--form", "--force", "--form-profile"]),
@@ -142,7 +174,12 @@ assert not {"docx", "httpx", "playwright", "prompt_toolkit", "PIL", "yt_dlp", "g
             (cli.app, ["agent", "status"], "--j", ["--json"]),
             (cli.app, ["rm"], "ev", ["event"]),
             (cli.app, ["--tool", "event"], "mov", ["movie night.toml"]),
-            (cli.app, ["--tool", "event", "--form-profile"], "mov", ["movie night.toml"]),
+            (
+                cli.app,
+                ["--tool", "event", "--form-profile"],
+                "mov",
+                ["movie night.toml"],
+            ),
             (cli.app, ["--tool", "event", "--logo"], "mov", ["movie night.toml"]),
             (cli.app, ["--tool", "auth", "-o"], "mov", ["movie night.toml"]),
             (cli.app, ["--tool", "event", "-o"], "ev", [f"events{os.sep}"]),
@@ -170,6 +207,8 @@ assert not {"docx", "httpx", "playwright", "prompt_toolkit", "PIL", "yt_dlp", "g
             "dev",
         ],
     )
-    def test_complete(self, paths, app, args, incomplete, expected):
+    def test_complete(
+        self, paths: Path, app: typer.Typer, args: list[str], incomplete: str, expected: list[str]
+    ) -> None:
         completion = BashComplete(get_command(app), {}, "mini", "_MINI_COMPLETE")
         assert [item.value for item in completion.get_completions(args, incomplete)] == expected
