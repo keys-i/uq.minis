@@ -1,0 +1,33 @@
+[Unit]
+Description=Private UQ workspace %i
+Requires=minis@%i.socket
+After=network-online.target
+BindsTo=minis.service
+
+[Service]
+Type=simple
+DynamicUser=yes
+User=uq-%i
+WorkingDirectory=/var/lib/uq-minis/%i
+StateDirectory=uq-minis/%i
+StateDirectoryMode=0700
+LoadCredential=identity:/var/lib/minis/workspaces/%i.json
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/minis/browsers
+ExecStart=/opt/minis/current/.venv/bin/minis-web
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+InaccessiblePaths=/var/lib/minis /run/minis
+IPAddressDeny=169.254.0.0/16
+LimitFSIZE=512M
+MemoryHigh=256M
+MemoryMax=768M
+TasksMax=256
+KillSignal=SIGINT
+TimeoutStopSec=30

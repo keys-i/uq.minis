@@ -1,0 +1,10 @@
+// Let the gateway start its private sockets and stop idle workspace units
+polkit.addRule(function(action, subject) {
+    if (action.id === "org.freedesktop.systemd1.manage-units" && subject.user === "minis") {
+        var unit = action.lookup("unit"), verb = action.lookup("verb");
+        if (/^minis@[a-f0-9]{24}\.socket$/.test(unit) && (verb === "start" || verb === "stop") ||
+            /^minis@[a-f0-9]{24}\.service$/.test(unit) && verb === "stop") {
+            return polkit.Result.YES;
+        }
+    }
+});

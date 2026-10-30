@@ -1,0 +1,12 @@
+[Unit]
+Description=Private UQ workspace socket %i
+After=minis.service
+BindsTo=minis.service
+
+[Socket]
+ListenStream=/run/minis/%i.sock
+SocketUser=minis
+SocketGroup=minis
+SocketMode=0600
+DirectoryMode=0700
+RemoveOnStop=yes

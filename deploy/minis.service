@@ -1,0 +1,38 @@
+[Unit]
+Description=UQ minis UQ sign-in gateway
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=minis
+Group=minis
+WorkingDirectory=/var/lib/minis
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/minis/browsers
+Environment=MINIS_ORIGIN=https://uni.keysi.dev
+EnvironmentFile=-/etc/minis/service.env
+ExecStart=/opt/minis/current/.venv/bin/minis-web --frontend /opt/minis/current/frontend
+RuntimeDirectory=minis
+RuntimeDirectoryMode=0700
+MemoryHigh=448M
+MemoryMax=512M
+TasksMax=256
+StateDirectory=minis
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadWritePaths=/var/lib/minis
+
+[Install]
+WantedBy=multi-user.target
