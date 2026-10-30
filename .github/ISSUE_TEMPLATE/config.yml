@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a vulnerability privately
+    url: https://github.com/keys-i/uq.minis/security/advisories/new
+    about: Send vulnerability reports exclusively through GitHub private reporting
+  - name: Accessibility guidance
+    url: https://github.com/keys-i/uq.minis/blob/main/docs/ACCESSIBILITY.md
+    about: Find supported options and what to include when reporting a barrier
+  - name: Conduct concerns
+    url: https://github.com/keys-i/uq.minis/blob/main/.github/CODE_OF_CONDUCT.md#report-a-concern
+    about: Find the available contact and platform-reporting options

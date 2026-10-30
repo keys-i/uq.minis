@@ -23,6 +23,10 @@ concurrency:
 env:
   UV_NO_PROGRESS: "1"
 
+defaults:
+  run:
+    working-directory: backend
+
 jobs:
   release:
     runs-on: ubuntu-24.04
@@ -40,7 +44,7 @@ jobs:
           version: "0.13.0"
           python-version: "3.15"
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "backend/uv.lock"
 
       - name: Verify tag matches project version
         env:
@@ -56,13 +60,13 @@ jobs:
           version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
           if not re.fullmatch(r"v\d+\.\d+\.\d+", tag) or tag[1:] != version:
               raise SystemExit(f"tag {tag!r} does not match project version {version!r}")
-          changelog = Path("CHANGELOG.md").read_text()
+          changelog = Path("../CHANGELOG.md").read_text()
           heading = f"\n## {tag}\n"
           if heading not in changelog:
               raise SystemExit(f"changelog has no entry for {tag}")
           notes = changelog.split(heading, 1)[1].split("\n## ", 1)[0].strip()
-          Path(".cache").mkdir(exist_ok=True)
-          Path(".cache/release.md").write_text(notes + "\n")
+          Path("../out/artifacts").mkdir(parents=True, exist_ok=True)
+          Path("../out/artifacts/release.md").write_text(notes + "\n")
           PY
 
       - name: Sync release environment
@@ -78,21 +82,21 @@ jobs:
 
       - name: Build and verify distributions
         run: |
-          uv build --no-sources -o .cache/dist
-          uv run --no-sync twine check .cache/dist/*
-          sha256sum .cache/dist/* > .cache/dist/SHA256SUMS
+          uv build --no-sources -o ../out/artifacts/dist
+          uv run --no-sync twine check ../out/artifacts/dist/*
+          sha256sum ../out/artifacts/dist/* > ../out/artifacts/dist/SHA256SUMS
 
       - name: Attest distributions
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-path: |
-            .cache/dist/*.whl
-            .cache/dist/*.tar.gz
+            out/artifacts/dist/*.whl
+            out/artifacts/dist/*.tar.gz
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create "$GITHUB_REF_NAME"
-          .cache/dist/*.whl .cache/dist/*.tar.gz .cache/dist/SHA256SUMS
-          --title "$GITHUB_REF_NAME" --notes-file .cache/release.md --verify-tag
+          ../out/artifacts/dist/*.whl ../out/artifacts/dist/*.tar.gz ../out/artifacts/dist/SHA256SUMS
+          --title "$GITHUB_REF_NAME" --notes-file ../out/artifacts/release.md --verify-tag

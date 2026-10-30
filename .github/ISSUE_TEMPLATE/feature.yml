@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest an improvement to a student or contributor workflow
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with the person's task and what makes it difficult today
+        Please avoid sharing private student, club or account data
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should this solve?
+      description: Who needs it, which mini is involved, and what currently gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What should happen instead?
+      description: Give a concrete example of the useful result, including browser or CLI needs
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Alternatives, sources or constraints
+      description: Optional — include accessibility needs or official public documentation; don't post credentials

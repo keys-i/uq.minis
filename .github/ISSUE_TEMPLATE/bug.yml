@@ -1,0 +1,45 @@
+name: Bug report
+description: Report a broken browser or CLI workflow, including an accessibility barrier
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem with invented or redacted data
+        Keep tokens, student marks, private announcements and mailbox exports out of this issue
+        For vulnerabilities, follow the [security policy](https://github.com/keys-i/uq.minis/blob/main/.github/SECURITY.md)
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - Browser
+        - CLI
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What happened, and what did you expect?
+      description: Name the mini and the task you were trying to complete
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the smallest safe input or command that shows the problem
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Version and environment
+      description: Include release or commit, operating system, browser or terminal, and relevant Python/Node versions or assistive technology
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted logs, screenshots or other evidence
+      description: Optional — remove credentials, private paths and identifying student data

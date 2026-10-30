@@ -22,6 +22,10 @@ concurrency:
 env:
   UV_NO_PROGRESS: "1"
 
+defaults:
+  run:
+    working-directory: backend
+
 jobs:
   quality:
     runs-on: ubuntu-24.04
@@ -38,23 +42,26 @@ jobs:
           version: "0.13.0"
           python-version: "3.15"
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "backend/uv.lock"
 
       - name: Sync development tools
         run: uv sync --locked
 
       - name: Lint, format and compile
         run: |
-          uv run --no-sync ruff check .
-          uv run --no-sync ruff format --check .
-          uv run --no-sync python -m compileall -q src tools tests
+          uv run --no-sync ruff --config ../tools/config/ruff.toml check . ../tools
+          uv run --no-sync ruff --config ../tools/config/ruff.toml format --check . ../tools
+          uv run --no-sync python -m compileall -q src ../tools tests
+
+      - name: Generate native tool settings
+        run: uv run --no-sync python ../tools/scripts/config.py
 
       - name: Check strict types across source, tests and artwork
         env:
-          UV_PROJECT_ENVIRONMENT: .cache/types
+          UV_PROJECT_ENVIRONMENT: ../out/.cache/types
         run: >-
           uv run --locked --all-extras --no-editable --reinstall-package uq-minis
-          basedpyright --pythonpath .cache/types/bin/python --warnings
+          basedpyright --project ../out/tools/pyrightconfig.json --pythonpath ../out/.cache/types/bin/python --warnings
 
   python:
     needs: quality
@@ -79,7 +86,7 @@ jobs:
           version: "0.13.0"
           python-version: "3.15"
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "backend/uv.lock"
 
       - name: Sync every mini
         run: uv sync --locked --all-extras
@@ -112,7 +119,7 @@ jobs:
       - name: Test with coverage
         run: >-
           uv run --no-sync dev test -q --tb=short
-          --junitxml=.cache/results.xml --cov-report=html
+          --junitxml=../out/test-results/backend.xml --cov-report=html
           ${{ matrix.coverage }}
 
       - name: Keep test and coverage reports
@@ -121,9 +128,9 @@ jobs:
         with:
           name: tests-${{ runner.os }}
           path: |
-            .cache/results.xml
-            .cache/coverage.xml
-            .cache/htmlcov/
+            out/test-results/backend.xml
+            out/coverage/coverage.xml
+            out/coverage/html/
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
@@ -144,25 +151,25 @@ jobs:
           version: "0.13.0"
           python-version: "3.15"
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "backend/uv.lock"
 
       - name: Build and verify distributions
         run: |
           uv sync --locked --no-default-groups --group release
-          uv build --no-sources -o .cache/dist
-          uv run --no-sync twine check .cache/dist/*
-          uv build .cache/dist/*.tar.gz --wheel --no-sources -o .cache/rebuilt
+          uv build --no-sources -o ../out/artifacts/dist
+          uv run --no-sync twine check ../out/artifacts/dist/*
+          uv build ../out/artifacts/dist/*.tar.gz --wheel --no-sources -o ../out/artifacts/rebuilt
 
       - name: Check the installed wheel away from source
         run: |
-          uv run --no-project --with .cache/rebuilt/*.whl python -I - <<'PY'
+          uv run --no-project --with ../out/artifacts/rebuilt/*.whl python -I - <<'PY'
           from importlib.resources import files
           from typer.testing import CliRunner
           from uq_minis.cli import app, tool_names
           from uq_minis.core.art import habitats, poses
           from uq_minis.minis.event.rooms import read
 
-          assert set(tool_names()) == {"agent", "auth", "event", "scrappy", "timey"}
+          assert set(tool_names()) == {"agent", "auth", "clubby", "event", "planny", "scrappy", "timey"}
           assert len(habitats()) == 50
           for name in tool_names():
               result = CliRunner().invoke(app, [name, "--help"])
@@ -172,7 +179,7 @@ jobs:
               "timey/fonts/bungee.ttf",
               "timey/art/plate.png",
               "terminal/forest.toml",
-              *(f"terminal/{name}.toml" for name in habitats()),
+              *(f"terminal/{name}.toml.gz" for name in habitats()),
           ):
               assert files("uq_minis.assets").joinpath(asset).is_file(), asset
           assert not files("uq_minis.assets").joinpath("event/rooms.csv").is_file()
@@ -180,7 +187,6 @@ jobs:
           for name, animal in habitats().items():
               for pose in poses(name):
                   assert animal.picture(4, pose).plain
-          assert files("uq_minis.skills").joinpath("event/SKILL.md").is_file()
           assert files("uq_minis.core").joinpath("uq-event-booking.toml").is_file()
           PY
 
@@ -188,7 +194,35 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: distributions
-          path: .cache/dist/*
+          path: out/artifacts/dist/*
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install uv and Python for configuration generation
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+        with:
+          version: "0.13.0"
+          python-version: "3.15"
+      - name: Use Node for native TypeScript tests
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Check React and build the browser app
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npm run check
