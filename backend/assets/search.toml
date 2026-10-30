@@ -1,0 +1,18 @@
+# == Everyday wording shared by local browser and server searches ==
+stop = "i me my we us our d m ve re a an the please can could would will want wants like looking look find search show get give for to in at on of with about that which are is some any something related interested interest into and or by"
+
+[domains]
+clubs = "club clubs society societies group groups join meet people uq uqu university"
+courses = "course courses study studying learn learning uq university"
+rooms = "room rooms venue venues space find somewhere gather fit fits seat seats people person persons guests capacity least minimum need needs st saint"
+animals = "animal animals resident residents live lives living from"
+announcements = "event events announcement announcements upcoming happening something"
+
+[synonyms]
+gaming = ["gaming", "games", "game", "esports"]
+coding = ["coding", "programming", "software"]
+maths = ["maths", "math", "mathematics", "mathematical"]
+stats = ["stats", "statistics", "statistical"]
+photography = ["photography", "photo", "photographic"]
+hiking = ["hiking", "hike", "bushwalking", "outdoor"]
+birds = ["bird", "birds", "eagle", "parakeet", "pigeon", "kakapo", "kākāpō", "vulture", "huia", "bustard", "florican", "penguin", "auk", "dodo"]

@@ -1,0 +1,1427 @@
+import asyncio
+import os
+import random
+import webbrowser
+from collections.abc import Callable
+from dataclasses import replace
+from datetime import date
+from datetime import time as Time
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, Literal, cast
+from unittest.mock import AsyncMock, Mock
+
+import pytest
+import typer.rich_utils as rich_utils
+from prompt_toolkit.buffer import Buffer, CompletionState
+from prompt_toolkit.completion import CompleteEvent, Completion
+from prompt_toolkit.data_structures import Point
+from prompt_toolkit.document import Document
+from prompt_toolkit.input import PipeInput
+from prompt_toolkit.layout import HSplit, Layout, Window
+from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.layout.menus import CompletionsMenuControl
+from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
+from prompt_toolkit.styles import merge_styles
+from prompt_toolkit.styles.defaults import default_ui_style
+from rich.cells import cell_len
+from rich.progress import Progress
+from rich.text import Text
+from typer.testing import CliRunner
+
+from tests.fixtures import Canvas, Keys, Screen, columns, parts
+from uq_minis.core import art, terminal
+from uq_minis.core.common import MiniError
+from uq_minis.core.terminal import application, ask, clock, confirm, day, number
+
+
+def test_lookup(pipe: PipeInput, entry: Mock, monkeypatch: pytest.MonkeyPatch) -> None:
+    buffer = Buffer()
+    monkeypatch.setattr(
+        "prompt_toolkit.application.get_app", lambda: SimpleNamespace(current_buffer=buffer)
+    )
+    monkeypatch.setattr(asyncio, "sleep", AsyncMock())
+    provider = AsyncMock(return_value=[f"Suggestion {index}" for index in range(12)])
+    ask("Search", lookup=provider)
+    completer = entry.call_args.kwargs["completer"]
+
+    async def read(value: str):
+        buffer.document = Document(value)
+        return [
+            item
+            async for item in completer.get_completions_async(
+                buffer.document, CompleteEvent(text_inserted=True)
+            )
+        ]
+
+    async def run():
+        for index in range(33):
+            results = await read(f"query {index}")
+            assert len(results) == 10 and results[0].start_position == -len(buffer.text)
+        await read("query 32")
+        assert provider.call_count == 33
+        await read("query 0")
+        assert provider.call_count == 34
+        assert [
+            item
+            async for item in completer.get_completions_async(Document("obsolete"), CompleteEvent())
+        ] == []
+        assert [
+            item
+            async for item in completer.get_completions_async(
+                Document("middle", 2), CompleteEvent()
+            )
+        ] == []
+        assert provider.call_count == 34
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("changed", [True, False], ids=["new-query", "prompt-closed"])
+def test_abort(
+    pipe: PipeInput, entry: Mock, monkeypatch: pytest.MonkeyPatch, changed: bool
+) -> None:
+    buffer = Buffer(document=Document("forest"))
+    monkeypatch.setattr(
+        "prompt_toolkit.application.get_app", lambda: SimpleNamespace(current_buffer=buffer)
+    )
+    monkeypatch.setattr(asyncio, "sleep", AsyncMock())
+
+    async def run():
+        started, closed = asyncio.Event(), asyncio.Event()
+
+        async def provider(query: str):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+                return [query]
+            finally:
+                closed.set()
+
+        ask("Search", lookup=provider)
+        completer = entry.call_args.kwargs["completer"]
+
+        async def read():
+            return [
+                item
+                async for item in completer.get_completions_async(buffer.document, CompleteEvent())
+            ]
+
+        task = asyncio.create_task(read())
+        await started.wait()
+        if changed:
+            buffer.text = "new query"
+            assert await task == []
+        else:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert closed.is_set()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("replace", [False, True], ids=["typing", "replace-query"])
+def test_predictions(canvas: Canvas, keys: Keys, replace: bool) -> None:
+    frames = canvas(140, 34, reply=("forest walk", "\t\n"))
+
+    async def provider(query: str) -> list[str]:
+        if query == "first":
+            await asyncio.sleep(10)
+        return [query + " sounds", query + " walk"]
+
+    keys(*(["first", "\x15forest"] if replace else ["forest"]), interval=0.5)
+    assert ask("Search YouTube", paths=True, lookup=provider) == "forest sounds"
+    assert any("forest walk" in row for frame in frames for row in frame)
+
+
+@pytest.mark.parametrize("fails", [False, True], ids=["sample", "recoverable-error"])
+def test_samples(canvas: Canvas, keys: Keys, fails: bool) -> None:
+    expected = "Sample unavailable" if fails else "Second font sample"
+    frames = canvas(140, 34, reply=(expected, "\n"))
+    closed: list[str] = []
+
+    async def provider(key: str) -> art.Preview:
+        if key == "first":
+            try:
+                await asyncio.sleep(10)
+            finally:
+                closed.append(key)
+        if fails:
+            raise MiniError("Font is offline")
+        return art.Preview(Text("Second font sample"), "Second font sample")
+
+    keys("first", "\x15second", interval=0.45)
+    assert (
+        ask("Font", suggestions={"first": "First", "second": "Second"}, previewer=provider)
+        == "second"
+    )
+    assert closed == ["first"]
+    assert any(expected in row for frame in frames for row in frame)
+
+
+def test_choice(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _, app = cursor
+    buffer = Buffer()
+    monkeypatch.setattr(buffer, "start_completion", Mock())
+    buffer.complete_state = CompletionState(Document(), [Completion("first"), Completion("second")])
+    app.current_buffer = buffer
+    app.layout = Layout(Window(CompletionsMenuControl()))
+    ask(
+        "Font",
+        choices=("first", "second"),
+        previews={"second": art.Preview(Text("Second face"), "Second face")},
+    )
+    entry.call_args.kwargs["pre_run"]()
+    panel = columns(app).children[1]
+    assert isinstance(panel, HSplit)
+    control = cast(CompletionsMenuControl, cast(Window, panel.children[1]).content)
+    control.mouse_handler(
+        MouseEvent(Point(0, 1), MouseEventType.MOUSE_MOVE, MouseButton.NONE, frozenset())
+    )
+    assert buffer.text == "second" and buffer.complete_state is not None
+    assert "Second face" in "".join(part[1] for part in parts(columns(app).children[0]))
+    app.exit.assert_not_called()
+    control.mouse_handler(
+        MouseEvent(Point(0, 1), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset())
+    )
+    assert buffer.text == "second" and buffer.complete_state is None
+
+
+@pytest.mark.parametrize(
+    "prompt,options,input,expected",
+    [
+        (ask, {"required": True}, "\nvalue\n", "value"),
+        (ask, {"choices": ("chosen",)}, "wrong\nchosen\n", "chosen"),
+        (ask, {}, "\n", ""),
+        (confirm, {"default": True}, "n\n", False),
+        (number, {"default": 1.0}, "bad\n1.5\n", 1.5),
+    ],
+    ids=["required", "choice", "optional", "confirmation", "number"],
+)
+def test_prompts(
+    prompt: Callable[..., Any],
+    options: dict[str, Any],
+    input: str,
+    expected: bool | float | str,
+    runner: CliRunner,
+) -> None:
+    app = application()
+    answers: list[str] = []
+
+    @app.command()
+    def run():
+        answers.append(prompt("Prompt", **options))
+
+    result = runner.invoke(app, [], input=input)
+    assert result.exit_code == 0, result.output
+    assert answers == [expected]
+
+
+@pytest.mark.parametrize(
+    "keys_,default,expected",
+    [
+        (("\x1b[B", "\n"), "", "first"),
+        (("\x1b[B", "\x1b[B", "\n"), "", "second"),
+        (("\x1b[A", "\n"), "", "second"),
+        (("sec", "\t", "\n"), "", "second"),
+        (("\n",), "first", "first"),
+    ],
+    ids=["down", "next", "up", "filter", "default"],
+)
+def test_choices(
+    pipe: PipeInput,
+    keys: Keys,
+    keys_: tuple[str, str, str] | tuple[str, str] | tuple[str],
+    default: str,
+    expected: str,
+) -> None:
+    keys(*keys_)
+    assert (
+        ask(
+            "Pick one",
+            choices={"first": "First choice", "second": "Second choice"},
+            default=default,
+        )
+        == expected
+    )
+
+
+def test_cancel(pipe: PipeInput, keys: Keys) -> None:
+    keys("\x03")
+    with pytest.raises(KeyboardInterrupt):
+        ask("Pick one", choices=("first", "second"))
+
+
+@pytest.mark.parametrize("key", ["\x1b", "\x1b[1;3D"], ids=["escape", "alt-left"])
+def test_back(canvas: Canvas, keys: Keys, key: str) -> None:
+    frames = canvas()
+    keys(key)
+    with terminal.habitat("quoll"), pytest.raises(terminal.Back):
+        ask("Video", required=True)
+    assert any("← menu" in row for frame in frames for row in frame)
+    assert terminal._DRAFT.get() is None
+
+
+@pytest.mark.parametrize("width", [40, 80], ids=["compact", "wide"])
+def test_shortcuts(canvas: Canvas, keys: Keys, width: int) -> None:
+    frames = canvas(width=width, reply=(terminal._key("Ctrl+U"), "?done\n"))
+    keys("?")
+    assert ask("Name") == "done"
+    assert any(terminal._key("Ctrl+U") in row for frame in frames for row in frame)
+    assert any("keys" in row for frame in frames for row in frame)
+
+
+@pytest.mark.parametrize(
+    "os,ctrl,alt",
+    [("darwin", "⌃", "⌥"), ("win32", "Ctrl+", "Alt+"), ("linux", "Ctrl+", "Alt+")],
+)
+def test_os(
+    canvas: Canvas, keys: Keys, monkeypatch: pytest.MonkeyPatch, os: str, ctrl: str, alt: str
+) -> None:
+    monkeypatch.setattr(terminal, "sys", SimpleNamespace(platform=os))
+    frames = canvas(reply=(ctrl + "U", "?done\n"))
+    keys("?")
+    assert ask("Name") == "done"
+    view = "\n".join(row for frame in frames for row in frame)
+    assert ctrl + "U" in view
+    assert alt + "M" in view
+    assert alt + "A" in view
+
+
+@pytest.mark.parametrize("moving", [False, True])
+def test_marquee(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+    moving: bool,
+) -> None:
+    monkeypatch.setenv("MINI_MOTION", "1" if moving else "0")
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    buffer, clock, app = cursor
+    first = "first · " + "a long description " * 4
+    buffer.complete_state.completions = [
+        Completion("first", display=first),
+        Completion("second", display="second · another long description"),
+    ]
+    buffer.complete_state.current_completion = buffer.complete_state.completions[0]
+    app.layout = Layout(Window(CompletionsMenuControl()))
+    ask("Name", choices={"first": first, "second": "Second"})
+    entry.call_args.kwargs["pre_run"]()
+    panel = columns(app).children[1]
+    assert isinstance(panel, HSplit)
+    menu = cast(CompletionsMenuControl, cast(Window, panel.children[1]).content)
+
+    def line(width: int):
+        return "".join(part[1] for part in menu.create_content(width, 2).get_line(0))
+
+    before = line(24)
+    clock.return_value = 2
+    assert (line(24) != before) is moving
+    assert buffer.complete_state.current_completion.text == "first"
+    assert cell_len(line(18)) == 18
+    assert "a long description" not in "".join(part[1] for part in parts(panel.children[-1]))
+    buffer.complete_state.complete_index = 1
+    buffer.complete_state.current_completion = buffer.complete_state.completions[1]
+    assert "second" in "".join(part[1] for part in menu.create_content(24, 2).get_line(1))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a long caption to scroll",
+        "很長的標題需要捲動顯示更多文字",
+        "Café déjà vu · a long caption",
+    ],
+)
+def test_caption(text: str) -> None:
+    frames = [terminal._marquee(text, 8, elapsed) for elapsed in (0, 0.5, 1, 2, 3)]
+    assert all(cell_len(frame) == 8 for frame in frames)
+    assert frames[0] == frames[1]
+    assert len(set(frames)) > 1
+
+
+@pytest.mark.parametrize("width", [40, 80])
+def test_scroll(canvas: Canvas, keys: Keys, width: int) -> None:
+    frames = canvas(width=width)
+    keys("\x1b[B", "\n", interval=3.2)
+    label = "ABCDEFGHIJKLMNOPQRSTUVWXYZ · " + "Long description " * 6
+    assert ask("Name", choices={"first": label, "second": "Short label"}) == "first"
+    selected = {row[row.index("ABC") :] for frame in frames for row in frame if "ABC" in row}
+    assert len(selected) > 1
+    assert any(
+        "FGHIJKLMNOPQRSTUVWXYZ" in row and "ABC" not in row for frame in frames for row in frame
+    )
+
+
+@pytest.mark.parametrize("name", list(art.habitats()))
+@pytest.mark.parametrize("moving", [False, True])
+def test_pokes(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    moving: bool,
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    monkeypatch.setenv("MINI_MOTION", "1" if moving else "0")
+    with terminal.habitat(name):
+        look = terminal._look()
+        ask("Name")
+        entry.call_args.kwargs["pre_run"]()
+        _, clock, app = cursor
+        control = app.layout.container.content.children[0].children[0].content
+        x, y = next(
+            (x + 2, y)
+            for y, row in enumerate(look.drawing()["hit"].splitlines())
+            for x, region in enumerate(row)
+            if region == "2"
+        )
+        click = MouseEvent(Point(x, y), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset())
+        for count in range(4):
+            control.mouse_handler(click)
+            view = "".join(text for _, text in control.text())
+            assert any(" ".join(line.split()[:4]) in view for line in look.quip.split("|")) is (
+                count > 2
+            )
+        clock.return_value = 5
+        view = "".join(text for _, text in control.text())
+        assert not any(" ".join(line.split()[:4]) in view for line in look.quip.split("|"))
+        assert app.refresh_interval == (1 / art.FPS if moving else 0)
+
+
+@pytest.mark.parametrize("name", list(art.habitats()))
+@pytest.mark.parametrize("width,height", [(40, 16), (73, 26), (80, 28)])
+def test_regions(name: str, width: int, height: int) -> None:
+    look = art.habitats()[name]
+    size = width, height
+    picture = look.picture(size=size)
+    assert len(picture.plain.splitlines()) == height
+    assert {cell_len(row) for row in picture.plain.splitlines()} == {width + 2}
+    assert "7" in look.tone
+    for pose, frames in art.poses(name).items():
+        for index in (0, len(frames) // 2):
+            rows = look.drawing(index, pose, size)["hit"].splitlines()
+            assert len(rows) == height
+            assert {len(row) for row in rows} == {width}
+            targets = {
+                look.region(index, pose, x + 2, y, size)
+                for y, row in enumerate(rows)
+                for x in range(len(row))
+            }
+            assert targets == {None, "ears", "pet", "object"}
+    assert look.region(0, "idle", -1, 0) is None
+    assert look.region(0, "idle", 0, -1) is None
+    assert look.region(0, "idle", width + 2, height, size) is None
+
+
+def test_flag() -> None:
+    look = art.habitats()["numbat"]
+    other = replace(look, flag="#69baff #ffffff #ff6a99")
+    assert look.picture().plain == other.picture().plain
+    assert look.picture().spans != other.picture().spans
+    assert look.colours()[0][:4] == other.colours()[0][:4]
+    assert look.colours()[3] != other.colours()[3]
+
+
+@pytest.mark.parametrize("country", art.flags())
+def test_flags(country: str) -> None:
+    flag = art.flags()[country]
+    assert not flag.code or len(flag.code) == 2 and flag.code.isupper()
+    assert len(flag.rows) in {12, 24} and all(len(row) == 24 for row in flag.rows)
+    assert 0 < flag.ratio <= 2
+    assert all(int(cell, 16) < len(flag.colours) for row in flag.rows for cell in row)
+    assert all(len(colour) == 7 and colour.startswith("#") for colour in flag.colours)
+    assert flag.colour(-1, -1) == flag.colour(0, 0)
+    assert flag.colour(2, 2) == flag.colour(1, 1)
+    dots = flag.picture().split("\n")
+    assert len(dots) == 3
+    assert all(row.cell_len == (round(12 * flag.ratio) + 1) // 2 for row in dots)
+    assert all(char in " \n" or "\u2800" <= char <= "\u28ff" for char in flag.picture().plain)
+
+
+@pytest.mark.parametrize(
+    "countries", ["Russia · China", "India · Pakistan", "Rwanda · Uganda · DR Congo"]
+)
+def test_countries(countries: str) -> None:
+    look = replace(art.habitats()["numbat"], country=countries)
+    rendered = look.countries()
+    assert all(name in rendered.plain for name in countries.split(" · "))
+    assert all(" on " not in str(span.style) for span in rendered.spans)
+    assert look.countries().spans == rendered.spans
+    for name in countries.split(" · "):
+        assert name in art.flags()
+    assert len(look.countries(38).split("\n")) >= len(rendered.split("\n"))
+    assert "\n" not in look.countries(compact=True).plain
+
+
+def test_layouts() -> None:
+    flags = art.flags()
+    samples = [(x / 12, y / 6) for y in range(6) for x in range(12)]
+    assert (
+        len({
+            tuple(flags[name].colour(x, y) for x, y in samples)
+            for name in ("Australia", "New Zealand", "Russia", "United States", "Cuba")
+        })
+        == 5
+    )
+    look = art.habitats()["numbat"]
+    assert "World oceans" in replace(look, country="World oceans").countries().plain
+    assert "Western Australia" in look.countries().plain
+
+
+@pytest.mark.parametrize(
+    "country", [name for name, flag in art.flags().items() if flag.code and name != "Nepal"]
+)
+def test_dense(country: str) -> None:
+    flag = art.flags()[country]
+    # Every dot in a rectangular flag stays filled, including mixed-colour cells
+    width = round(12 * flag.ratio)
+    assert flag.picture().plain.split("\n") == ["⣿" * (width // 2) + "⡇" * (width % 2)] * 3
+    assert all(str(span.style) in flag.colours for span in flag.picture().spans)
+
+
+def test_hover(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    ask("Name")
+    entry.call_args.kwargs["pre_run"]()
+    _, clock, app = cursor
+    control = app.layout.container.content.children[0].children[0].content
+    look = terminal._look()
+    x, y = next(
+        (x + 2, y)
+        for y, row in enumerate(look.drawing()["hit"].splitlines())
+        for x, region in enumerate(row)
+        if region == "1"
+    )
+    control.mouse_handler(
+        MouseEvent(Point(x, y), MouseEventType.MOUSE_MOVE, MouseButton.NONE, frozenset())
+    )
+    clock.return_value = 0.5
+    assert "".join(text for _, text in control.text()).startswith(
+        look.picture(art.FPS // 2, "peek").plain
+    )
+
+
+def test_paint(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    _, _, app = cursor
+    app.renderer = SimpleNamespace(last_rendered_screen=None)
+    look = terminal._look()
+    art.Habitat.picture.cache_clear()
+    art.Habitat.drawing.cache_clear()
+    load = Mock(wraps=art.poses)
+    monkeypatch.setattr(art, "poses", load)
+    ask("Name")
+    entry.call_args.kwargs["pre_run"]()
+    control = app.layout.container.content.children[0].children[0].content
+    assert "".join(value for _, value in control.text()).startswith(look.picture().plain)
+    load.assert_not_called()
+    app.renderer.last_rendered_screen = object()
+    control.text()
+    load.assert_called_with(look.animal)
+
+
+@pytest.mark.parametrize(
+    "url,result,message",
+    [
+        ("https://example.org/animal", True, ""),
+        ("https://example.org/animal", False, "Browser unavailable"),
+        ("https://example.org/animal", OSError("offline"), "Browser unavailable"),
+        ("file:///etc/passwd", True, "Animal page unavailable"),
+        ("https://user:secret@example.org/", True, "Animal page unavailable"),
+        ("https://[broken", True, "Animal page unavailable"),
+    ],
+    ids=["opens", "no-browser", "browser-error", "local-file", "credentials", "malformed"],
+)
+def test_species(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+    url: str,
+    result: bool | OSError,
+    message: str,
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    look = replace(art.habitats()["numbat"], source=url)
+    monkeypatch.setattr(terminal, "_look", lambda: look)
+    browser = Mock(side_effect=result) if isinstance(result, OSError) else Mock(return_value=result)
+    monkeypatch.setattr(webbrowser, "open", browser)
+    ask("Name")
+    entry.call_args.kwargs["pre_run"]()
+    _, _, app = cursor
+    portrait = columns(app).children[0]
+    assert isinstance(portrait, Window)
+    control = portrait.content
+    assert isinstance(control, FormattedTextControl)
+    assert any(
+        "underline" in style and look.name + " ↗" in value for style, value, *_ in parts(portrait)
+    )
+    point = Point(3, 16)
+    control.mouse_handler(
+        MouseEvent(point, MouseEventType.MOUSE_MOVE, MouseButton.NONE, frozenset())
+    )
+    assert any("bg:" in style and look.name in value for style, value, *_ in parts(portrait))
+    control.mouse_handler(MouseEvent(point, MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset()))
+    right = columns(app).children[1]
+    assert isinstance(right, HSplit)
+    footer = parts(right.children[-1])
+    if message:
+        assert message in "".join(value for _, value, *_ in footer)
+    assert browser.call_count == int(url == "https://example.org/animal")
+    app.exit.assert_not_called()
+
+
+def test_page(canvas: Canvas, keys: Keys, monkeypatch: pytest.MonkeyPatch) -> None:
+    frames = canvas()
+    browser = Mock(return_value=True)
+    monkeypatch.setattr(webbrowser, "open", browser)
+    keys("\x1ba", "done\n")
+    assert ask("Name") == "done"
+    browser.assert_called_once_with(terminal._look().source)
+    assert any(terminal._look().name + " ↗" in row for frame in frames for row in frame)
+
+
+def test_pause(canvas: Canvas, keys: Keys, monkeypatch: pytest.MonkeyPatch) -> None:
+    frames = canvas()
+    monkeypatch.setattr(terminal, "still", False)
+    keys("\x1bm", "first\n")
+    assert ask("Name") == "first"
+    assert terminal.still
+    assert any("play" in row for frame in frames for row in frame)
+    keys("\x1bm", "second\n")
+    assert ask("Name") == "second"
+    assert not terminal.still
+
+
+def test_complete(canvas: Canvas, keys: Keys) -> None:
+    frames = canvas(reply=("second", "\t\n"))
+    keys("\x00")
+    assert ask("Name", suggestions=("first", "second")) == "first"
+    assert any("second" in row for frame in frames for row in frame)
+
+
+@pytest.mark.parametrize("no_color", [False, True], ids=["colour", "monochrome"])
+def test_focus(
+    pipe: PipeInput, entry: Mock, monkeypatch: pytest.MonkeyPatch, no_color: bool
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", no_color)
+    assert ask("Pick one", choices=("first",)) == "first"
+    styles = merge_styles([default_ui_style(), entry.call_args.kwargs["style"]])
+    focus = styles.get_attrs_for_style_str("class:completion-menu.completion.current")
+    assert focus.reverse is no_color
+    if not no_color:
+        assert focus.bgcolor == art.blend(
+            terminal.COLOURS["surface"], terminal._look().primary, 0.18
+        ).lstrip("#")
+        assert focus.color == terminal.COLOURS["text"].lstrip("#")
+
+
+@pytest.mark.parametrize("name", list(art.habitats()))
+@pytest.mark.parametrize("moving", [False, True])
+def test_palette(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    moving: bool,
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    monkeypatch.setenv("MINI_MOTION", "1" if moving else "0")
+    buffer, clock, app = cursor
+    buffer.complete_state.completions = [
+        Completion(value) for value in ("first", "second", "third")
+    ]
+    app.layout = Layout(Window(CompletionsMenuControl()))
+    with terminal.habitat(name):
+        ask("Name", choices=("first", "second", "third"))
+        entry.call_args.kwargs["pre_run"]()
+        styles = entry.call_args.kwargs["style"]
+        colours = {
+            styles.get_attrs_for_style_str(f"class:{field}").color
+            for field in ("animal", "status", "country", "place")
+        }
+        assert len(colours) == 4
+        assert (
+            styles.get_attrs_for_style_str("class:row0").bgcolor
+            != styles.get_attrs_for_style_str("class:row1").bgcolor
+        )
+        layout = columns(app)
+        portrait = "".join(part[1] for part in parts(layout.children[0]))
+        assert all(
+            value in portrait
+            for value in (
+                terminal._look().name,
+                terminal._look().status[:3],
+                terminal._look().country[:3],
+                terminal._look().place[:3],
+            )
+        )
+        panel = layout.children[1]
+        assert isinstance(panel, HSplit)
+        menu = cast(CompletionsMenuControl, cast(Window, panel.children[1]).content).create_content(
+            30, 3
+        )
+        assert "class:row1" in menu.get_line(1)[0][0]
+        assert "class:row0" in menu.get_line(2)[0][0]
+        assert "class:row" not in menu.get_line(0)[0][0]
+        labels = [part for part in parts(layout.children[0]) if part[0].startswith("class:")]
+        clock.return_value = 4
+        changed = [part for part in parts(layout.children[0]) if part[0].startswith("class:")]
+        assert (labels != changed) is moving
+
+
+@pytest.mark.parametrize("moving", [False, True], ids=["still", "animated"])
+def test_motion(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+    moving: bool,
+) -> None:
+    monkeypatch.setenv("MINI_MOTION", "1" if moving else "0")
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    ask("Pick one", choices=("first",))
+    options = entry.call_args.kwargs
+    assert options["refresh_interval"] == (1 / art.FPS if moving else 0)
+    options["pre_run"]()
+    buffer, clock, app = cursor
+    layout = app.layout.container.content.children[0]
+    message = layout.children[0].content.text
+    before = message()
+    footer = layout.children[1].children[-1].content.text
+    clock.return_value = 0.25
+    assert (before != message()) is moving
+    buffer.text = "first"
+    assert "enter" in footer()[0][1]
+    buffer.complete_state.current_completion = SimpleNamespace(text="first")
+    assert "enter to choose" in footer()[0][1]
+    assert footer()[0][0] == "class:chosen"
+    assert app.erase_when_done
+    if moving:
+        message()
+        clock.return_value = 0.75
+        assert "".join(text for _, text in message()) != terminal._look().picture().plain
+        buffer.text = ""
+        buffer.complete_state.current_completion = None
+        clock.return_value = 3
+        first = message()
+        clock.return_value = 3.5
+        second = message()
+        assert first != second
+        clock.return_value = 5
+        assert len("".join(text for _, text in message()).splitlines()) == 20
+
+
+@pytest.mark.parametrize("name", list(art.habitats()))
+def test_routines(name: str) -> None:
+    look = art.habitats()[name]
+    other: set[str] = set[str]().union(
+        *(set(pet.idle.split()[:4]) for pet in art.habitats().values() if pet != look)
+    )
+    for routine in look.idle.split()[:4]:
+        assert routine not in other
+        frames = art.poses(name)[routine]
+        assert look.seconds(routine) >= 2
+        assert len({frame["art"] for frame in frames}) > 8
+        assert look.picture(0, routine).plain == look.picture().plain
+        assert look.picture(len(frames) - 1, routine).plain == look.picture().plain
+
+
+def test_interrupt(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    monkeypatch.setattr(random, "choice", Mock(return_value="wander"))
+    ask("Name")
+    entry.call_args.kwargs["pre_run"]()
+    buffer, clock, app = cursor
+    control = app.layout.container.content.children[0].children[0].content
+    clock.return_value = 3
+    control.text()
+    clock.return_value = 5
+    assert "".join(text for _, text in control.text()).startswith(
+        terminal._look().picture(art.FPS * 2, "wander").plain
+    )
+    buffer.text = "hello"
+    control.text()
+    clock.return_value = 5.5
+    assert "".join(text for _, text in control.text()).startswith(
+        terminal._look().picture(art.FPS // 2, "listen").plain
+    )
+
+
+def test_button(
+    pipe: PipeInput, entry: Mock, cursor: tuple[SimpleNamespace, Mock, SimpleNamespace]
+) -> None:
+    with terminal.habitat("quoll"):
+        ask("Name")
+        entry.call_args.kwargs["pre_run"]()
+        _, _, app = cursor
+        footer = app.layout.container.content.children[0].children[1].children[0].content.text
+        fragment = next(part for part in footer() if "← menu" in part[1])
+        for event, style in (
+            (MouseEventType.MOUSE_MOVE, "hot"),
+            (MouseEventType.MOUSE_DOWN, "pressed"),
+        ):
+            fragment[2](MouseEvent(Point(0, 0), event, MouseButton.LEFT, frozenset()))
+            assert next(part for part in footer() if "← menu" in part[1])[0] == f"class:{style}"
+        fragment[2](MouseEvent(Point(0, 0), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset()))
+        assert isinstance(app.exit.call_args.kwargs["exception"], terminal.Back)
+
+
+@pytest.mark.parametrize("name", list(art.habitats()))
+def test_habitat(screen: Screen, name: str) -> None:
+    original = terminal._look()
+    option = rich_utils.STYLE_OPTION
+    for width in (28, 80):
+        console, output = screen(width=width, live=True)
+        accent = console.get_style("accent")
+        with pytest.raises(KeyboardInterrupt), terminal.habitat(name):
+            look = terminal._look()
+            terminal.intro("A mini", "Something useful to make")
+            colour = console.get_style("accent").color
+            assert colour is not None and colour.get_truecolor().hex == look.primary
+            frames = [look.picture(frame) for frame in range(24)]
+            assert len({frame.plain for frame in frames}) == 1
+            assert {cell_len(row) for row in frames[0].plain.splitlines()} == {42}
+            for pose in art.poses(name):
+                picture = look.picture(4, pose)
+                assert len(picture.plain.splitlines()) == 16
+                assert {cell_len(row) for row in picture.plain.splitlines()} == {42}
+                assert picture != frames[0], f"{name}: {pose}"
+            raise KeyboardInterrupt
+        assert terminal._look() is original
+        assert rich_utils.STYLE_OPTION == option
+        assert console.get_style("accent") == accent
+        rendered = Text.from_ansi(output.getvalue()).plain
+        assert "A mini" in rendered
+        assert all(cell_len(line) <= width for line in rendered.splitlines())
+
+
+@pytest.mark.parametrize(
+    "width,rows,no_color,art",
+    [
+        (80, 24, False, True),
+        (40, 24, False, False),
+        (80, 12, False, False),
+        (80, 24, True, True),
+        (112, 32, False, True),
+        (140, 34, False, True),
+        (240, 40, False, True),
+    ],
+    ids=["wide", "narrow", "short", "monochrome", "detailed", "full", "ultrawide"],
+)
+def test_layout(canvas: Canvas, width: int, rows: int, no_color: bool, art: bool) -> None:
+    frames = canvas(width, rows, no_color, reply=("First choice", "\x1b[B\n"))
+    with terminal.habitat("quoll"):
+        assert (
+            ask(
+                "Choose a background video, search YouTube or enter a local file path",
+                choices={"first": "First choice", "second": "Second choice"},
+            )
+            == "first"
+        )
+    view = "\n".join(row for frame in frames for row in frame)
+    assert "First choice" in view
+    assert "Window too small" not in view
+    assert any("\u2800" <= char <= "\u28ff" for char in view) is art
+    if art:
+        limit = 34 if width >= 160 else 32 if width >= 140 else 26 if width >= 112 else 22
+        assert all(not any(row.strip() for row in frame[limit:]) for frame in frames)
+        assert all(
+            min(96, round(width * 0.55)) + 2
+            <= row.index("first")
+            <= min(96, round(width * 0.55)) + 4
+            for frame in frames
+            for row in frame
+            if "First choice" in row
+        )
+
+
+@pytest.mark.parametrize(
+    "width,rows,term",
+    [(60, 24, "xterm-256color"), (80, 12, "xterm-256color"), (80, 24, "dumb")],
+    ids=["narrow", "short", "plain"],
+)
+def test_portrait(
+    canvas: Canvas,
+    keys: Keys,
+    screen: Screen,
+    monkeypatch: pytest.MonkeyPatch,
+    width: int,
+    rows: int,
+    term: str,
+) -> None:
+    canvas(width, rows, True)
+    console, output = screen(width=width, live=True, no_color=True)
+    monkeypatch.setenv("TERM", term)
+    if term == "dumb":
+        monkeypatch.setattr(console, "input", Mock(return_value="first"))
+    else:
+        keys("first\n")
+    with terminal.habitat("quoll"):
+        assert ask("Pick one", choices=("first", "second")) == "first"
+        view = Text.from_ansi(output.getvalue()).plain
+        assert terminal._look().name in view
+        assert terminal._look().place in view
+        assert any("\u2800" <= char <= "\u28ff" for char in view)
+        assert all(cell_len(row) <= width for row in view.splitlines())
+
+
+@pytest.mark.parametrize("failed", [False, True], ids=["open", "recover"])
+def test_linked(canvas: Canvas, keys: Keys, failed: bool) -> None:
+    frames = canvas()
+    action = Mock(side_effect=MiniError("Photo unavailable") if failed else None)
+    keys("\x1b[B", "\x1b[C", "\x1b[D", "\n")
+    assert (
+        ask(
+            "Room",
+            choices=("first", "second"),
+            actions={"right": ("photo", action), "left": ("tour", action)},
+        )
+        == "first"
+    )
+    assert action.call_count == 2 and all(call.args == ("first",) for call in action.call_args_list)
+    view = "\n".join(row for frame in frames for row in frame)
+    assert "→ photo" in view and "← tour" in view
+    assert ("Photo unavailable" in view) is failed
+
+
+def test_quiet(canvas: Canvas, keys: Keys, capsys: pytest.CaptureFixture[str]) -> None:
+    frames = canvas()
+    keys("wrong\n", "first\n")
+    assert ask("Pick one", choices=("first",)) == "first"
+    keys("2\n")
+    assert number("How many", default=1) == 2
+    assert not any("✓ ›" in row for frame in frames for row in frame)
+    assert "Pick one: first" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("control", ["slider", "dial"])
+@pytest.mark.parametrize(
+    "inputs,expected",
+    [
+        (("\x1b[C", "\x1b[C", "\x1b[D", "\n"), 110),
+        (("200", "\x1b[C", "\n"), 200),
+        (("nan\n", "-1\n", "50\n"), 50),
+    ],
+    ids=["arrows", "limit", "validation"],
+)
+def test_controls(
+    canvas: Canvas,
+    keys: Keys,
+    control: Literal["slider", "dial"],
+    inputs: tuple[str, ...],
+    expected: int,
+) -> None:
+    frames = canvas(80, 24)
+    keys(*inputs)
+    assert (
+        number(
+            "Loudness",
+            default=100,
+            minimum=0,
+            maximum=200,
+            step=10,
+            control=control,
+            unit="%",
+        )
+        == expected
+    )
+    assert not any("Window too small" in row for frame in frames for row in frame)
+    assert any("%" in row for frame in frames for row in frame)
+
+
+@pytest.mark.parametrize("control", ["slider", "dial"])
+def test_meter(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    control: Literal["slider", "dial"],
+) -> None:
+    entry.return_value = "100"
+    number("Loudness", default=100, minimum=0, maximum=200, step=10, control=control)
+    entry.call_args.kwargs["pre_run"]()
+    buffer, _, app = cursor
+    buffer.text = "100"
+    panel = cast(HSplit, columns(app).children[1])
+    footer = cast(Window, panel.children[-1])
+    part = parts(footer)[2 if control == "dial" else 0]
+    assert len(part) == 3
+    part[2](MouseEvent(Point(25, 0), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset()))
+    assert buffer.text == ("110" if control == "dial" else "200")
+    part = parts(footer)[0]
+    assert len(part) == 3
+    part[2](MouseEvent(Point(0, 0), MouseEventType.SCROLL_DOWN, MouseButton.NONE, frozenset()))
+    assert buffer.text == ("100" if control == "dial" else "190")
+
+
+@pytest.mark.parametrize("count", [2, 5, 9])
+@pytest.mark.parametrize("width,rows", [(40, 8), (60, 12), (80, 24), (100, 28), (140, 34)])
+def test_review(canvas: Canvas, keys: Keys, width: int, rows: int, count: int) -> None:
+    frames = canvas(width, rows, reply=("Save to", "\n"))
+    details = {
+        f"Item {index}": "A longer detail that wraps safely at small widths" for index in range(20)
+    }
+    details["Save to"] = "outputs/timer.mp4"
+    keys("\x1b[1;3B" * 20)
+    assert (
+        ask(
+            "Ready?",
+            choices={
+                "make": "Make timer",
+                **{f"edit{index}": "Adjust details" for index in range(count - 1)},
+            },
+            default="make",
+            details=details,
+        )
+        == "make"
+    )
+    view = "\n".join(row for frame in frames for row in frame)
+    assert "Window too small" not in view
+    assert "Save to" in view and "Make timer" in view
+
+
+@pytest.mark.parametrize(
+    "prefix", ["dir/nest/f", "dir with spaces/nest/f", "~/dir/nest/f", "/absolute"]
+)
+def test_paths(
+    pipe: PipeInput, entry: Mock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prefix: str
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    for name in ("dir", "dir with spaces"):
+        folder = tmp_path / name / "nest"
+        folder.mkdir(parents=True)
+        (folder / "file.toml").write_text("[event]\n")
+    query = str(tmp_path / "dir/nest/f") if prefix == "/absolute" else str(Path(prefix))
+    ask("File", paths=True)
+    completer = entry.call_args.kwargs["completer"]
+    values = list(completer.get_completions(Document(query), CompleteEvent()))
+    assert len(values) == 1 and values[0].text == os.path.join(os.path.dirname(query), "file.toml")
+    assert values[0].start_position == -len(query)
+
+
+def test_descend(
+    canvas: Canvas, keys: Keys, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "folder" / "nested"
+    folder.mkdir(parents=True)
+    (folder / "event.toml").write_text("[event]\n")
+    monkeypatch.chdir(tmp_path)
+    frames = canvas()
+    keys("fold", "\t", "\t", "\t", "\n", interval=0.3)
+    assert ask("File", paths=True) == str(Path("folder/nested/event.toml"))
+    assert "Window too small" not in "\n".join(row for frame in frames for row in frame)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"minimum": 0},
+        {"minimum": 0, "maximum": 0},
+        {"minimum": 0, "maximum": 2, "step": 0},
+        {"minimum": 0, "maximum": float("inf")},
+        {"minimum": 2, "maximum": 3},
+    ],
+)
+def test_bounds(options: dict[str, float]) -> None:
+    with pytest.raises(ValueError, match="finite bounds"):
+        number(
+            "Size",
+            default=1,
+            minimum=options.get("minimum"),
+            maximum=options.get("maximum"),
+            step=options.get("step", 1),
+        )
+
+
+@pytest.mark.parametrize(
+    "inputs,expected",
+    [
+        (("Original\n",), 0),
+        (("480p\n",), 480),
+        (("\x1b[D", "\n"), 1080),
+        (("99\n", "240\n"), 240),
+    ],
+)
+def test_stops(canvas: Canvas, keys: Keys, inputs: tuple[str, ...], expected: int) -> None:
+    frames = canvas(80, 24)
+    keys(*inputs)
+    assert (
+        number(
+            "Video quality",
+            default=0,
+            stops={240: "240p", 480: "480p", 1080: "1080p", 0: "Original"},
+            parse=lambda value: float(value.removesuffix("p")),
+        )
+        == expected
+    )
+    view = "\n".join(row for frame in frames for row in frame)
+    assert "Original" in view and "Window too small" not in view
+
+
+def test_continuity(
+    pipe: PipeInput, entry: Mock, cursor: tuple[SimpleNamespace, Mock, SimpleNamespace]
+) -> None:
+    _, clock, app = cursor
+    ask("First", choices=("first",))
+    entry.call_args.kwargs["pre_run"]()
+    clock.return_value = 4
+    before = [part for part in parts(columns(app).children[0]) if part[0].startswith("class:")]
+    ask("Second", choices=("first",))
+    app.layout = Layout(Window())
+    entry.call_args.kwargs["pre_run"]()
+    after = [part for part in parts(columns(app).children[0]) if part[0].startswith("class:")]
+    assert before == after
+
+
+@pytest.mark.parametrize("width,rows", [(40, 8), (60, 12), (80, 24), (100, 28)])
+@pytest.mark.parametrize(
+    "inputs,expected",
+    [
+        (("\x1b[C\n",), date(2026, 2, 1)),
+        (("\t", "\x1b[C", "\n"), date(2026, 2, 28)),
+        (("\t", "\t", "\x1b[C", "\n"), date(2027, 1, 31)),
+        (("\x1b[Z", "\x1b[D", "\n"), date(2025, 1, 31)),
+        (("2026-02-30\n", "2028-02-29\n"), date(2028, 2, 29)),
+    ],
+)
+def test_calendar(
+    canvas: Canvas, keys: Keys, width: int, rows: int, inputs: tuple[str, ...], expected: date
+) -> None:
+    frames = canvas(width, rows)
+    keys(*inputs)
+    assert day("Event date", default=date(2026, 1, 31)) == expected
+    view = "\n".join(row for frame in frames for row in frame)
+    assert "Window too small" not in view and "Tab unit" in view
+
+
+@pytest.mark.parametrize(
+    "inputs,expected",
+    [
+        (("\x1b[C", "\t", "\x1b[C", "\n"), Time(19, 1)),
+        (("\t", "\x1b[D", "\n"), Time(17, 59)),
+        (("25:00\n", "6:30 PM\n"), Time(18, 30)),
+    ],
+)
+def test_clock(canvas: Canvas, keys: Keys, inputs: tuple[str, ...], expected: Time) -> None:
+    frames = canvas()
+    keys(*inputs)
+    assert clock("Event begins", default="18:00") == expected
+    view = "\n".join(row for frame in frames for row in frame)
+    assert "Window too small" not in view and "Tab unit" in view
+
+
+@pytest.mark.parametrize("kind", ["date", "time"])
+def test_clock_click(
+    pipe: PipeInput, entry: Mock, cursor: tuple[SimpleNamespace, Mock, SimpleNamespace], kind: str
+) -> None:
+    buffer, _, app = cursor
+    entry.return_value = "2026-01-31" if kind == "date" else "18:00"
+    if kind == "date":
+        day("Date", default=date(2026, 1, 31))
+    else:
+        clock("Time")
+    entry.call_args.kwargs["pre_run"]()
+    panel = columns(app).children[1]
+    assert isinstance(panel, HSplit)
+    controls = parts(panel.children[-1])
+    for part in controls:
+        if len(part) == 3 and part[1].strip() == (">" if kind == "date" else "+"):
+            part[2](
+                MouseEvent(
+                    Point(1, 0 if kind == "date" else 2),
+                    MouseEventType.MOUSE_UP,
+                    MouseButton.LEFT,
+                    frozenset(),
+                )
+            )
+            break
+    assert buffer.text == ("2026-02-28" if kind == "date" else "19:00")
+
+
+@pytest.mark.parametrize("moving", [False, True], ids=["still", "animated"])
+def test_dials(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+    moving: bool,
+) -> None:
+    monkeypatch.setenv("MINI_MOTION", "1" if moving else "0")
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    entry.return_value = "18:00"
+    clock("Time")
+    entry.call_args.kwargs["pre_run"]()
+    buffer, elapsed, app = cursor
+    panel = columns(app).children[1]
+    assert isinstance(panel, HSplit)
+    footer = panel.children[-1]
+    buffer.text = "18:00"
+    parts(footer)
+    buffer.text = "00:00"
+    turning = parts(footer)
+    elapsed.return_value = 0.05
+    midway = parts(footer)
+    elapsed.return_value = 0.3
+    settled = parts(footer)
+    assert ([(p[0], p[1]) for p in turning] != [(p[0], p[1]) for p in settled]) is moving
+    assert ([(p[0], p[1]) for p in midway] != [(p[0], p[1]) for p in settled]) is moving
+    face = next(p for p in settled if len(p) == 3 and "00 m" in p[1])
+    face[2](MouseEvent(Point(30, 2), MouseEventType.MOUSE_MOVE, MouseButton.LEFT, frozenset()))
+    assert buffer.text == "00:15"
+    face[2](MouseEvent(Point(25, 2), MouseEventType.SCROLL_UP, MouseButton.NONE, frozenset()))
+    assert buffer.text == "00:16"
+    assert next(p for p in parts(footer) if "16 m" in p[1])[0] == "class:chosen"
+
+
+@pytest.mark.parametrize("region", ["ears", "pet", "object"])
+def test_touch(
+    pipe: PipeInput,
+    entry: Mock,
+    cursor: tuple[SimpleNamespace, Mock, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+    region: str,
+) -> None:
+    monkeypatch.setattr(terminal.CONSOLE, "no_color", False)
+    monkeypatch.setenv("MINI_MOTION", "1")
+    monkeypatch.setattr(random, "uniform", Mock(return_value=100))
+    ask("Pick one", choices=("first",))
+    entry.call_args.kwargs["pre_run"]()
+    buffer, clock, app = cursor
+    control = app.layout.container.content.children[0].children[0].content
+    look = terminal._look()
+    target = {"ears": "1", "pet": "2", "object": "3"}[region]
+    x, y = next(
+        (x + 2, y)
+        for y, row in enumerate(look.drawing()["hit"].splitlines())
+        for x, value in enumerate(row)
+        if value == target
+    )
+    point = Point(x, y)
+    control.mouse_handler(
+        MouseEvent(point, MouseEventType.MOUSE_MOVE, MouseButton.NONE, frozenset())
+    )
+    footer = app.layout.container.content.children[0].children[1].children[-1].content.text
+    assert "click" in footer()[0][1]
+    app.invalidate.reset_mock()
+    poses = getattr(
+        look,
+        {"ears": "head_moves", "pet": "body_moves", "object": "object_moves"}[region],
+    ).split()
+    for index, pose in enumerate(poses):
+        clock.return_value = index * 10
+        control.text()
+        # Click the drawn resting frame so the hit target follows the animation
+        frame = int(clock.return_value * art.FPS) % (art.FPS * 3)
+        rows = look.drawing(frame, "breathe")["hit"].splitlines()
+        x, y = next(
+            (x + 2, y)
+            for y, row in enumerate(rows)
+            for x, value in enumerate(row)
+            if value == target
+        )
+        control.mouse_handler(
+            MouseEvent(Point(x, y), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset())
+        )
+        clock.return_value += 0.5
+        assert "".join(text for _, text in control.text()).startswith(
+            look.picture(art.FPS // 2, pose).plain
+        )
+    buffer.text = "first"
+    clock.return_value = 30
+    control.text()
+    clock.return_value = 31.5
+    assert "".join(text for _, text in control.text()).startswith(
+        terminal._look().picture(art.FPS - 1, "listen").plain
+    )
+
+
+def test_mouse(canvas: Canvas, keys: Keys) -> None:
+    frames = canvas()
+    keys("\x1b[<35;25;13M", "\x1b[<0;25;13m", "\x1b[B", "\n")
+    assert ask("Pick one", choices=("first",)) == "first"
+    assert any("back · click to scratch" in row for frame in frames for row in frame)
+
+
+@pytest.mark.parametrize("no_color", [False, True], ids=["picture", "text"])
+@pytest.mark.parametrize("width", [80, 140, 240])
+def test_preview(canvas: Canvas, keys: Keys, no_color: bool, width: int) -> None:
+    frames = canvas(width=width, no_color=no_color)
+    sample = art.image([[(200, 100, 50)] * 26] * 14, "Forest video · 01:23")
+    keys("\x1b[B", "\n")
+    assert ask("Video", choices={"link": "Forest video"}, previews={"link": sample}) == "link"
+    assert any("▀" in row for frame in frames for row in frame) is not no_color
+    assert len({row.index("Video:") for frame in frames for row in frame if "Video:" in row}) == 1
+    assert "Window too small" not in "\n".join(row for frame in frames for row in frame)
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [[], [[(0, 0, 0)] * 513], [[(0, 0, 0)]] * 513, [[(300, 0, 0)]], [[(0, 0, 0)], []]],
+)
+def test_pixels(rows: Any) -> None:
+    with pytest.raises(ValueError, match="512 × 512"):
+        art.image(rows, "A picture")
+
+
+def test_resize() -> None:
+    def render(width: int, height: int) -> Text:
+        return Text(f"{width} × {height}")
+
+    draw = Mock(side_effect=render)
+    preview = art.Preview(Text("Fallback"), "Image", draw)
+    for size in ((40, 16), (73, 26), (128, 48), (73, 26), (80, 28)):
+        assert preview.fit(size).plain == f"{size[0]} × {size[1]}"
+    assert draw.call_count == 4
+    assert len(preview._sizes) == 3
+    assert art.Preview(Text("Unavailable"), "Image").fit((80, 28)).plain == "Unavailable"
+
+
+def test_live() -> None:
+    draw = Mock(return_value=Text("Moving sample"))
+    preview = art.Preview(Text("Still sample"), "Image", live=draw)
+    first = preview.fit((80, 28), elapsed=0.01)
+    assert preview.fit((80, 28), elapsed=0.08) is first
+    preview.fit((80, 28), elapsed=0.13)
+    assert draw.call_count == 2 and len(preview._frames) == 1
+    assert preview.fit((80, 28)).plain == "Still sample"
+
+
+@pytest.mark.parametrize(
+    "prompt,options,input,expected",
+    [
+        (confirm, {"default": True}, "n\n", False),
+        (number, {"default": 1}, "1.5\n", 1.5),
+    ],
+    ids=["confirmation", "number"],
+)
+def test_input(
+    pipe: PipeInput,
+    keys: Keys,
+    prompt: Callable[..., Any],
+    options: dict[str, Any],
+    input: str,
+    expected: bool | float,
+) -> None:
+    keys(input)
+    assert prompt("Choose", **options) == expected
+
+
+@pytest.mark.parametrize(
+    "arguments,input,expected",
+    [
+        (
+            ["--name", "two words"],
+            ("edit\n", "'broken\n", "--name fixed\n"),
+            ["--name", "fixed"],
+        ),
+        (["--upload", "--yes"], ("edit\n", "\n"), ["--upload"]),
+        (["--submit"], ("edit\n", "\n", "n\n"), None),
+    ],
+    ids=["arguments", "upload-review", "submission-cancel"],
+)
+def test_recovery(
+    pipe: PipeInput,
+    keys: Keys,
+    arguments: list[str],
+    input: tuple[str, str, str] | tuple[str, str],
+    expected: None | list[str],
+) -> None:
+    with terminal.habitat("numbat"):
+        keys(*input)
+        if expected is None:
+            with pytest.raises(terminal.Back):
+                terminal.recover(ValueError("Check the source"), arguments)
+        else:
+            assert terminal.recover(ValueError("Check the source"), arguments) == expected
+
+
+@pytest.mark.parametrize(
+    "width,live,no_color",
+    [(28, False, False), (80, True, False), (40, True, True), (60, False, True)],
+    ids=["narrow", "colour", "monochrome", "plain"],
+)
+def test_render(screen: Screen, width: int, live: bool, no_color: bool) -> None:
+    console, output = screen(width=width, live=live, no_color=no_color)
+    terminal.intro("[red]A mini[/red]", "Something nice to make")
+    view = terminal.table("File", "Saved to")
+    assert (
+        console.get_style(view.row_styles[0]).bgcolor
+        != console.get_style(view.row_styles[1]).bgcolor
+    )
+    path = "folder[rose]/a-long-file.docx"
+    view.add_row(Text("event"), Text(path))
+    console.print(view)
+    rendered = Text.from_ansi(output.getvalue()).plain
+    assert "[red]A mini[/red]" in rendered
+    assert "folder[rose]" in rendered
+    assert all(cell_len(line) <= width for line in rendered.splitlines())
+    if no_color:
+        assert "\x1b[38;" not in output.getvalue()
+
+
+@pytest.mark.parametrize("live", [False, True], ids=["plain", "terminal"])
+def test_progress(screen: Screen, live: bool) -> None:
+    _, output = screen(live=live)
+    with terminal.activity("Reading the video") as update:
+        update(None, "Reading the video · checking metadata")
+        update(0.5, "Downloading background · 5 MiB / 10 MiB")
+        update(None, "Stitching the background")
+    rendered = Text.from_ansi(output.getvalue()).plain
+    assert "Stitching" in rendered
+    assert "0%" not in rendered.split("50%")[0]
+    assert "50%" not in rendered.rsplit("Stitching", 1)[-1]
+    if not live:
+        assert "50%" in rendered
+
+
+@pytest.mark.parametrize("width", [80, 140, 240])
+def test_loading(screen: Screen, monkeypatch: pytest.MonkeyPatch, width: int) -> None:
+    console, _ = screen(width=width, live=True)
+    samples: list[Progress] = []
+
+    def start(progress: Progress) -> None:
+        samples.append(progress)
+
+    monkeypatch.setattr(Progress, "start", start)
+    sample = art.image([[(200, 100, 50)] * 26] * 14, "Chosen video\n01:23")
+    token = terminal._PREVIEW.set(sample)
+    try:
+        with terminal.activity("Loading clip") as update:
+            update(0.5, "Loading clip")
+            rows = console.render_lines(samples[0].get_renderable(), console.options, pad=False)
+            lines = ["".join(segment.text for segment in row) for row in rows]
+            assert any("Chosen video" in row for row in lines)
+            assert (
+                next(row.index("Loading clip") for row in lines if "Loading clip" in row)
+                == terminal._width(width) + 2
+            )
+            assert any("50%" in row for row in lines)
+            assert all(cell_len(row) <= width for row in lines)
+    finally:
+        terminal._PREVIEW.reset(token)

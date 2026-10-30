@@ -1,0 +1,8 @@
+# == Parallel backend tests ==
+
+[pytest]
+"cache_dir" = "../out/.cache/pytest"
+"addopts" = ["-ra", "--strict-config", "--strict-markers", "-n", "auto", "--maxprocesses=4", "--dist=worksteal"]
+"testpaths" = ["tests"]
+
+pythonpath = ["..", "."]

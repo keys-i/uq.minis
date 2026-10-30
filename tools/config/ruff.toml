@@ -1,0 +1,24 @@
+# == Python formatting and lint ==
+target-version = "py315"
+preview = true
+line-length = 100
+cache-dir = "../out/.cache/ruff"
+src = ["src", "../tools", "tests"]
+extend-exclude = ["generated", "_render"]
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I"]
+extend-select = ["D"]
+ignore = ["D400", "D415"] # Docstring summaries intentionally omit final punctuation
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
+"**/tests/**" = ["D"]
+
+[lint.isort]
+known-first-party = ["uq_minis", "tools"]
+
+[format]
+line-ending = "lf"

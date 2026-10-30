@@ -13,7 +13,7 @@ import typer
 
 from uq_minis.core.terminal import CONSOLE, application
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[2] / "backend"
 FORWARD = {"allow_extra_args": True, "ignore_unknown_options": True}
 app = application(add_completion=True, context_settings=FORWARD)
 
@@ -36,7 +36,7 @@ def _checkout() -> None:
 
 def _types() -> int:
     """Check the current wheel without replacing the interactive environment"""
-    directory = ROOT / ".cache/types"
+    directory = ROOT.parent / "out/.cache/types"
     python = directory / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     env = dict(os.environ)
     env.pop("VIRTUAL_ENV", None)
@@ -51,6 +51,8 @@ def _types() -> int:
             "--reinstall-package",
             "uq-minis",
             "basedpyright",
+            "--project",
+            str(ROOT.parent / "out/tools/pyrightconfig.json"),
             "--pythonpath",
             str(python),
             "--warnings",
@@ -62,12 +64,20 @@ def _types() -> int:
 def _task(task: str, extra: list[str]) -> int:
     """Run the selected checks and stop at the first failed command"""
     _checkout()
-    ruff = ["ruff"]
+    from tools.scripts.config import generate
+
+    generate()
+    ruff = ["ruff", "--config", "../tools/config/ruff.toml"]
     tests = [
         sys.executable,
         "-m",
         "pytest",
+        "-c",
+        "../out/tools/pytest.toml",
+        "--rootdir",
+        ".",
         "--cov",
+        "--cov-config=../tools/config/coverage.toml",
         "--cov-report=term-missing:skip-covered",
         "--cov-report=xml",
     ]
@@ -80,10 +90,10 @@ def _task(task: str, extra: list[str]) -> int:
             "--severity-level",
             "medium",
             "-c",
-            "tools/config/bandit.toml",
+            "../tools/config/bandit.toml",
             "-r",
             "src",
-            "tools",
+            "../tools",
         ]):
             return status
         with TemporaryDirectory(prefix="uq-minis-audit-") as directory:
@@ -113,9 +123,9 @@ def _task(task: str, extra: list[str]) -> int:
             ])
     if task == "check":
         commands = [
-            [*ruff, "check", "."],
-            [*ruff, "format", "--check", "."],
-            [sys.executable, "-m", "compileall", "-q", "src", "tools", "tests"],
+            [*ruff, "check", ".", "../tools"],
+            [*ruff, "format", "--check", ".", "../tools"],
+            [sys.executable, "-m", "compileall", "-q", "src", "../tools", "tests"],
         ]
     else:
         check = "--check" in extra
@@ -154,6 +164,31 @@ def security(context: typer.Context) -> None:
 def test(context: typer.Context) -> None:
     """Run tests with coverage"""
     raise typer.Exit(_task("test", context.args))
+
+
+@app.command()
+def deploy(host: str, dry_run: bool = False) -> None:
+    """Check and publish Minis using only ~/.ssh/oracle, preserving server state"""
+    from tools.scripts.deploy import publish, target
+
+    host = target(host)
+    if dry_run:
+        CONSOLE.print(
+            f"Check backend and frontend, build an allowlisted release, upload to {host} "
+            "using ~/.ssh/oracle, then activate with a health check and rollback on failure",
+            markup=False,
+        )
+        return
+    _checkout()
+    if status := _task("check", []):
+        raise typer.Exit(status)
+    if status := run(["npm", "--prefix", "../frontend", "run", "check"]):
+        raise typer.Exit(status)
+    try:
+        publish(ROOT.parent, host)
+    except subprocess.CalledProcessError as exc:
+        CONSOLE.print(f"Deployment stopped with exit status {exc.returncode}", style="red")
+        raise typer.Exit(exc.returncode) from exc
 
 
 def main(argv: list[str] | None = None) -> None:

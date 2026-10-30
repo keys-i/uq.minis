@@ -1,0 +1,10 @@
+# == Strict Python typing ==
+"typeCheckingMode" = "strict"
+"pythonVersion" = "3.15"
+extraPaths = [".."]
+"include" = ["src", "../tools", "tests", "assets/terminal/sculpt.py"]
+
+[[executionEnvironments]]
+root = "tests"
+extraPaths = [".", ".."]
+reportPrivateUsage = false

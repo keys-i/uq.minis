@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {terminal_width} {terminal_height}">
+<style>text {{font:20px ui-monospace,monospace;white-space:pre}}{styles}</style>
+<defs>{lines}</defs>{backgrounds}{matrix}</svg>

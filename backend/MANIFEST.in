@@ -1,0 +1,4 @@
+include .python-version uv.lock examples/.env.example
+recursive-include tests *.py
+recursive-include examples *.toml
+recursive-include assets *.png *.ttf *.txt *.md *.gz *.toml *.py

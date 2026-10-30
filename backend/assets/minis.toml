@@ -1,0 +1,32 @@
+# == Public catalogue shared by the API and first browser paint ==
+[scrappy]
+title = "Scrappy"
+about = "Choose courses and explore their profiles"
+
+[planny]
+title = "Planny"
+about = "Assessments, personal targets and marks"
+
+[buzzy]
+title = "Buzzy"
+about = "Deadlines and society events in one calendar"
+
+[clubby]
+title = "Clubby"
+about = "Find clubs and collect scheduled events"
+
+[event]
+title = "Eventy"
+about = "Prepare events and follow booking replies"
+
+[timey]
+title = "Timey"
+about = "Make a countdown video"
+
+[auth]
+title = "Authy"
+about = "Sign in for Microsoft Forms"
+
+[agent]
+title = "Watchy"
+about = "Follow event bookings in Outlook"

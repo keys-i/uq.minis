@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=77,<83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uq-minis"
+version = "0.33.0"
+description = "Fast UQ and UQU event automations driven by TOML"
+readme = "README.md"
+requires-python = ">=3.15"
+license = "MIT"
+authors = [{ name = "keys-i" }]
+dependencies = [
+  "httpx>=0.28.1,<1",
+  "python-docx>=1.2,<2",
+  "python-dotenv>=1.1,<2",
+  "prompt-toolkit>=3.0.52,<4",
+  "rich>=14.2,<16",
+  "typer>=0.27.2,<1",
+]
+
+[project.optional-dependencies]
+auth = ["playwright>=1.55,<2"]
+agent = ["msal>=1.31,<2", "playwright>=1.55,<2"]
+timey = [
+  "pillow>=13,<14",
+  "yt-dlp[default]>=2026.3.17",
+  "google-api-python-client>=2.190,<3",
+  "google-auth-oauthlib>=1.2,<2",
+  "pillow-heif>=1.1,<2",
+]
+browser = [
+    "playwright>=1.55,<2",
+    "websockets>=15,<18",
+    "fastapi>=0.115,<1",
+    "python-multipart>=0.0.20,<1",
+    "uvicorn>=0.34,<1",
+]
+
+[project.scripts]
+mini = "uq_minis.cli:main"
+minis-web = "uq_minis.web:main"
+dev = "uq_minis.cli.dev:main"
+
+[dependency-groups]
+art = ["pillow>=13,<14", "tomli-w>=1.2,<2"]
+dev = [
+  {include-group = "art"},
+  "pytest>=9,<10",
+  "pytest-cov>=7,<8",
+  "greenlet>=3.1,<4",
+  "ruff>=0.16.6,<1",
+  "pyyaml>=6,<7",
+  "basedpyright>=1.40.2,<2",
+  "types-pyyaml>=6.0.12.20260906",
+  "lxml-stubs>=0.5.1",
+  "pytest-xdist>=3.8,<4",
+]
+security = [
+  "bandit[toml]>=1.8,<2",
+  "pip-audit>=2.9,<3",
+]
+release = ["twine>=6.2,<7"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.package-dir]
+"" = "src"
+uq_minis = "src"
+"uq_minis.assets" = "assets"
+
+[tool.setuptools.package-data]
+uq_minis = ["py.typed", "core/*.toml"]
+"uq_minis.assets" = ["*.png", "*.json", "*.svg", "*.toml", "terminal/*.toml", "terminal/*.toml.gz", "event/*.gz", "timey/fonts/*.ttf", "timey/fonts/*.txt", "timey/art/*.png", "timey/art/*.md", ]

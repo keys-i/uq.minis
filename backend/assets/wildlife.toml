@@ -1,0 +1,1103 @@
+# == Shared wildlife catalogue ==
+# Coarse representative habitat coordinates, never visitor locations
+[species.otter]
+name = "Giant otter"
+status = "endangered"
+place = "Amazon river and flooded forest"
+source = "https://iucn.org/news/202502/third-giant-otter-international-workshop-advances-human-otter-coexistence-and-ex-situ"
+family = "otter"
+movement = "groom"
+scene = 1
+region = "amazon"
+home = "Amazon and Orinoco basins / South America"
+story = "I fish with my family and use whistles and calls to stay in touch along the river. Clean waterways are our home and our pantry"
+care = "Connected riverbanks, healthy fish stocks and space to live alongside fishing communities"
+places = [
+    "americas",
+]
+latitude = -3.1
+longitude = -60.0
+zone = "America/Manaus"
+nocturnal = false
+reaction = "The illustrated otter leans into a chin scratch"
+fact = "My family hunts and rests together beside South American rivers. We recognise one another by our throat markings"
+
+[species.numbat]
+name = "Numbat"
+status = "endangered"
+place = "Dry eucalypt woodland"
+source = "https://perthzoo.wa.gov.au/animal/numbat"
+family = "quadruped"
+movement = "forage"
+scene = 6
+region = "australia"
+home = "South-western Australia"
+story = "I spend daylight hours following termites beneath the soil. My long, sticky tongue reaches into their tunnels, and hollow logs give me a safe place to sleep"
+care = "Fox and feral-cat control, old woodland and hollow logs left on the ground"
+places = [
+    "AU",
+]
+latitude = -34.0
+longitude = 116.1
+zone = "Australia/Perth"
+nocturnal = false
+reaction = "The illustrated numbat pauses, sniffs and looks up"
+fact = "I spend daylight hours following termites with my long sticky tongue. Hollow logs give me a safe place to sleep"
+
+[species.penguin]
+name = "African penguin"
+status = "critically endangered"
+place = "Rocky coastal islands"
+source = "https://www.birdlife.org/news/2024/11/20/african-penguin-on-the-brink-of-extinction/"
+family = "bird"
+movement = "preen"
+scene = 4
+region = "cape"
+home = "South Africa and Namibia / Atlantic coast"
+story = "I chase sardines and anchovies at sea, then return to my colony on shore. That loud braying call is how we find one another"
+care = "Enough fish near breeding colonies, safe nesting places and protection from oil spills"
+places = [
+    "africa",
+]
+latitude = -34.2
+longitude = 18.5
+zone = "Africa/Johannesburg"
+nocturnal = false
+reaction = "The illustrated penguin ruffles its feathers"
+fact = "I nest on the southern African coast, but I need fish at sea to feed my chicks. Safe land alone is not enough"
+
+[species.dodo]
+name = "Dodo"
+status = "extinct"
+place = "Island forest"
+source = "https://www.nhm.ac.uk/discover/the-dodo-bird-the-real-facts-about-this-icon-of-extinction.html"
+family = "bird"
+movement = "peck"
+scene = 0
+region = "mauritius"
+home = "Mauritius / Indian Ocean"
+story = "My forest home was one island, and I was a pigeon relative that couldn't fly. People knew me for only a short time before I disappeared in the 1600s"
+care = "Hunting, introduced animals and forest clearance followed human arrival on Mauritius"
+places = [
+    "MU",
+]
+latitude = -20.3
+longitude = 57.5
+zone = "Indian/Mauritius"
+nocturnal = false
+reaction = "The illustrated dodo tilts its head towards you"
+fact = "I was a flightless pigeon from Mauritius. My wings were small, and I searched the island forest for food on foot"
+
+[species.quoll]
+name = "Northern quoll"
+status = "endangered / AU"
+place = "Rocky tropical woodland"
+source = "https://www.dcceew.gov.au/environment/biodiversity/threatened/action-plan/priority-mammals/northern-quoll"
+family = "quadruped"
+movement = "forage"
+scene = 6
+region = "australia"
+home = "Northern Australia"
+story = "I explore after dark, eating insects and other small animals. Rocky crevices and tree hollows are my daytime hideaways"
+care = "Safer habitat, careful fire management and protection from cane toads and feral predators"
+places = [
+    "AU",
+]
+latitude = -12.5
+longitude = 131.0
+zone = "Australia/Darwin"
+nocturnal = true
+reaction = "The illustrated quoll takes a curious little sniff"
+fact = "I am a small marsupial with a spotted coat. I usually forage at night and rest in sheltered dens during the day"
+
+[species.pangolin]
+name = "Sunda pangolin"
+status = "critically endangered"
+place = "Lowland tropical forest"
+source = "https://avs.nparks.gov.sg/wildlife/wildlife-trade/wildlife-forensics/fauna-identification/pangolins/"
+family = "quadruped"
+movement = "forage"
+scene = 0
+region = "sunda"
+home = "Southeast Asia / forests of the Sunda region"
+story = "I follow ants and termites by scent and scoop them up with my sticky tongue. My scales are made of keratin, like your fingernails"
+care = "An end to illegal wildlife trade and forests where I can forage undisturbed"
+places = [
+    "asia",
+]
+latitude = 1.5
+longitude = 103.0
+zone = "Asia/Kuala_Lumpur"
+nocturnal = true
+reaction = "The illustrated pangolin hunkers down and settles"
+fact = "My scales are made of keratin, just like your nails. I can curl up to protect my softer underside"
+
+[species.kakapo]
+name = "Kākāpō"
+status = "critically endangered"
+place = "Predator-free island forest"
+source = "https://www.doc.govt.nz/kakapo"
+family = "bird"
+movement = "preen"
+scene = 8
+region = "aotearoa"
+home = "Aotearoa New Zealand / protected islands"
+story = "I'm a flightless, nocturnal parrot. I climb trees, eat plants and fruit, and males make deep booming calls during the breeding season"
+care = "Predator-free habitat and the careful monitoring and breeding work of the recovery team"
+places = [
+    "NZ",
+]
+latitude = -46.7
+longitude = 167.9
+zone = "Pacific/Auckland"
+nocturnal = true
+reaction = "The illustrated kākāpō fluffs up its feathers"
+fact = "I am a nocturnal, flightless parrot from Aotearoa. I climb well, and males make deep booming calls in the breeding season"
+
+[species.axolotl]
+name = "Axolotl"
+status = "critically endangered"
+place = "Xochimilco lake canals"
+source = "https://lazoo.org/explore-your-zoo/our-animals/amphibians/axolotl/"
+family = "axolotl"
+movement = "swim"
+scene = 11
+region = "mexico"
+home = "Xochimilco / Mexico City, Mexico"
+story = "I keep my feathery gills as an adult and live in freshwater. My mottled skin helps me blend into the canal floor while I hunt small aquatic animals"
+care = "Clean canals and restored chinampa wetlands, with fewer invasive fish eating our eggs and young"
+places = [
+    "MX",
+]
+latitude = 19.3
+longitude = -99.1
+zone = "America/Mexico_City"
+nocturnal = false
+reaction = "The illustrated axolotl fans its feathery gills"
+fact = "I keep my feathery external gills into adulthood. The canals of Xochimilco are my remaining wild home"
+
+[species.thylacine]
+name = "Thylacine"
+status = "extinct"
+place = "Woodland and open scrub"
+source = "https://australian.museum/learn/australia-over-time/extinct-animals/the-thylacine/"
+family = "quadruped"
+movement = "prowl"
+scene = 6
+region = "australia"
+home = "Tasmania / last surviving wild population"
+story = "I was a striped, meat-eating marsupial, rather than a tiger or a dog. The last known captive thylacine died in Hobart in 1936"
+care = "Persecution and bounty hunting drove my decline, alongside other pressures that are still studied"
+places = [
+    "AU",
+]
+latitude = -42.9
+longitude = 147.1
+zone = "Australia/Hobart"
+nocturnal = true
+reaction = "The illustrated thylacine pauses to listen"
+fact = "I looked a little like a striped dog, but I was a marsupial from Tasmania. My relatives carried their young in a pouch"
+
+[species.turtle]
+name = "Hawksbill turtle"
+status = "critically endangered"
+place = "Coral reefs"
+source = "https://www.fisheries.noaa.gov/species/hawksbill-turtle"
+family = "turtle"
+movement = "swim"
+scene = 2
+region = "reef"
+home = "Tropical coral reefs / Atlantic, Indian and Pacific oceans"
+story = "My narrow beak reaches into reef crevices to eat sponges. I spend much of my life at sea, but females return to sandy beaches to nest"
+care = "Protected reefs and nesting beaches, less accidental fishing capture and an end to tortoiseshell trade"
+places = [
+    "world",
+]
+latitude = -16.5
+longitude = 145.5
+zone = "Australia/Brisbane"
+nocturnal = false
+reaction = "The illustrated turtle paddles and gently turns"
+fact = "My narrow beak helps me reach food in coral reef crevices. Healthy reefs and safe nesting beaches both matter to me"
+
+[species.bee]
+name = "Rusty patched bumblebee"
+status = "endangered / US"
+place = "Wildflower meadow"
+source = "https://www.fws.gov/species/rusty-patched-bumble-bee-bombus-affinis"
+family = "bee"
+movement = "hover"
+scene = 3
+region = "prairie"
+home = "Eastern North America / surviving range"
+story = "I carry pollen between flowers while collecting nectar and pollen for my colony. The rusty patch that gives us our name appears on workers and males"
+care = "Native flowers from spring to autumn, nesting habitat and fewer harmful pesticides"
+places = [
+    "americas",
+]
+latitude = 42.0
+longitude = -89.0
+zone = "America/Chicago"
+nocturnal = false
+reaction = "The illustrated bumblebee darts away, then hovers back"
+fact = "I carry pollen between flowers while gathering food. A varied patch of native flowers helps my colony through the season"
+
+[species.saola]
+name = "Saola"
+status = "critically endangered"
+place = "Annamite mountain forest"
+source = "https://www.worldwildlife.org/species/saola/"
+family = "quadruped"
+movement = "browse"
+scene = 0
+region = "annamite"
+home = "Annamite Mountains / Laos and Vietnam"
+story = "I'm a shy forest relative of cattle, with two long, nearly parallel horns. Scientists first described my species in 1992, and sightings are exceptionally rare"
+care = "Forests free from wire snares, supported by local conservation teams"
+places = [
+    "LA",
+    "VN",
+]
+latitude = 18.2
+longitude = 105.5
+zone = "Asia/Vientiane"
+nocturnal = false
+reaction = "The illustrated saola takes a cautious step back"
+fact = "My two straight horns gave me the nickname Asian unicorn. My real home is the Annamite forest of Laos and Vietnam"
+
+[species.auk]
+name = "Great auk"
+status = "extinct"
+place = "North Atlantic rocky coast"
+source = "https://www.nhm.ac.uk/discover/worlds-collide-great-auk.html"
+family = "bird"
+movement = "preen"
+scene = 16
+region = "atlantic"
+home = "Rocky islands / North Atlantic"
+story = "I was a large flightless seabird that swam with short, strong wings. I bred on rocky islands; the last confirmed pair was killed in Iceland in 1844"
+care = "Intensive hunting for food, feathers and specimens overwhelmed my breeding colonies"
+places = [
+    "world",
+]
+latitude = 63.5
+longitude = -20.0
+zone = "Atlantic/Reykjavik"
+nocturnal = false
+reaction = "The illustrated great auk gives a little feather shake"
+fact = "I could not fly, but my short wings carried me through the North Atlantic water. I came ashore to breed"
+
+[species.vaquita]
+name = "Vaquita"
+status = "critically endangered"
+place = "Upper Gulf of California"
+source = "https://www.fisheries.noaa.gov/species/vaquita"
+family = "cetacean"
+movement = "swim"
+scene = 5
+region = "mexico"
+home = "Upper Gulf of California / Mexico"
+story = "I'm a small porpoise with dark rings around my eyes. My entire wild home is in the shallow waters of the northern Gulf of California"
+care = "Gillnet-free waters: becoming tangled in fishing nets is the greatest threat to my survival"
+places = [
+    "MX",
+]
+latitude = 31.0
+longitude = -114.5
+zone = "America/Tijuana"
+nocturnal = false
+reaction = "The illustrated vaquita dips beneath your touch"
+fact = "My only home is the northern Gulf of California. I am a small porpoise, and fishing nets are my greatest danger"
+
+[species.elephant]
+name = "Indian elephant"
+status = "endangered"
+place = "Monsoon forest and grassland"
+source = "https://www.worldwildlife.org/species/indian-elephant"
+family = "quadruped"
+movement = "browse"
+scene = 0
+region = "india"
+home = "India and neighbouring mainland Asian countries"
+story = "My trunk is a nose, a drinking hose and a very delicate hand. Our family groups need room to travel between food, water and shelter"
+care = "Connected habitat and ways for people and elephants to share farmland boundaries safely"
+places = [
+    "IN",
+]
+latitude = 24.0
+longitude = 78.0
+zone = "Asia/Kolkata"
+nocturnal = false
+reaction = "The illustrated elephant sways and lifts its trunk"
+fact = "My family remembers routes between water and feeding places. Connected habitat lets us use that knowledge safely"
+
+[species.pigeon]
+name = "Passenger pigeon"
+status = "extinct"
+place = "Deciduous forest"
+source = "https://www.si.edu/spotlight/passenger-pigeon"
+family = "bird"
+movement = "peck"
+scene = 12
+region = "woodland"
+home = "Eastern North America / former range"
+story = "My flocks once filled North American skies. I ate forest seeds and fruit; Martha, the last known passenger pigeon, died at Cincinnati Zoo in 1914"
+care = "Commercial hunting and forest loss destroyed the vast flocks my species depended on"
+places = [
+    "americas",
+]
+latitude = 15.4
+longitude = -61.3
+zone = "America/New_York"
+nocturnal = false
+reaction = "The illustrated pigeon gives a quick head bob"
+fact = "My flocks once filled North American skies. Hunting and forest loss helped silence a bird that once seemed countless"
+
+[species.frog]
+name = "Mountain chicken frog"
+status = "critically endangered"
+place = "Caribbean forest floor"
+source = "https://www.zsl.org/what-we-do/projects/mountain-chicken-frog-conservation"
+family = "frog"
+movement = "hop"
+scene = 0
+region = "caribbean"
+home = "Dominica and Montserrat / Caribbean"
+story = "Despite my name, I'm a very large frog. I hunt insects and other small animals on the forest floor, mostly after dark"
+care = "Protection from chytrid fungus, healthy forest and the conservation breeding programme"
+places = [
+    "DM",
+    "MS",
+]
+latitude = 15.4
+longitude = -61.3
+zone = "America/Dominica"
+nocturnal = true
+reaction = "The illustrated frog crouches, then makes a small hop"
+fact = "Despite my name, I am a large frog from the Caribbean. I live on the forest floor and need damp places to shelter"
+
+[species.panda]
+name = "Red panda"
+status = "endangered"
+place = "Himalayan bamboo forest"
+source = "https://nationalzoo.si.edu/animals/red-panda"
+family = "quadruped"
+movement = "browse"
+scene = 9
+region = "himalaya"
+home = "Eastern Himalayas and south-western China"
+story = "My paws help me grip bamboo, and my tail helps me balance in the trees. Although I'm a carnivore by ancestry, bamboo makes up most of my diet"
+care = "Connected mountain forests, less poaching and fewer encounters with free-roaming dogs"
+places = [
+    "asia",
+]
+latitude = 27.0
+longitude = 88.5
+zone = "Asia/Kathmandu"
+nocturnal = false
+reaction = "The illustrated red panda leans into a cheek scratch"
+fact = "I am a red panda from Himalayan forests. A special wrist bone helps me hold bamboo while I eat"
+
+[species.horse]
+name = "Przewalski’s horse"
+status = "endangered"
+place = "Dry steppe grassland"
+source = "https://nationalzoo.si.edu/animals/przewalskis-horse"
+family = "quadruped"
+movement = "graze"
+scene = 10
+region = "steppe"
+home = "Mongolia / reintroduced steppe populations"
+story = "I graze grasses and live in social groups on the open steppe. My species disappeared from the wild, then returned through breeding and reintroduction programmes"
+care = "Protected grasslands, water and careful management of disease and genetic diversity"
+places = [
+    "MN",
+]
+latitude = 47.5
+longitude = 94.5
+zone = "Asia/Ulaanbaatar"
+nocturnal = false
+reaction = "The illustrated horse lowers its head and relaxes"
+fact = "My family returned to the Mongolian steppe through reintroduction programmes. I am a Przewalski’s horse"
+
+[species.whale]
+name = "Blue whale"
+status = "endangered"
+place = "Open ocean"
+source = "https://www.fisheries.noaa.gov/species/blue-whale"
+family = "cetacean"
+movement = "swim"
+scene = 5
+region = "ocean"
+home = "Open oceans / worldwide"
+story = "I filter tiny krill from seawater through baleen plates. My low-frequency calls can travel great distances through the ocean"
+care = "Fewer ship strikes and fishing-line entanglements, with quieter and healthier feeding grounds"
+places = [
+    "world",
+]
+latitude = 35.0
+longitude = -124.0
+zone = "Pacific/Honolulu"
+nocturnal = false
+reaction = "The illustrated whale rolls into a slow glide"
+fact = "I am a blue whale. I feed on tiny krill with baleen plates rather than teeth, and my calls travel through the ocean"
+
+[species.huia]
+name = "Huia"
+status = "extinct"
+place = "Aotearoa forest canopy"
+source = "https://www.nzbirdsonline.org.nz/species/huia"
+family = "bird"
+movement = "probe"
+scene = 8
+region = "aotearoa"
+home = "North Island / Aotearoa New Zealand"
+story = "We had strikingly different bills: a female's was long and curved, a male's shorter and stout. Our feathers were taonga, treasured by Māori"
+care = "Forest clearance and hunting drove my disappearance; the last accepted sighting was in 1907"
+places = [
+    "NZ",
+]
+latitude = -46.7
+longitude = 167.9
+zone = "Pacific/Auckland"
+nocturnal = false
+reaction = "The illustrated huia tilts its head as if listening"
+fact = "Our male and female beaks had different shapes. We searched the forests of Aotearoa for food before our extinction"
+
+[species.rhino]
+name = "Javan rhinoceros"
+status = "critically endangered"
+place = "Lowland rainforest"
+source = "https://www.worldwildlife.org/species/javan-rhino/"
+family = "quadruped"
+movement = "graze"
+scene = 0
+region = "sunda"
+home = "Ujung Kulon / Java, Indonesia"
+story = "I browse leaves and shoots and cool off in muddy wallows. My remaining wild home is a single protected area on the western tip of Java"
+care = "Strong protection from poaching and a larger, safer habitat beyond one vulnerable location"
+places = [
+    "ID",
+]
+latitude = 1.5
+longitude = 103.0
+zone = "Asia/Jakarta"
+nocturnal = false
+reaction = "The illustrated rhino gives a slow, weighty nod"
+fact = "I am a Javan rhinoceros. My surviving wild relatives live in Ujung Kulon, so protecting that habitat is vital"
+
+[species.seacow]
+name = "Steller’s sea cow"
+status = "extinct"
+place = "Cold kelp shallows"
+source = "https://www.nhm.ac.uk/discover/stellers-sea-cow-first-historical-extinction-of-marine-mammal-at-human-hands.html"
+family = "cetacean"
+movement = "swim"
+scene = 7
+region = "pacific"
+home = "Commander Islands / North Pacific, last known range"
+story = "I was a huge relative of today's dugongs and manatees, feeding on kelp near shore. My last known population disappeared in the 1700s"
+care = "Hunting after the 1741 European encounter wiped out the remaining known population"
+places = [
+    "world",
+]
+latitude = 55.0
+longitude = 165.0
+zone = "Asia/Kamchatka"
+nocturnal = false
+reaction = "The illustrated sea cow drifts down and eases back"
+fact = "I was a large marine herbivore from the North Pacific. I grazed kelp near the surface rather than hunting fish"
+
+[species.tiger]
+name = "Tiger"
+status = "endangered"
+place = "Sal forest and tall grass"
+source = "https://www.worldwildlife.org/species/tiger/"
+family = "quadruped"
+movement = "prowl"
+scene = 0
+region = "india"
+home = "Asia / forests, grasslands and wetlands"
+story = "I usually hunt alone and use scent marks to communicate with other tigers. Each tiger's stripe pattern is different"
+care = "Connected habitat, healthy wild prey and protection from poaching and illegal trade"
+places = [
+    "asia",
+]
+latitude = 24.0
+longitude = 78.0
+zone = "Asia/Kolkata"
+nocturnal = true
+reaction = "The illustrated tiger stretches into a cheek scratch"
+fact = "My stripes help me blend into cover. A connected forest needs enough prey and safe space for a tiger to live"
+
+[species.mink]
+name = "European mink"
+status = "critically endangered"
+place = "Reedy riverbank"
+source = "https://tallinnzoo.ee/en/animal/european-mink/"
+family = "quadruped"
+movement = "swim"
+scene = 12
+region = "europe"
+home = "Europe"
+story = "I slip between riverbank roots and shallow water, looking for fish, frogs and a quiet place to rest"
+care = "Healthy connected wetlands and protection from habitat loss and introduced American mink"
+places = [
+    "europe",
+]
+latitude = 58.0
+longitude = 25.0
+zone = "Europe/Tallinn"
+nocturnal = true
+reaction = "Hang on, I've got water in my whiskers"
+fact = "I slip between riverbank roots and shallow water, looking for fish, frogs and a quiet place to rest"
+
+[species.solenodon]
+name = "Cuban solenodon"
+status = "endangered"
+place = "Cuban mountain forest"
+source = "https://www.edgeofexistence.org/species/cuban-solenodon/"
+family = "quadruped"
+movement = "forage"
+scene = 0
+region = "cuba"
+home = "Cuba"
+story = "I follow my nose through the Cuban forest at night. My long snout helps me find small animals beneath the leaf litter"
+care = "Native forest and protection from introduced predators"
+places = [
+    "americas",
+]
+latitude = 20.0
+longitude = -76.0
+zone = "America/Havana"
+nocturnal = true
+reaction = "I was following a smell. Was that you?"
+fact = "I follow my nose through the Cuban forest at night. My long snout helps me find small animals beneath the leaf litter"
+
+[species.potoroo]
+name = "Gilbert's potoroo"
+status = "critically endangered"
+place = "Coastal heathland"
+source = "https://www.dcceew.gov.au/environment/biodiversity/threatened/action-plan/gilbert-potoroo"
+family = "quadruped"
+movement = "forage"
+scene = 6
+region = "southwest"
+home = "Western Australia"
+story = "I nose through the leaf litter for underground fungi. Dense coastal vegetation gives my little family somewhere to hide"
+care = "Safe habitat, careful fire management and protection from introduced predators"
+places = [
+    "AU",
+]
+latitude = -34.0
+longitude = 116.1
+zone = "Australia/Perth"
+nocturnal = true
+reaction = "I think there's a truffle under your foot"
+fact = "I nose through the leaf litter for underground fungi. Dense coastal vegetation gives my little family somewhere to hide"
+
+[species.melomys]
+name = "Bramble Cay melomys"
+status = "extinct"
+place = "Sandy coral cay"
+source = "https://australian.museum/learn/australia-over-time/extinct-animals/melomys-rubicola/"
+family = "quadruped"
+movement = "forage"
+scene = 18
+region = "reef"
+home = "Torres Strait / Australia"
+story = "My whole world was one low island in the Torres Strait. I searched its vegetation for food and shelter"
+care = "My island habitat was lost as seawater repeatedly flooded the cay"
+places = [
+    "AU",
+]
+latitude = -16.5
+longitude = 145.5
+zone = "Australia/Brisbane"
+nocturnal = true
+reaction = "That patch of sunlight feels familiar"
+fact = "My whole world was one low island in the Torres Strait. I searched its vegetation for food and shelter"
+
+[species.skink]
+name = "Christmas Island forest skink"
+status = "extinct"
+place = "Tropical forest floor"
+source = "https://herpconbio.org/Volume_7/Issue_2/Smith_etal_2012.pdf"
+family = "reptile"
+movement = "bask"
+scene = 0
+region = "sunda"
+home = "Christmas Island / Australia"
+story = "I lived among the leaf litter of Christmas Island. A sunlit patch and tiny forest creatures once made a good day"
+care = "Introduced species and other changes overwhelmed my island home"
+places = [
+    "AU",
+]
+latitude = 1.5
+longitude = 103.0
+zone = "Asia/Kuala_Lumpur"
+nocturnal = false
+reaction = "This bit of ground is still warm"
+fact = "I lived among the leaf litter of Christmas Island. A sunlit patch and tiny forest creatures once made a good day"
+
+[species.paddlefish]
+name = "Chinese paddlefish"
+status = "extinct"
+place = "Yangtze river"
+source = "https://nasps-sturgeon.org/iucn-assessment-2022/"
+family = "fish"
+movement = "swim"
+scene = 1
+region = "yangtze"
+home = "China"
+story = "My long snout led the way through the Yangtze. I was a very large freshwater fish in a river that changed around me"
+care = "Fishing pressure and dams disrupted my population and river journeys"
+places = [
+    "asia",
+]
+latitude = 30.5
+longitude = 114.3
+zone = "Asia/Shanghai"
+nocturnal = false
+reaction = "I'd like one more turn through that current"
+fact = "My long snout led the way through the Yangtze. I was a very large freshwater fish in a river that changed around me"
+
+[species.crayfish]
+name = "Scottsdale burrowing crayfish"
+status = "endangered / TAS"
+place = "Damp sedgeland burrow"
+source = "https://nre.tas.gov.au/conservation/threatened-species-and-communities/lists-of-threatened-species/threatened-species-invertebrates/threatened-species-invertebrate-animals-e-z/freshwater-burrowing-crayfish"
+family = "crustacean"
+movement = "dig"
+scene = 8
+region = "highlands"
+home = "Tasmania / Australia"
+story = "I keep a damp burrow in north-eastern Tasmania. My little patch of wet ground is a whole home"
+care = "Undisturbed wet soil and protection from drainage and habitat damage"
+places = [
+    "AU",
+]
+latitude = -42.9
+longitude = 147.1
+zone = "Australia/Hobart"
+nocturnal = true
+reaction = "I've nearly finished this tunnel"
+fact = "I keep a damp burrow in north-eastern Tasmania. My little patch of wet ground is a whole home"
+
+[species.dog]
+name = "African wild dog"
+status = "endangered"
+place = "Savanna and open woodland"
+source = "https://www.worldwildlife.org/species/african-wild-dog/"
+family = "quadruped"
+movement = "wander"
+scene = 13
+region = "savanna"
+home = "Sub-Saharan Africa"
+story = "My painted coat is my own pattern. I travel, hunt and raise pups with a close-knit pack"
+care = "Connected habitat, fewer snares and protection from disease and conflict"
+places = [
+    "africa",
+]
+latitude = -19.0
+longitude = 23.0
+zone = "Africa/Gaborone"
+nocturnal = false
+reaction = "Did someone else hear that?"
+fact = "My painted coat is my own pattern. I travel, hunt and raise pups with a close-knit pack"
+
+[species.orangutan]
+name = "Bornean orangutan"
+status = "critically endangered"
+place = "Bornean rainforest canopy"
+source = "https://nationalzoo.si.edu/animals/orangutan"
+family = "primate"
+movement = "climb"
+scene = 0
+region = "sunda"
+home = "Indonesia / Malaysia"
+story = "I build a leafy sleeping nest above the forest floor. Fruit keeps me moving through the Bornean canopy"
+care = "Connected rainforest and protection from hunting and forest clearance"
+places = [
+    "ID",
+]
+latitude = 1.5
+longitude = 103.0
+zone = "Asia/Kuala_Lumpur"
+nocturnal = false
+reaction = "I can reach it. I'm deciding whether to"
+fact = "I build a leafy sleeping nest above the forest floor. Fruit keeps me moving through the Bornean canopy"
+
+[species.leopard]
+name = "Amur leopard"
+status = "critically endangered"
+place = "Temperate forest"
+source = "https://www.worldwildlife.org/species/amur-leopard/"
+family = "quadruped"
+movement = "wander"
+scene = 15
+region = "amur"
+home = "Russia / China"
+story = "I keep to the forests of the Russian Far East and nearby China. A quiet route through the trees suits me"
+care = "Connected forest, healthy prey populations and protection from poaching"
+places = [
+    "asia",
+]
+latitude = 44.0
+longitude = 133.0
+zone = "Asia/Vladivostok"
+nocturnal = true
+reaction = "I've been here the whole time"
+fact = "I keep to the forests of the Russian Far East and nearby China. A quiet route through the trees suits me"
+
+[species.lynx]
+name = "Iberian lynx"
+status = "vulnerable"
+place = "Mediterranean scrub"
+source = "https://iucn.org/press-release/202406/iberian-lynx-rebounding-thanks-conservation-action-iucn-red-list"
+family = "quadruped"
+movement = "wander"
+scene = 14
+region = "iberia"
+home = "Spain / Portugal"
+story = "My ear tufts catch your eye, but rabbits catch mine. Mediterranean scrub gives me cover to hunt and rest"
+care = "Healthy rabbit populations, connected habitat and safer roads"
+places = [
+    "europe",
+]
+latitude = 38.0
+longitude = -6.5
+zone = "Europe/Madrid"
+nocturnal = true
+reaction = "Those ears picked you up a while ago"
+fact = "My ear tufts catch your eye, but rabbits catch mine. Mediterranean scrub gives me cover to hunt and rest"
+
+[species.gorilla]
+name = "Mountain gorilla"
+status = "endangered"
+place = "Montane cloud forest"
+source = "https://www.worldwildlife.org/species/gorilla/mountain-gorilla/"
+family = "primate"
+movement = "browse"
+scene = 0
+region = "virunga"
+home = "Rwanda / Uganda / DR Congo"
+story = "I share mountain forest with my family. Leaves and stems fill much of my day before we make our sleeping nests"
+care = "Protected mountain forest and careful management of disease and human contact"
+places = [
+    "africa",
+]
+latitude = -1.4
+longitude = 29.5
+zone = "Africa/Kigali"
+nocturnal = false
+reaction = "You can sit nearby. I was resting"
+fact = "I share mountain forest with my family. Leaves and stems fill much of my day before we make our sleeping nests"
+
+[species.bonobo]
+name = "Bonobo"
+status = "endangered"
+place = "Humid Congo forest"
+source = "https://www.worldwildlife.org/species/bonobo/"
+family = "primate"
+movement = "climb"
+scene = 0
+region = "congo"
+home = "DR Congo"
+story = "My home is south of the Congo River. I forage and spend time with my social group among the forest trees"
+care = "Intact Congolese forest and protection from hunting"
+places = [
+    "africa",
+]
+latitude = -1.5
+longitude = 22.0
+zone = "Africa/Kinshasa"
+nocturnal = false
+reaction = "I was wondering what you were doing"
+fact = "My home is south of the Congo River. I forage and spend time with my social group among the forest trees"
+
+[species.lemur]
+name = "Ring-tailed lemur"
+status = "endangered"
+place = "Dry forest and scrub"
+source = "https://nationalzoo.si.edu/animals/ring-tailed-lemur"
+family = "primate"
+movement = "browse"
+scene = 17
+region = "madagascar"
+home = "Madagascar"
+story = "My striped tail helps my group keep in touch. On a cool morning, a warm patch of sunshine is very welcome"
+care = "Protected Madagascan habitat and an end to capture and hunting"
+places = [
+    "africa",
+]
+latitude = -22.5
+longitude = 45.4
+zone = "Indian/Antananarivo"
+nocturnal = false
+reaction = "I'm keeping my tail up so the others can see me"
+fact = "My striped tail helps my group keep in touch. On a cool morning, a warm patch of sunshine is very welcome"
+
+[species.aye]
+name = "Aye-aye"
+status = "endangered"
+place = "Nocturnal rainforest"
+source = "https://lemur.duke.edu/discover/meet-the-lemurs/aye-aye/"
+family = "primate"
+movement = "forage"
+scene = 0
+region = "madagascar"
+home = "Madagascar"
+story = "I tap wood and listen, then use my long middle finger to find food inside. The Madagascan night is my working day"
+care = "Native forest and protection from persecution"
+places = [
+    "africa",
+]
+latitude = -22.5
+longitude = 45.4
+zone = "Indian/Antananarivo"
+nocturnal = true
+reaction = "Quiet a second. I'm listening inside this branch"
+fact = "I tap wood and listen, then use my long middle finger to find food inside. The Madagascan night is my working day"
+
+[species.tamarin]
+name = "Golden lion tamarin"
+status = "endangered"
+place = "Atlantic coastal forest"
+source = "https://nationalzoo.si.edu/animals/golden-lion-tamarin"
+family = "primate"
+movement = "climb"
+scene = 0
+region = "brazil"
+home = "Brazil"
+story = "I search the Atlantic forest with my family. Tree hollows are good sleeping places for a little golden lion tamarin"
+care = "Connected Atlantic forest and safe habitat for family groups"
+places = [
+    "americas",
+]
+latitude = -22.5
+longitude = -42.5
+zone = "America/Sao_Paulo"
+nocturnal = false
+reaction = "Wait for me. I'm checking the next branch"
+fact = "I search the Atlantic forest with my family. Tree hollows are good sleeping places for a little golden lion tamarin"
+
+[species.macaque]
+name = "Lion-tailed macaque"
+status = "endangered"
+place = "Western Ghats rainforest"
+source = "https://www.zoo-dresden.de/en/animal/lion-tailed-macaque/"
+family = "primate"
+movement = "climb"
+scene = 0
+region = "ghats"
+home = "India"
+story = "My silver mane frames a dark face. I find much of my food up in the rainforest canopy of the Western Ghats"
+care = "Connected native rainforest with room to move between feeding trees"
+places = [
+    "IN",
+]
+latitude = 10.3
+longitude = 77.0
+zone = "Asia/Kolkata"
+nocturnal = false
+reaction = "I'll keep this fruit in my cheek for now"
+fact = "My silver mane frames a dark face. I find much of my food up in the rainforest canopy of the Western Ghats"
+
+[species.tahr]
+name = "Nilgiri tahr"
+status = "endangered"
+place = "Western Ghats grass cliffs"
+source = "https://www.wwfindia.org/about_wwf/priority_species/lesser_known_species/"
+family = "quadruped"
+movement = "browse"
+scene = 19
+region = "ghats"
+home = "India"
+story = "Steep grassy slopes in the Western Ghats feel like home. My hooves help me keep my footing on rocky ground"
+care = "Protected mountain grasslands and connected populations"
+places = [
+    "IN",
+]
+latitude = 10.3
+longitude = 77.0
+zone = "Asia/Kolkata"
+nocturnal = false
+reaction = "I'll put my foot here. It's the steadier bit"
+fact = "Steep grassy slopes in the Western Ghats feel like home. My hooves help me keep my footing on rocky ground"
+
+[species.dolphin]
+name = "Ganges river dolphin"
+status = "endangered"
+place = "Ganges river channels"
+source = "https://www.riverdolphins.org/river-dolphins-worldwide/ganges-river-dolphin/"
+family = "cetacean"
+movement = "swim"
+scene = 1
+region = "ganges"
+home = "India / Bangladesh / Nepal"
+story = "I navigate cloudy river water using sound. Deep pools and connected channels matter much more to me than a clear view"
+care = "Healthy flowing rivers, safer fishing practices and fewer barriers"
+places = [
+    "IN",
+]
+latitude = 25.3
+longitude = 83.0
+zone = "Asia/Kolkata"
+nocturnal = false
+reaction = "I was listening for the bank"
+fact = "I navigate cloudy river water using sound. Deep pools and connected channels matter much more to me than a clear view"
+
+[species.bustard]
+name = "Great Indian bustard"
+status = "critically endangered"
+place = "Open dry grassland"
+source = "https://www.birdlife.org/news/2025/07/04/close-to-extinction-the-status-of-critically-endangered-species/"
+family = "bird"
+movement = "wander"
+scene = 3
+region = "india"
+home = "India / Pakistan"
+story = "I am a large bird of open grassland. Quiet ground and space to see the horizon suit me well"
+care = "Protected grassland, safe breeding areas and safer power lines"
+places = [
+    "IN",
+]
+latitude = 24.0
+longitude = 78.0
+zone = "Asia/Kolkata"
+nocturnal = false
+reaction = "I can see further if I straighten up"
+fact = "I am a large bird of open grassland. Quiet ground and space to see the horizon suit me well"
+
+[species.florican]
+name = "Bengal florican"
+status = "critically endangered"
+place = "Seasonal tall grassland"
+source = "https://datazone.birdlife.org/species/factsheet/bengal-florican-houbaropsis-bengalensis"
+family = "bird"
+movement = "forage"
+scene = 3
+region = "grassland"
+home = "India / Nepal / Cambodia"
+story = "Tall grass gives me cover. During breeding displays, males leap above it before dropping back into the green"
+care = "Protected floodplain grasslands and careful seasonal management"
+places = [
+    "asia",
+]
+latitude = 26.0
+longitude = 92.0
+zone = "Asia/Kolkata"
+nocturnal = false
+reaction = "Did you see that jump?"
+fact = "Tall grass gives me cover. During breeding displays, males leap above it before dropping back into the green"
+
+[species.vulture]
+name = "White-rumped vulture"
+status = "critically endangered"
+place = "Open woodland and grassland"
+source = "https://datazone.birdlife.org/species/factsheet/white-rumped-vulture-gyps-bengalensis"
+family = "bird"
+movement = "soar"
+scene = 13
+region = "india"
+home = "India / Nepal"
+story = "Rising warm air helps me search a wide landscape. My family helps clean up what other animals leave behind"
+care = "Food free from harmful veterinary medicines and safe nesting trees"
+places = [
+    "asia",
+]
+latitude = 24.0
+longitude = 78.0
+zone = "Asia/Kolkata"
+nocturnal = false
+reaction = "The air is lifting me here"
+fact = "Rising warm air helps me search a wide landscape. My family helps clean up what other animals leave behind"
+
+[species.gharial]
+name = "Gharial"
+status = "critically endangered"
+place = "Sandy river banks"
+source = "https://nationalzoo.si.edu/animals/gharial"
+family = "reptile"
+movement = "bask"
+scene = 1
+region = "ganges"
+home = "India / Nepal"
+story = "My long narrow snout is well suited to catching fish. A sandy riverbank is a good place to warm up"
+care = "Connected healthy rivers, safe sandbanks and fewer fishing-net deaths"
+places = [
+    "IN",
+]
+latitude = 25.3
+longitude = 83.0
+zone = "Asia/Kolkata"
+nocturnal = false
+reaction = "That bank is warm enough now"
+fact = "My long narrow snout is well suited to catching fish. A sandy riverbank is a good place to warm up"
+
+[species.indipangolin]
+name = "Indian pangolin"
+status = "endangered"
+place = "Forest and dry scrub"
+source = "https://iucn.org/news/secretariat/201610/what-does-new-trade-ban-mean-pangolin-conservation"
+family = "quadruped"
+movement = "dig"
+scene = 6
+region = "india"
+home = "India / Sri Lanka / Pakistan"
+story = "I follow ants and termites, and strong claws help me dig. My scales are keratin, the same material as your nails"
+care = "Protection from wildlife trafficking and safe habitat"
+places = [
+    "IN",
+]
+latitude = 24.0
+longitude = 78.0
+zone = "Asia/Kolkata"
+nocturnal = true
+reaction = "I was following the termites"
+fact = "I follow ants and termites, and strong claws help me dig. My scales are keratin, the same material as your nails"
+
+[species.parakeet]
+name = "Carolina parakeet"
+status = "extinct"
+place = "Riverine woodland"
+source = "https://www.floridamuseum.ufl.edu/100-years/object/carolina-parakeet/"
+family = "bird"
+movement = "fly"
+scene = 12
+region = "america"
+home = "United States"
+story = "My flock once brought green wings and bright heads to American river woods. We ate seeds and travelled together"
+care = "Habitat loss and persecution helped bring my species to extinction"
+places = [
+    "americas",
+]
+latitude = 33.0
+longitude = -81.0
+zone = "America/New_York"
+nocturnal = false
+reaction = "I used to have someone answering back"
+fact = "My flock once brought green wings and bright heads to American river woods. We ate seeds and travelled together"
+
+[species.eagle]
+name = "Philippine eagle"
+status = "critically endangered"
+place = "Tropical mountain forest"
+source = "https://www.philippineeaglefoundation.org/philippine-eagle"
+family = "bird"
+movement = "soar"
+scene = 0
+region = "philippines"
+home = "Philippines"
+story = "My broad wings carry me through Philippine forest. A big bird needs a big, connected home"
+care = "Protected native forest and protection from hunting"
+places = [
+    "asia",
+]
+latitude = 7.0
+longitude = 125.0
+zone = "Asia/Manila"
+nocturnal = false
+reaction = "I can see that movement from here"
+fact = "My broad wings carry me through Philippine forest. A big bird needs a big, connected home"

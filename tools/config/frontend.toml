@@ -1,0 +1,82 @@
+# == Frontend tooling ==
+# Declarative settings generate native formats under out/tools
+
+[typescript]
+"include" = ["src", "tests", "vite.config.ts", "playwright.config.ts"]
+
+[typescript.compilerOptions]
+"target" = "ES2023"
+"lib" = ["ES2023", "DOM", "DOM.Iterable"]
+"module" = "ESNext"
+"moduleResolution" = "Bundler"
+"jsx" = "react-jsx"
+"allowImportingTsExtensions" = true
+"strict" = true
+"noEmit" = true
+"skipLibCheck" = true
+"types" = ["vite/client", "node"]
+
+[vite]
+"cacheDir" = "../out/.cache/vite"
+
+[vite.build]
+"assetsInlineLimit" = 0
+"outDir" = "../out/artifacts/frontend"
+"emptyOutDir" = true
+
+[vite.test]
+"include" = ["tests/**/*.test.{ts,tsx}"]
+"environment" = "node"
+"setupFiles" = ["./tests/setup.ts"]
+"restoreMocks" = true
+"unstubGlobals" = true
+"maxWorkers" = 4
+
+[vite.server]
+"port" = 5173
+"strictPort" = true
+
+[vite.server.proxy]
+
+[vite.server.proxy."/api"]
+"target" = "http://127.0.0.1:8765"
+"changeOrigin" = true
+"ws" = true
+
+[vite.server.proxy."/calendar.ics"]
+"target" = "http://127.0.0.1:8765"
+"changeOrigin" = true
+"ws" = false
+
+[vite.server.proxy."/download"]
+"target" = "http://127.0.0.1:8765"
+"changeOrigin" = true
+"ws" = false
+
+[playwright]
+"testDir" = "./tests/browser"
+"fullyParallel" = true
+"workers" = 2
+"reporter" = "list"
+"outputDir" = "../out/test-results/browser"
+
+[playwright.use]
+"baseURL" = "http://127.0.0.1:5174"
+"reducedMotion" = "reduce"
+"screenshot" = "only-on-failure"
+"trace" = "retain-on-failure"
+
+[playwright.use.viewport]
+"width" = 1440
+"height" = 1000
+
+[playwright.webServer]
+"command" = "npm run dev -- --port 5174"
+"url" = "http://127.0.0.1:5174"
+
+# == Rust-based formatter and linter ==
+[oxfmt]
+printWidth = 100
+tabWidth = 2
+
+[oxlint]

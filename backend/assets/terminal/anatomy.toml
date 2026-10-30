@@ -1,0 +1,557 @@
+# == Local contours ==
+# Coordinates follow each part's existing scale and joint, preserving attachments
+# Soft contours are subdivided in the generator; fins, bills and horn tips keep their edges
+[contours]
+torso = [[-1,0.1],[-0.92,-0.5],[-0.65,-0.91],[-0.24,-1],[0.22,-0.82],[0.63,-0.83],[0.96,-0.4],[1,0.15],[0.82,0.64],[0.58,0.89],[0.1,0.76],[-0.42,0.96],[-0.85,0.62]]
+cat = [[-1,0.08],[-0.9,-0.62],[-0.54,-0.93],[-0.14,-0.86],[0.28,-0.72],[0.7,-0.95],[0.99,-0.38],[1,0.2],[0.77,0.73],[0.45,0.91],[0.13,0.68],[-0.26,0.7],[-0.63,1],[-0.91,0.63]]
+mustelid = [[-1,0.1],[-0.84,-0.49],[-0.48,-0.74],[-0.08,-0.93],[0.39,-1],[0.81,-0.75],[1,-0.19],[0.97,0.35],[0.72,0.84],[0.2,0.94],[-0.2,0.65],[-0.71,0.67]]
+rat = [[-1,0.1],[-0.78,-0.49],[-0.38,-0.76],[0.2,-1],[0.68,-0.77],[1,-0.21],[0.98,0.31],[0.67,0.88],[0.22,1],[-0.4,0.74],[-0.86,0.5]]
+ungulate = [[-1,-0.13],[-0.81,-0.82],[-0.5,-1],[-0.1,-0.88],[0.29,-0.85],[0.69,-0.91],[1,-0.41],[0.92,0.52],[0.72,0.78],[0.26,0.78],[-0.04,0.95],[-0.56,0.97],[-0.9,0.51]]
+ape = [[-0.79,-0.69],[-0.31,-1],[0.28,-0.93],[0.7,-0.57],[1,-0.03],[0.72,0.48],[0.59,0.96],[0.2,0.82],[-0.22,1],[-0.55,0.63],[-0.8,0.13],[-1,-0.25]]
+rhino = [[-1,-0.04],[-0.8,-0.64],[-0.4,-0.99],[0.04,-0.88],[0.39,-0.81],[0.84,-0.59],[1,-0.03],[0.96,0.47],[0.64,0.92],[0.03,0.93],[-0.6,0.88],[-0.94,0.49]]
+elephant = [[-1,-0.06],[-0.77,-0.73],[-0.42,-1],[0.04,-0.94],[0.47,-0.83],[0.82,-0.74],[1,-0.16],[0.88,0.63],[0.47,0.88],[0.08,1],[-0.53,0.9],[-0.88,0.54]]
+bird = [[-0.73,-0.83],[-0.12,-1],[0.42,-0.63],[0.75,-0.11],[1,0.5],[0.55,0.93],[0.01,0.84],[-0.49,1],[-0.86,0.43],[-1,-0.13]]
+penguin = [[-0.49,-1],[0.13,-0.91],[0.56,-0.57],[0.76,0.1],[1,0.72],[0.57,1],[-0.25,0.92],[-0.73,0.68],[-1,0.07],[-0.87,-0.6]]
+fish = [[-1,0],[-0.68,-0.65],[-0.23,-0.96],[0.21,-0.85],[0.65,-0.44],[1,-0.1],[1,0.13],[0.64,0.37],[0.11,0.89],[-0.36,0.96],[-0.77,0.53]]
+whale = [[-1,-0.08],[-0.89,-0.64],[-0.57,-0.9],[-0.09,-0.87],[0.47,-0.61],[0.84,-0.27],[1,-0.07],[1,0.14],[0.67,0.36],[0.22,0.79],[-0.39,1],[-0.86,0.64]]
+porpoise = [[-1,0.03],[-0.76,-0.68],[-0.29,-1],[0.2,-0.93],[0.59,-0.56],[1,-0.11],[1,0.16],[0.62,0.51],[0.1,0.88],[-0.36,0.96],[-0.82,0.57]]
+seacow = [[-1,0.03],[-0.72,-0.57],[-0.28,-0.91],[0.15,-1],[0.56,-0.74],[0.85,-0.32],[1,-0.07],[1,0.18],[0.59,0.69],[0.04,1],[-0.48,0.93],[-0.86,0.62]]
+reptile = [[-1,-0.02],[-0.77,-0.68],[-0.25,-0.96],[0.21,-0.86],[0.59,-0.57],[1,-0.16],[1,0.15],[0.59,0.68],[0.1,0.89],[-0.43,0.87],[-0.82,0.43]]
+shell = [[-1,-0.04],[-0.85,-0.59],[-0.46,-0.95],[0.11,-0.96],[0.66,-0.6],[1,-0.12],[0.9,0.23],[0.98,0.36],[0.76,0.55],[0.85,0.68],[0.58,0.79],[0.68,0.92],[0.24,0.87],[-0.13,1],[-0.58,0.76],[-0.9,0.46]]
+frog = [[-0.94,-0.36],[-0.57,-0.82],[-0.13,-1],[0.41,-0.73],[0.82,-0.19],[1,0.29],[0.71,0.77],[0.11,0.91],[-0.43,1],[-0.93,0.41],[-1,-0.05]]
+carapace = [[-1,-0.13],[-0.59,-0.75],[-0.12,-1],[0.52,-0.66],[1,-0.19],[0.94,0.55],[0.61,0.98],[0.2,0.77],[-0.17,1],[-0.76,0.59]]
+head = [[-1,0.28],[-0.85,-0.32],[-0.34,-0.92],[0.25,-1],[0.75,-0.5],[1,0.13],[0.68,0.69],[0.19,0.87],[-0.43,1],[-0.85,0.65]]
+wedge = [[-1,0.37],[-0.58,-0.23],[-0.14,-0.86],[0.34,-1],[0.84,-0.51],[1,0.2],[0.7,0.79],[0.13,0.87],[-0.58,0.66]]
+longhead = [[-0.94,-0.12],[-0.49,-0.91],[0.16,-1],[0.72,-0.5],[1,0.09],[0.6,0.49],[0.15,0.94],[-0.49,1],[-0.9,0.65]]
+snout = [[-1,0.2],[-0.83,-0.32],[-0.16,-0.7],[0.45,-1],[1,-0.36],[0.9,0.56],[0.22,0.98],[-0.46,0.61],[-0.92,0.48]]
+blunt = [[-1,-0.1],[-0.73,-0.82],[-0.15,-1],[0.61,-0.73],[1,-0.15],[0.89,0.58],[0.26,1],[-0.44,0.87],[-0.93,0.44]]
+tail = [[-1,-0.53],[-0.52,-0.82],[-0.07,-0.88],[0.31,-0.64],[0.65,-0.36],[1,-0.02],[0.74,0.23],[0.35,0.47],[-0.17,0.73],[-0.66,0.84],[-1,0.64]]
+brush = [[-1,0.23],[-0.75,-0.53],[-0.36,-0.69],[0.01,-1],[0.43,-0.77],[0.91,-0.35],[1,0.16],[0.77,0.19],[0.75,0.61],[0.39,0.6],[0.16,0.94],[-0.13,0.73],[-0.52,1],[-0.69,0.64],[-1,0.46]]
+upright = [[-0.1,-1],[0.5,-0.8],[0.88,-0.31],[0.73,0.13],[0.67,0.68],[0.19,1],[-0.52,0.73],[-0.86,0.17],[-0.8,-0.45],[-0.46,-0.89]]
+feathers = [[-1,-0.33],[-0.41,-1],[0.17,-0.54],[0.83,-0.87],[1,-0.29],[0.73,0.8],[0.37,1],[0.11,0.67],[-0.31,0.94],[-0.75,0.46]]
+wing = [[-0.55,-1],[-1,-0.5],[-0.62,-0.12],[-0.35,0.42],[0.39,1],[0.58,0.63],[0.81,0.75],[0.83,0.25],[1,0.1],[0.68,-0.19],[0.23,-0.35]]
+flipper = [[-0.44,-1],[-0.88,-0.52],[-0.65,0.06],[-0.19,0.69],[0.4,1],[0.71,0.56],[0.67,-0.04],[0.31,-0.63]]
+dorsal = [[-1,1],[-0.54,0.26],[-0.13,-0.54],[0.2,-1],[0.4,-0.55],[0.45,0.28],[0.75,0.78],[1,1]]
+triangle = [[-1,1],[-0.43,0.03],[0.07,-1],[0.46,-0.02],[1,1]]
+fluke = [[-1,-0.15],[-0.43,-0.38],[0.24,-0.88],[1,-1],[0.79,-0.49],[0.24,0.51],[-0.08,1],[-0.31,0.41],[-0.71,0.18]]
+flukedown = [[-1,0.15],[-0.43,0.38],[0.24,0.88],[1,1],[0.79,0.49],[0.24,-0.51],[-0.08,-1],[-0.31,-0.41],[-0.71,-0.18]]
+pointed = [[-1,-0.67],[-0.5,-0.96],[0.36,-0.49],[1,0],[0.36,0.49],[-0.5,0.96],[-1,0.67]]
+fishfin = [[-1,0.75],[-0.65,0.07],[-0.27,-1],[0.15,-0.58],[0.61,-0.47],[1,1],[0.22,0.8]]
+horn = [[-0.85,1],[-0.63,0.47],[-0.34,-0.2],[0.03,-1],[0.28,-0.28],[0.63,0.49],[0.91,1]]
+tahrhorn = [[-0.81,1],[-0.65,0.18],[-0.29,-0.55],[0.33,-0.97],[0.96,-0.79],[0.45,-0.45],[0.15,0.05],[0.13,0.54],[0.31,1]]
+rhinohorn = [[-1,1],[-0.47,0.22],[-0.02,-0.27],[0.19,-1],[0.37,-0.06],[0.63,0.48],[1,1]]
+bill = [[-1,0.08],[-0.54,-0.48],[0.21,-0.92],[1,-0.69],[1,0.72],[0.13,0.85],[-0.64,0.39]]
+hook = [[-1,0.42],[-0.65,-0.53],[-0.01,-0.88],[0.69,-0.68],[1,-0.07],[0.84,0.7],[0.07,0.34],[-0.61,0.04],[-0.8,1]]
+huia = [[1,-1],[0.47,-0.81],[-0.06,-0.57],[-0.45,-0.2],[-0.76,0.22],[-1,1],[-0.62,0.51],[-0.29,0.1],[0.21,-0.24],[0.64,-0.4],[1,-0.47]]
+scale = [[-1,-0.34],[-0.56,-0.91],[0.42,-1],[1,-0.35],[0.52,0.42],[0.12,1],[-0.56,0.54]]
+hoof = [[-1,-0.54],[-0.72,-1],[0.39,-0.81],[0.75,0.18],[1,0.9],[-0.92,1]]
+cloven = [[-1,-0.54],[-0.72,-1],[0.39,-0.81],[0.75,0.18],[1,0.9],[0.15,1],[0.01,0.43],[-0.13,1],[-0.92,1]]
+ear = [[-0.63,1],[-1,0.31],[-0.72,-0.54],[-0.01,-1],[0.63,-0.64],[1,0.19],[0.61,1]]
+mane = [[-1,0],[-0.78,-0.31],[-0.92,-0.58],[-0.43,-0.69],[-0.39,-1],[0.02,-0.79],[0.42,-0.97],[0.47,-0.62],[0.94,-0.54],[0.72,-0.12],[1,0.25],[0.65,0.49],[0.69,0.83],[0.32,0.75],[0,1],[-0.25,0.75],[-0.61,0.87],[-0.64,0.49],[-0.94,0.41]]
+rostrum = [[-1,-0.13],[-0.95,-0.31],[-0.12,-0.76],[0.67,-1],[1,-0.39],[1,0.51],[0.36,0.97],[-0.24,0.59],[-0.94,0.13]]
+limb = [[-0.35,-1],[-0.86,-0.65],[-1,-0.19],[-0.75,0.34],[-0.32,1],[0.35,1],[0.59,0.41],[0.93,-0.05],[0.68,-0.72],[0.25,-1]]
+thigh = [[-0.42,-1],[-0.9,-0.68],[-1,-0.1],[-0.68,0.42],[-0.3,1],[0.3,1],[0.53,0.38],[0.91,-0.12],[0.67,-0.78],[0.26,-1]]
+shank = [[-0.24,-1],[-0.78,-0.61],[-1,-0.18],[-0.53,0.35],[-0.25,1],[0.29,1],[0.46,0.25],[0.7,-0.42],[0.44,-0.91]]
+column = [[-0.43,-1],[-0.85,-0.64],[-0.96,-0.1],[-0.7,0.47],[-0.45,1],[0.51,1],[0.66,0.5],[0.94,-0.05],[0.74,-0.72],[0.37,-1]]
+pawfoot = [[-1,0.56],[-0.92,-0.06],[-0.52,-0.71],[0.13,-1],[0.66,-0.62],[1,0.1],[0.88,0.76],[0.32,1],[-0.23,0.86],[-0.62,1]]
+hand = [[-1,0.62],[-0.94,-0.19],[-0.63,-0.47],[-0.26,-0.82],[0.17,-1],[0.64,-0.72],[0.86,-0.15],[1,0.41],[0.73,0.91],[0.39,0.63],[0.11,1],[-0.14,0.72],[-0.39,1],[-0.64,0.69]]
+birdfoot = [[-1,0.12],[-0.26,-0.18],[-0.2,-1],[0.2,-1],[0.25,-0.16],[1,0.21],[0.64,0.4],[0.14,0.18],[0.76,0.93],[0.41,1],[-0.01,0.38],[-0.56,0.99],[-0.83,0.73],[-0.26,0.18]]
+webfoot = [[-0.65,-0.79],[-0.05,-1],[0.32,-0.45],[1,0.79],[0.4,0.69],[0.17,1],[-0.13,0.72],[-0.53,0.91],[-1,0.59]]
+cushion = [[-1,0.4],[-0.89,-0.38],[-0.34,-1],[0.47,-0.89],[0.96,-0.24],[1,0.52],[0.49,0.96],[-0.15,1],[-0.72,0.9]]
+flightarm = [[-0.31,-1],[-0.78,-0.76],[-1,-0.16],[-0.81,0.49],[-0.23,1],[0.36,0.94],[0.85,0.34],[1,-0.28],[0.63,-0.83],[0.13,-1]]
+primary = [[-0.37,-1],[-0.85,-0.71],[-1,-0.21],[-0.72,0.41],[-0.16,1],[0.22,0.89],[0.63,0.23],[0.78,-0.48],[0.31,-1]]
+membrane = [[-0.2,1],[-0.85,0.45],[-1,-0.1],[-0.72,-0.8],[0.05,-1],[0.67,-0.64],[1,-0.1],[0.64,0.65]]
+
+# == Limb construction ==
+# Display proportions and timings are reconstruction choices, not measured joint trajectories
+[legs.paw]
+species = ["numbat","mink","quoll","pangolin","solenodon","potoroo","melomys","tiger","panda","dog","otter","leopard","lynx","indipangolin","thylacine"]
+upper = "limb"
+lower = "shank"
+foot = "pawfoot"
+[legs.hoof]
+species = ["saola","tahr","horse"]
+upper = "limb"
+lower = "shank"
+foot = "hoof"
+[legs.heavy]
+species = ["elephant","rhino"]
+upper = "column"
+lower = "column"
+foot = "cushion"
+[legs.hand]
+species = ["orangutan","gorilla","bonobo","lemur","aye","tamarin","macaque"]
+upper = "limb"
+lower = "shank"
+foot = "hand"
+[legs.toe]
+species = ["huia","bustard","florican","vulture","dodo","pigeon","parakeet","kakapo","eagle"]
+upper = "limb"
+lower = "shank"
+foot = "birdfoot"
+[legs.web]
+species = ["auk","penguin"]
+upper = "limb"
+lower = "shank"
+foot = "webfoot"
+[legs.splay]
+species = ["skink","gharial","axolotl","frog"]
+upper = "limb"
+lower = "shank"
+foot = "hand"
+
+# Feather fans differ in spread and taper; diving birds keep their shortened flipper plan
+[wings.huia]
+span = 0.24
+breadth = 0.045
+fan = 0.28
+beat = 2.5
+stroke = 0.85
+[wings.vulture]
+span = 0.33
+breadth = 0.052
+fan = 0.62
+beat = 1.2
+stroke = 0.8
+[wings.eagle]
+span = 0.32
+breadth = 0.055
+fan = 0.52
+beat = 1.7
+stroke = 0.95
+[wings.pigeon]
+span = 0.28
+breadth = 0.034
+fan = 0.18
+beat = 4.0
+stroke = 1.05
+[wings.parakeet]
+span = 0.24
+breadth = 0.046
+fan = 0.34
+beat = 3.5
+stroke = 1.0
+[wings.bustard]
+span = 0.31
+breadth = 0.06
+fan = 0.44
+beat = 2.0
+stroke = 0.9
+[wings.florican]
+span = 0.26
+breadth = 0.046
+fan = 0.36
+beat = 2.3
+stroke = 0.9
+[wings.dodo]
+span = 0.11
+breadth = 0.028
+fan = 0.24
+beat = 0.0
+stroke = 0.0
+[wings.kakapo]
+span = 0.16
+breadth = 0.041
+fan = 0.34
+beat = 0.0
+stroke = 0.0
+
+# == Species silhouettes ==
+# Shape changes are applied before limb and tail joints are built
+[species.numbat]
+body = "torso"
+head = "wedge"
+face = "snout"
+tail = "brush"
+ear = "ear"
+parts.body = [0.49,0.69,0.245,0.105,0.20,0,0]
+parts.face = [0.145,0.545,0.093,0.029,0.09,0.14,0]
+
+[species.saola]
+body = "ungulate"
+head = "longhead"
+face = "blunt"
+tail = "tail"
+horn = "horn"
+ear = "ear"
+foot = "hoof"
+
+[species.huia]
+body = "bird"
+head = "head"
+tail = "feathers"
+paw = "wing"
+beak = "huia"
+face = "bill"
+parts.face = [0.19,0.36,0.095,0.018,0.05,0.10,0]
+parts.beak1 = [0.118,0.398,0.065,0.054,0.045,0.11,0]
+parts.beak2 = [0.081,0.457,0.014,0.026,0.032,0.13,0]
+
+[species.mink]
+body = "mustelid"
+head = "wedge"
+face = "snout"
+tail = "tail"
+
+[species.bee]
+body = "carapace"
+head = "blunt"
+wing = "membrane"
+paw = "membrane"
+darkhead = "blunt"
+parts.darkhead = [0.28,0.48,0.08,0.08,0.16,0.17,0]
+parts.eye1 = [0.255,0.475,0.017,0.023,0.02,0.34,0]
+parts.eyelight = [0.25,0.468,0.004,0.004,0.01,0.365,0]
+parts.paw1 = [0.37,0.39,0.07,0.16,0.035,-0.02,-0.32]
+parts.paw2 = [0.55,0.40,0.06,0.155,0.03,-0.02,0.32]
+parts.wing1 = [0.38,0.42,0.05,0.11,0.025,-0.03,-0.32]
+parts.wing2 = [0.56,0.43,0.045,0.106,0.024,-0.03,0.32]
+
+[species.quoll]
+body = "torso"
+head = "wedge"
+face = "snout"
+tail = "tail"
+parts.body = [0.49,0.69,0.24,0.115,0.20,0,0]
+parts.face = [0.145,0.542,0.085,0.032,0.09,0.14,0]
+
+[species.pangolin]
+body = "rat"
+head = "wedge"
+face = "snout"
+tail = "tail"
+scale = "scale"
+
+[species.solenodon]
+body = "rat"
+head = "wedge"
+face = "snout"
+tail = "tail"
+
+[species.auk]
+body = "penguin"
+head = "head"
+face = "bill"
+paw = "flipper"
+tail = "feathers"
+
+[species.potoroo]
+body = "rat"
+head = "wedge"
+face = "snout"
+tail = "tail"
+
+[species.melomys]
+body = "rat"
+head = "wedge"
+face = "snout"
+tail = "tail"
+
+[species.skink]
+body = "reptile"
+head = "wedge"
+face = "snout"
+tail = "tail"
+scale = "scale"
+
+[species.paddlefish]
+body = "fish"
+head = "wedge"
+face = "rostrum"
+tail = "tail"
+tailupper = "fishfin"
+taillower = "fishfin"
+paw = "fishfin"
+
+[species.frog]
+body = "frog"
+head = "blunt"
+face = "blunt"
+
+[species.crayfish]
+body = "carapace"
+head = "wedge"
+tail = "feathers"
+claw = "scale"
+scale = "scale"
+
+[species.tiger]
+body = "cat"
+head = "head"
+face = "blunt"
+tail = "tail"
+
+[species.elephant]
+body = "elephant"
+head = "longhead"
+face = "blunt"
+tail = "tail"
+ear = "ear"
+
+[species.panda]
+body = "torso"
+head = "head"
+face = "blunt"
+tail = "brush"
+ear = "ear"
+
+[species.dog]
+body = "cat"
+head = "wedge"
+face = "snout"
+tail = "brush"
+parts.body = [0.50,0.64,0.235,0.135,0.20,0,0]
+
+[species.orangutan]
+body = "ape"
+head = "head"
+face = "blunt"
+
+[species.otter]
+body = "mustelid"
+head = "wedge"
+face = "blunt"
+tail = "tail"
+parts.tail = [0.79,0.755,0.18,0.065,0.08,0,-0.12]
+
+[species.leopard]
+body = "cat"
+head = "head"
+face = "blunt"
+tail = "tail"
+
+[species.lynx]
+body = "cat"
+head = "head"
+face = "blunt"
+tail = "tail"
+ear = "ear"
+
+[species.rhino]
+body = "rhino"
+head = "longhead"
+face = "blunt"
+tail = "tail"
+horn = "rhinohorn"
+ear = "ear"
+
+[species.gorilla]
+body = "ape"
+head = "head"
+face = "blunt"
+
+[species.bonobo]
+body = "ape"
+head = "head"
+face = "blunt"
+
+[species.lemur]
+body = "torso"
+head = "wedge"
+face = "snout"
+tail = "upright"
+whitetailbase = "upright"
+ear = "ear"
+
+[species.aye]
+body = "torso"
+head = "wedge"
+face = "snout"
+tail = "brush"
+
+[species.tamarin]
+body = "torso"
+head = "mane"
+face = "blunt"
+tail = "upright"
+
+[species.macaque]
+body = "torso"
+head = "head"
+face = "blunt"
+facewhite = "mane"
+tail = "upright"
+
+[species.tahr]
+body = "ungulate"
+head = "longhead"
+face = "blunt"
+tail = "tail"
+ear = "ear"
+horn = "tahrhorn"
+foot = "hoof"
+parts.body = [0.51,0.63,0.24,0.15,0.21,0,0]
+parts.horn1 = [0.26,0.273,0.046,0.085,0.07,0.07,0]
+parts.horn2 = [0.316,0.281,0.038,0.076,0.06,-0.015,0]
+
+[species.dolphin]
+body = "fish"
+head = "wedge"
+face = "rostrum"
+beak = "rostrum"
+tail = "tail"
+tailupper = "fluke"
+taillower = "flukedown"
+paw1 = "flipper"
+paw2 = "dorsal"
+
+[species.bustard]
+body = "bird"
+head = "head"
+face = "bill"
+beak = "bill"
+tail = "feathers"
+paw = "wing"
+
+[species.florican]
+body = "bird"
+head = "head"
+face = "bill"
+beak = "bill"
+tail = "feathers"
+paw = "wing"
+
+[species.vulture]
+body = "bird"
+head = "wedge"
+face = "hook"
+beak = "hook"
+tail = "feathers"
+paw = "wing"
+
+[species.gharial]
+body = "reptile"
+head = "wedge"
+face = "rostrum"
+tail = "tail"
+scale = "scale"
+parts.paw1 = [0.33,0.76,0.025,0.04,0.07,0.03,0]
+parts.paw2 = [0.65,0.77,0.03,0.035,0.07,0.025,0]
+
+[species.indipangolin]
+body = "rat"
+head = "wedge"
+face = "snout"
+tail = "tail"
+scale = "scale"
+
+[species.dodo]
+body = "bird"
+head = "longhead"
+face = "hook"
+beak = "hook"
+tail = "feathers"
+paw = "wing"
+parts.body = [0.48,0.62,0.172,0.185,0.21,0,0]
+parts.neck = [0.36,0.435,0.064,0.13,0.15,0,0]
+
+[species.thylacine]
+body = "cat"
+head = "wedge"
+face = "snout"
+tail = "tail"
+parts.body = [0.495,0.667,0.245,0.115,0.20,0,0]
+
+[species.pigeon]
+body = "bird"
+head = "head"
+face = "bill"
+beak = "bill"
+tail = "pointed"
+paw = "wing"
+parts.tail = [0.765,0.685,0.175,0.047,0.055,0,0.19]
+
+[species.parakeet]
+body = "bird"
+head = "head"
+face = "hook"
+beak = "hook"
+tail = "feathers"
+paw = "wing"
+
+[species.seacow]
+body = "seacow"
+head = "blunt"
+face = "blunt"
+tail = "tail"
+tailupper = "fluke"
+taillower = "flukedown"
+paw = "flipper"
+
+[species.vaquita]
+body = "porpoise"
+head = "blunt"
+face = "blunt"
+tail = "tail"
+tailupper = "fluke"
+taillower = "flukedown"
+paw1 = "flipper"
+paw2 = "triangle"
+
+[species.axolotl]
+body = "reptile"
+head = "blunt"
+face = "blunt"
+tail = "tail"
+tailfin = "fishfin"
+ear = "flipper"
+parts.paw1 = [0.33,0.755,0.022,0.035,0.06,0.03,0]
+parts.paw2 = [0.65,0.76,0.026,0.035,0.06,0.025,0]
+parts.foot1 = [0.30,0.795,0.025,0.008,0.04,0.04,0]
+parts.foot2 = [0.68,0.795,0.029,0.009,0.04,0.035,0]
+
+[species.turtle]
+body = "shell"
+head = "wedge"
+face = "hook"
+beak = "hook"
+tail = "tail"
+paw = "flipper"
+scale = "scale"
+parts.paw3 = [0.375,0.735,0.047,0.10,0.07,-0.12,0]
+parts.paw4 = [0.715,0.71,0.075,0.055,0.065,-0.12,0]
+
+[species.whale]
+body = "whale"
+head = "blunt"
+face = "blunt"
+tail = "tail"
+tailupper = "fluke"
+taillower = "flukedown"
+paw1 = "flipper"
+paw2 = "dorsal"
+parts.body = [0.49,0.555,0.305,0.115,0.22,0,0]
+parts.head = [0.245,0.55,0.155,0.086,0.18,0.04,0]
+parts.face = [0.11,0.588,0.055,0.018,0.05,0.14,0]
+parts.paw2 = [0.705,0.486,0.024,0.033,0.05,-0.025,0]
+
+[species.penguin]
+body = "penguin"
+head = "head"
+face = "bill"
+paw = "flipper"
+tail = "feathers"
+
+[species.kakapo]
+body = "bird"
+head = "head"
+face = "hook"
+beak = "hook"
+paw = "wing"
+tail = "feathers"
+
+[species.eagle]
+body = "bird"
+head = "head"
+face = "hook"
+beak = "hook"
+paw = "wing"
+tail = "feathers"
+
+[species.horse]
+body = "ungulate"
+head = "longhead"
+face = "blunt"
+tail = "tail"
+ear = "ear"
+foot = "hoof"
