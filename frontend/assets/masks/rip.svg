@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" preserveAspectRatio="none">
+  <defs>
+    <filter id="paper" x="-5%" y="-8%" width="110%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency=".018 .04" numOctaves="3" seed="14" result="fibre"/>
+      <feDisplacementMap in="SourceGraphic" in2="fibre" scale="18" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <path fill="white" filter="url(#paper)" d="M18 51Q86 30 151 45Q218 28 286 45Q353 25 422 43Q489 23 555 45Q625 26 690 44Q759 25 827 46Q895 27 980 50Q965 119 980 184Q962 252 980 316Q960 383 977 449Q957 515 980 574Q909 593 840 579Q770 599 701 581Q633 600 564 580Q494 602 426 581Q357 600 288 579Q218 599 150 580Q82 598 20 574Q38 509 20 445Q40 379 21 315Q42 249 22 184Q42 117 18 51Z"/>
+</svg>

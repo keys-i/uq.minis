@@ -1,0 +1,115 @@
+/* == Shared canvas with semantic controls above the artwork == */
+.wildlife-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  contain: strict;
+}
+.animal-cartoon {
+  container-type: size;
+}
+.cartoon-still {
+  position: absolute;
+  width: min(100cqw, 145.4545cqh);
+  aspect-ratio: 320 / 220;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.92);
+  opacity: 1;
+  transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cartoon-pose {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-repeat: no-repeat;
+}
+.animal[data-rendered="true"] .cartoon-still {
+  opacity: 0;
+}
+.habitat-page {
+  isolation: auto;
+}
+.page-habitat {
+  z-index: 0;
+  overflow: clip;
+}
+.habitat-clouds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #182e43;
+  opacity: calc(var(--cloud-cover, 0) * 0.25);
+  transition: opacity 4s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cartoon-still,
+  .habitat,
+  .page-habitat,
+  .habitat-light,
+  .habitat-clouds {
+    transition: none;
+  }
+}
+
+/* -- A resident shares a new fact after a few gentle interactions -- */
+.animal-discovery {
+  position: absolute;
+  z-index: 6;
+  bottom: 80%;
+  left: 0;
+  right: 0;
+  border-radius: 22px 22px 22px 6px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text);
+  box-shadow: 0 4px 14px #182f3820;
+}
+.animal-discovery p {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+.animal-discovery button {
+  min-height: 40px;
+  font-size: 0.8rem;
+}
+.weather-credit {
+  display: block;
+  margin-top: 16px;
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+.animal-fact {
+  background: var(--home-soft);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+/* -- Painted foreground layers follow wind without moving the controls -- */
+.habitat-foreground {
+  position: absolute;
+  right: -12px;
+  bottom: -8px;
+  width: 27%;
+  height: 40%;
+  pointer-events: none;
+  transform-origin: 80% 100%;
+}
+.pal[data-running="true"] .habitat-foreground {
+  animation: habitat-wind var(--gust, 9s) ease-in-out infinite alternate;
+}
+.pal[data-running="true"]:has([data-action="forage"]) .habitat-foreground {
+  animation-duration: 1.6s;
+}
+@keyframes habitat-wind {
+  to {
+    transform: rotate(var(--sway, 1deg));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .habitat-foreground {
+    animation: none !important;
+  }
+}

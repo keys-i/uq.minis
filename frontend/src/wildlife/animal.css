@@ -1,0 +1,576 @@
+/* == Living postcard habitats == */
+.pal {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+.animal {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+.animal-presence > .habitat {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.animal-tools {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 9px;
+  display: flex;
+  align-items: center;
+  z-index: 2;
+}
+.animal-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  background: #fffdf5ed;
+  border: 1px solid #ffffffc7;
+  border-radius: 15px;
+  box-shadow: 0 3px 12px #243e2820;
+  text-align: left;
+}
+.animal-details > span:nth-child(2) {
+  min-width: 0;
+}
+.animal-details strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.animal-details small {
+  display: block;
+  font-size: 0.65rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--accent);
+}
+.animal-note {
+  --home: #297665;
+  --home-soft: #e5efe2;
+  --home-trim: #cfac55;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  padding: 25px;
+  border: 1px solid #ffffffd9;
+  border-radius: 25px;
+  background: #fffdf5;
+  color: var(--text);
+  box-shadow: 0 12px 60px #183c3345;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  border-top: 7px solid var(--home);
+}
+.animal-note::backdrop {
+  background: #183c332b;
+}
+.animal-note[data-region="australia"] {
+  --home: #786039;
+  --home-soft: #f1eadb;
+  --home-trim: #bd8154;
+}
+.animal-note[data-region="amazon"] {
+  --home: #247064;
+  --home-soft: #e1f0e9;
+  --home-trim: #d2ac48;
+}
+.animal-note[data-region="cape"] {
+  --home: #356782;
+  --home-soft: #e6eef2;
+  --home-trim: #ce9c48;
+}
+.animal-note[data-region="mauritius"],
+.animal-note[data-region="caribbean"] {
+  --home: #217979;
+  --home-soft: #e0f2ed;
+  --home-trim: #d59070;
+}
+.animal-note[data-region="sunda"],
+.animal-note[data-region="annamite"] {
+  --home: #426854;
+  --home-soft: #e8eedb;
+  --home-trim: #b79950;
+}
+.animal-note[data-region="aotearoa"] {
+  --home: #355e4b;
+  --home-soft: #e4ebe0;
+  --home-trim: #a79771;
+}
+.animal-note[data-region="mexico"] {
+  --home: #a34c35;
+  --home-soft: #f5e7d3;
+  --home-trim: #32877e;
+}
+.animal-note[data-region="reef"],
+.animal-note[data-region="ocean"] {
+  --home: #247587;
+  --home-soft: #e1f1f1;
+  --home-trim: #c69a62;
+}
+.animal-note[data-region="prairie"],
+.animal-note[data-region="woodland"] {
+  --home: #8b632e;
+  --home-soft: #f3ecd9;
+  --home-trim: #769167;
+}
+.animal-note[data-region="atlantic"],
+.animal-note[data-region="pacific"] {
+  --home: #486a7d;
+  --home-soft: #e9eef0;
+  --home-trim: #8a9c85;
+}
+.animal-note[data-region="india"] {
+  --home: #9c572b;
+  --home-soft: #f7ecd5;
+  --home-trim: #777647;
+}
+.animal-note[data-region="himalaya"] {
+  --home: #496c63;
+  --home-soft: #e8efea;
+  --home-trim: #b69066;
+}
+.animal-note[data-region="steppe"] {
+  --home: #386680;
+  --home-soft: #f2eddb;
+  --home-trim: #bd9654;
+}
+.story-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin: -2px 0 22px;
+  padding-bottom: 15px;
+  border-bottom: 2px dashed var(--home-trim);
+}
+.story-home {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  font-weight: 800;
+  color: var(--home);
+}
+.story-home > .place-mark {
+  flex: none;
+  max-width: 104px;
+}
+.story-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0;
+  background: var(--home-soft);
+  color: var(--home);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: none;
+  font-size: 1.5rem;
+}
+.story-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: -9px -9px 0 0;
+}
+.animal-note .animal-story {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 19px 0;
+}
+.animal-care {
+  background: var(--home-soft);
+  border-radius: 16px;
+  padding: 15px 17px;
+  margin: 0 0 14px;
+}
+.animal-care strong {
+  font-size: 0.78rem;
+  color: var(--home);
+}
+.animal-note .animal-care p {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 5px 0 0;
+}
+.animal-note a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  color: var(--home);
+}
+.animal-note .protector-link {
+  justify-content: flex-start;
+  margin-top: 17px;
+  padding: 9px 12px;
+  border: 2px solid var(--home);
+  border-radius: 18px;
+  background: var(--home-soft);
+  box-shadow: 0 3px 0 var(--home);
+  text-decoration: none;
+}
+.protector-link > span:nth-child(2) {
+  flex: 1;
+  font-family: DynaPuff, "Comic Neue", cursive;
+}
+.protector-link > .icon {
+  width: 16px;
+  height: 16px;
+}
+.protector-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border: 2px solid var(--home-trim);
+  border-radius: 50%;
+  background: var(--panel);
+}
+.protector-mark .animal-portrait {
+  width: 38px;
+  height: 38px;
+  background: transparent;
+}
+.status-badge {
+  display: block;
+  width: 25px;
+  height: 28px;
+  flex: none;
+  --badge: #f4c35b;
+  --badge-ink: #69501b;
+  transform-origin: center;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (hover: hover) {
+  .status-badge:hover {
+    transform: translateY(-2px) rotate(-4deg) scale(1.1);
+  }
+}
+.status-badge:active {
+  transform: translateY(1px) rotate(0) scale(0.96);
+}
+.status-badge img {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.badge-symbol {
+  transform-origin: 16px 16px;
+}
+.status-critical {
+  --badge: #ffd2b8;
+  --badge-ink: #8a412c;
+}
+.status-extinct {
+  --badge: #e3d5f3;
+  --badge-ink: #654b85;
+}
+.animal-touch {
+  position: absolute;
+  z-index: 2;
+  inset: 12% 10% 27%;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 40%;
+  box-shadow: none;
+  cursor: grab;
+}
+.animal-touch:active {
+  cursor: grabbing;
+}
+.animal-touch:focus-visible {
+  outline-offset: -4px;
+}
+.pat-spark {
+  position: absolute;
+  right: 18%;
+  top: 5%;
+  font-size: 25px;
+  font-weight: 900;
+  color: #bc4f62;
+  opacity: 0;
+  pointer-events: none;
+}
+.is-petted .pat-spark {
+  opacity: 1;
+  animation: pat-spark 1.7s ease-out both;
+}
+.animal-thought {
+  position: absolute;
+  bottom: 104px;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  padding: 16px;
+  background: #fffdf5;
+  border: 1px solid #fff;
+  border-radius: 25px;
+  box-shadow: 0 7px 22px #213e3324;
+  pointer-events: none;
+}
+.animal-thought::after,
+.animal-thought::before {
+  content: "";
+  position: absolute;
+  background: #fffdf5;
+  border-radius: 50%;
+  bottom: -9px;
+  left: 29px;
+  width: 17px;
+  height: 17px;
+}
+.animal-thought::before {
+  bottom: -19px;
+  left: 20px;
+  width: 8px;
+  height: 8px;
+}
+.animal-thought p {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  font-weight: 700;
+  margin: 0 0 7px;
+}
+.animal-thought small {
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+.menu-visitor .animal-touch {
+  inset: 15% 3% 10%;
+}
+
+/* == Resident stages and story portraits == */
+.animal-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.animal-presence {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.animal-portrait {
+  display: block;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  background: #f3ecd7;
+  border-radius: 12px;
+}
+.place-mark {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  max-width: 104px;
+}
+.place-flag {
+  position: relative;
+  display: block;
+  width: 46px;
+  height: 35px;
+  flex: none;
+}
+.place-flag::before {
+  content: "";
+  position: absolute;
+  inset: 4px auto 2px 1px;
+  width: 2px;
+  border-radius: 999px;
+  background: #776c4e;
+}
+.place-flag .flag-cloth {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  clip-path: inset(0 0 0 6%);
+  transform-origin: 6% 50%;
+}
+.place-flag .flag-cloth[data-live="true"] {
+  animation: flag-wave var(--flag-speed, 3.4s) ease-in-out infinite alternate;
+}
+@keyframes flag-wave {
+  0% {
+    clip-path: polygon(6% 0, 96% 3%, 100% 25%, 96% 50%, 100% 75%, 96% 97%, 6% 100%);
+    transform: perspective(70px) rotateY(-6deg) skewY(-1deg) scaleX(0.98);
+  }
+  100% {
+    clip-path: polygon(6% 0, 100% 0, 96% 25%, 100% 50%, 96% 75%, 100% 100%, 6% 100%);
+    transform: perspective(70px) rotateY(6deg) skewY(1deg) scaleX(1.01);
+  }
+}
+.place-globe {
+  display: block;
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+.animal-call {
+  position: absolute;
+  right: 14px;
+  top: 18px;
+  z-index: 3;
+  padding: 9px 13px;
+  background: #fff8dc;
+  border: 2px solid #66582b;
+  border-radius: 20px 20px 4px 20px;
+  font-family: DynaPuff, cursive;
+  font-size: 0.85rem;
+  pointer-events: none;
+  animation: call-arrive 220ms ease-out both;
+}
+.home-clock {
+  display: table;
+  margin-top: 5px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--home) 35%, transparent);
+  border-radius: 7px;
+  background: var(--home-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+.pal[data-running="false"] .animal *,
+.pal[data-running="false"] .animal-presence {
+  animation-play-state: paused !important;
+}
+@keyframes call-arrive {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes pat-spark {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.8);
+  }
+  25%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-12px) scale(1.1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animal *,
+  .badge-symbol,
+  .pat-spark,
+  .place-mark * {
+    animation: none !important;
+  }
+  .status-badge {
+    transform: none !important;
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .animal-details,
+  .animal-note,
+  .animal-care {
+    border: 1px solid CanvasText;
+  }
+  .animal,
+  .place-mark {
+    forced-color-adjust: none;
+  }
+}
+
+.animal-portrait {
+  overflow: hidden;
+}
+.animal-portrait > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+.habitat {
+  position: relative;
+  overflow: clip;
+}
+.habitat,
+.page-habitat {
+  background-repeat: no-repeat;
+  transition: filter 4s ease;
+}
+.habitat-light {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background-color: transparent;
+  opacity: calc((1 - var(--daylight, 1)) * 0.42);
+  transition:
+    background-color 4s ease,
+    opacity 4s ease;
+}
+[data-light="dawn"] .habitat-light {
+  background-color: #e99b5d;
+}
+[data-light="dusk"] .habitat-light {
+  background-color: #775487;
+}
+[data-light="night"] .habitat-light {
+  background-color: #122444;
+}
+.status-badge > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
+}

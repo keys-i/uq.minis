@@ -1,0 +1,55 @@
+{
+  "name": "uq-minis-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run test:browser && npm run build",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --config ../out/tools/oxlint.json --deny-warnings src tests vite.config.ts playwright.config.ts",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "format": "oxfmt --config ../out/tools/oxfmt.json src tests vite.config.ts playwright.config.ts",
+    "format:check": "oxfmt --config ../out/tools/oxfmt.json --check src tests vite.config.ts playwright.config.ts",
+    "configure": "uv run --directory ../backend --no-sync python ../tools/scripts/config.py",
+    "predev": "npm run configure",
+    "prebuild": "npm run assets && npm run configure",
+    "pretypecheck": "npm run configure",
+    "pretest": "npm run configure",
+    "pretest:browser": "npm run configure",
+    "preformat": "npm run configure",
+    "preformat:check": "npm run configure",
+    "prelint": "npm run configure",
+    "assets": "uv run --directory ../backend --locked --no-default-groups --group art --inexact python ../tools/scripts/atlas.py"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.104.5",
+    "chrono-node": "^2.10.3",
+    "pixi.js": "^8.22.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.6.7",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react-swc": "^4.3.3",
+    "jsdom": "^30.1.3",
+    "oxfmt": "^0.74.0",
+    "oxlint": "^1.89.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.0.0",
+    "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
