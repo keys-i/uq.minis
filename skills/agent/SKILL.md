@@ -5,6 +5,8 @@ description: Use when asked to monitor booking email, answer risk requests or re
 
 # Booking follow-up
 
+Run Python commands from `backend/` in this checkout
+
 Follow the booking through its next useful step and keep a durable record.
 Match the event precisely, prepare the agreed attachment and carry out the monitoring or reply already authorised
 
@@ -27,6 +29,8 @@ Bring an ambiguous or changed request back to the organiser with the relevant ev
 With UQ minis, read `docs/agent.md` for the account setup that applies to this checkout.
 Run `mini agent status` to inspect existing registrations before adding another.
 Register the event's source, booking ID and approved attachment only within the user's authority for its automatic risk reply.
+Keep the authorised recipient with that registration: the default is `pfeventa@uq.edu.au`, with `--recipient pfassist@pf.uq.edu.au` for a direct PF Assist return
+New registrations use the exact subject `UQU Risk Assessment Return Ref ID:ID`, without a space after the colon
 Use `poll` for an authorised processing pass, then inspect the resulting status:
 
 ```sh
@@ -36,7 +40,7 @@ uv run --extra agent mini agent status
 ```
 
 Use `status --json` when the saved details or structured state are needed; the default table omits email text.
-Default private state is `.minis/agent/`.
+Default private state is `.config/agent/`.
 Install the macOS watcher only when persistent background monitoring is requested.
 An installed watcher continues after the terminal session ends
 

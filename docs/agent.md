@@ -1,6 +1,6 @@
 # Outlook event watcher
 
-The watcher is a local macOS background worker for registered event applications. It watches for the risk-assessment request, replies to `pfeventa@uq.edu.au` with the required form and attachment, then watches the same conversation for a UQ Clubs booking update. It alerts you when it finishes or when booking wording needs review.
+The watcher is a local macOS background worker for registered event applications. It watches for the risk-assessment request, replies to the event's registered recipient with the required form and attachment, then watches the same conversation for a UQ Clubs booking update. It alerts you when it finishes or when booking wording needs review
 
 ## Browser setup
 
@@ -41,9 +41,11 @@ Supplying client and tenant IDs also selects Graph for existing commands. Withou
 uv run --extra agent mini agent watch event.toml --event-id ID --attachment approved.docx
 ```
 
+The default recipient is `pfeventa@uq.edu.au`. Use `--recipient pfassist@pf.uq.edu.au` when sending directly to PF Assist is authorised. New registrations retain the exact subject `UQU Risk Assessment Return Ref ID:ID`, with no space after the colon. Existing registrations retain their original subject and recipient for reconciliation
+
 `--attachment` accepts an approved `.docx` or `.pdf`. `--since YYYY-MM-DD` limits old mail; without it the watcher starts 30 days back. Omit `--attachment` to generate the risk form from TOML. Registration saves a fixed copy of the form; later edits do not change it. Each Event ID can be registered once.
 
-The worker checks mail every 60 seconds. It matches the event ID and title, replies only to `pfeventa@uq.edu.au`, and looks for `clubs@uqu.com.au` in the same conversation. Clear booked, not-booked or changed wording completes the watch. Ambiguous wording sends a notification and leaves it running for your review.
+The worker checks mail every 60 seconds. It matches the event ID and title, replies only to the registered UQ risk-assessment address, and looks for `clubs@uqu.com.au` in the same conversation. Clear booked, not-booked or changed wording completes the watch. Ambiguous wording sends a notification and leaves it running for your review
 
 ```sh
 uv run --extra agent mini agent install

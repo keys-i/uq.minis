@@ -5,6 +5,8 @@ description: Use when an agent needs to find the workflow for a task; discover C
 
 # Workflow discovery
 
+Run Python commands from `backend/` in this checkout
+
 Find the capability that fits the person's task and use it to complete the work.
 Start from the requested result and existing authority.
 Keep command setup behind the person's actual deliverable

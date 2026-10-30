@@ -2,11 +2,47 @@
 
 ## v0.33.0
 
-- Keep the familiar two-column interface with a 55% mascot / 45% content split, adaptive sculptures up to 128 × 96 dots, alternating habitat-coloured rows and a subtle selection highlight
+- Cache Timey’s ten-second background sections for local playback, remove embedded players and unify preview and export settings in consistent side controls
+- Edit Timey directly on its preview with drag, resize, labels and contextual tools; add buffered playback, scrubbing and ten-second skips
+- Start Timey from preview search or local upload, add iOS-style playback and a circular timing dial, and keep edge resizing and placement highlights together
+- Resize Timey overlays independently by width and height, remove selection boxes and blend clean playback controls with the minis theme
+
+- Separate Scrappy course selection, Planny assessment planning and Buzzy’s combined calendar; group booking follow-up inside Eventy and account access behind the sidebar avatar
+- Crawl the official UQ course index, keep selection usable during catalogue outages and add offering badges, assumed knowledge and coloured prerequisite trees with keyboard path highlighting
+- Give Timey a central live renderer preview, duration presets, a position pad and built-in YouTube search with ten-second timestamp previews
+
+- Keep each event's risk-return recipient and exact subject together, add the authorised PF Assist choice to both interfaces, and preserve legacy return details when upgrading saved watches
+
+- Separate React and npm into `frontend/`, Python and uv into `backend/`, and keep shared task skills at the repository root
+- Add FastAPI browser routes for every mini, sharing the CLI's habitat colours, animal artwork and Python implementations
+- Combine UQ course research, club discovery and published UNSW CSE offerings in Scrappy and Clubby, with validated imports and pooled public-directory requests
+- Add Planny enrolments, assessment review, personal deadlines, Gantt planning, weighted marks with PAFs and hurdles, and subscribable local calendars
+- Unify public Rubric announcements, authorised Discord scheduled events and social exports, with bounded search indexes and private local plans
+
+- Give timer themes their own shared preview/export scenes, textured font fills and continuous motion: temple vines and cracks, stacked Minecraft worlds and reacting grass, moving graffiti trains, circuit traffic and liquid-glass refraction
+- Show static, proportional flags twelve dots high in mascot-sized braille beside status, country and habitat; use separate flags for shared ranges, original vector colours and offline globe or regional silhouettes
+- Rebuild all 50 animal sculptures from editable anatomy profiles at 224 × 160 dots and 24 FPS; replace generic rounded fins, horns, tails and torsos with shaped contours and clipped markings
+- Articulate feathered wings through shoulder, elbow, wrist and separate feather fans; distinguish limb and foot types, diagonal trots, hopping extension, fixed dorsal fins and coordinated swimming
+- Replace slogan-like animal bubbles with natural species-specific remarks and add underlined, hoverable reference links with a ↗ and Alt+A shortcut; browser errors preserve the menu
+- Document species anatomy, locomotion research and reconstruction limits, with focused regressions for silhouette edges, joints, footfalls and link recovery
+
+- Use calendars and hour/minute dials with arrows, Tab and eased markers; add sliders for bounded values and labelled resolution stops, with direct typing retained
+- Complete nested folder and file paths, descend into directories with Tab and preserve filenames containing spaces
+- Replace per-action menu receipts with final reviews; make Timey's Finish and create timer action start processing directly and choose numbered filenames for occupied interactive destinations
+- Collect new event details and save their validated TOML before generation; review venue and document choices before writing or submitting
+- Add verified official room photos, Right/Left photo and virtual-tour shortcuts, and recoverable missing-preview messages
+- Expand public Python docstrings with input contracts, return values, cancellation and file-safety behaviour
+- Unify mini inputs, navigation, alternating habitat-coloured rows and subtle highlights; retain the 55% scene / 45% content split, close the gap on wide terminals and prevent completion menus from reporting a small window
+- Keep the left panel stable for sculptures up to 184 × 112 dots, thumbnails and live timer samples; resize from the original image and preserve selected previews beside compact right-panel loading bars
+- Complete YouTube video and music queries as you type, with debouncing, cancelled obsolete requests and offline fallback; fetch the largest available thumbnail before trying smaller images
+- Default exports to original source dimensions and best available YouTube quality; offer 240p–4320p ceilings, arbitrary heights above 240 and no upscaling of smaller footage
+- Preview actual font lettering on hover or keyboard highlight, name its family and face, load Google Fonts on demand and cancel obsolete samples without leaving the picker
 - Preserve textured natural fur with flag colours in highlights and surroundings; improve surface lighting, marine flukes, side-profile faces and ground shadows
-- Animate at 12 frames per second with planted footsteps, delayed ear and tail settling, body breathing, swaying foliage, swimming wakes, dust and reactions in nearby plants
+- Animate at 16 frames per second with planted four-legged footfalls, connected elbows and knees, frog launch and landing poses, flightless bird rules and different tail movement for fish and cetaceans
+- Ground habitat trees and terrain, add depth and parallax, and preserve delayed ear and tail settling, body breathing, swaying foliage, swimming wakes, dust and reactions in nearby plants
+- Correct attached facial markings, tail bands, orangutan fist walking, wild axolotl colouring and eyelids, bumblebee wing and leg counts, and the Ganges dolphin's small eye; document animal references and reconstruction limits
 - Make animals glance when hovered, reveal interaction hints and keep pointer targets attached across movement and terminal sizes; retain pause, reduced-motion and monochrome views
-- Rebuild all 50 species as compressed movement assets, reducing bundled artwork from 31 MB to about 5 MB while retaining editable geometry and bounded lazy caches
+- Rebuild all 50 species as compressed movement assets while retaining editable geometry and bounded lazy caches
 - Check movement, high-resolution rendering and pointer maps across the species catalogue; remove inherited virtual-environment warnings from isolated type checks
 
 Requires Python 3.15+

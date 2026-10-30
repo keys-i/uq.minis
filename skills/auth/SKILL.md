@@ -5,6 +5,8 @@ description: Use when a workflow needs browser sign-in or a refreshed session; p
 
 # Browser authentication
 
+Run Python commands from `backend/` in this checkout
+
 Get the person's blocked workflow moving again.
 Identify the service, intended account and operation, then prepare its supported sign-in flow.
 Keep passwords, MFA and account selection in the browser
@@ -22,6 +24,19 @@ Refresh the intended credential file while preserving other settings and working
 Return to the original task once access is established.
 Verify through an available read or preview before a consequential operation
 
+## Verify university access
+
+The public Minis home opens first; only Eventy and its Forms/mailbox connections request UQ sign-in inside the mini
+Other minis use an isolated browser workspace without UQ access
+The browser's **Check UQ access** action displays the protected authentication-status page at auth.uq.edu.au inside minis
+Minis presents a themed username and password form immediately, while a private backend browser opens UQ's live sign-in form
+Credentials travel only on submission to those bounded UQ controls and are not retained in application state or logs
+UQ remains responsible for checking the account and MFA; additional interactive steps retain UQ or Duo's original page with labelled controls
+A successful check recognises UQ's session confirmation and account attributes, establishes a short-lived minis session and discards the portal browser context
+Closing or cancelling the in-site window also closes that browser; no desktop browser window is launched
+It does not capture Forms credentials or connect a mailbox, and needs no registered application
+Do not treat merely opening the public portal or receiving a client-supplied email as proof of access
+
 ## Use the tools
 
 For UQ Forms, run the existing authentication mini:
@@ -30,14 +45,14 @@ For UQ Forms, run the existing authentication mini:
 uv run --extra auth mini auth
 ```
 
-Its default is `.minis/auth/.env`.
+Its default is `.config/auth/.env`.
 Use `--force` to refresh that intended file, or `--output PATH` for a specific destination.
 The person completes browser sign-in; unattended capture is unsupported.
 Forms submission reads the default file or credentials already supplied through the environment
 
 For Outlook, run `uv run --extra agent mini agent login --mailbox ADDRESS`, with `--username ADDRESS` when the sign-in account differs.
-Mailbox state belongs in `.minis/agent/`.
-For YouTube, use the timer workflow's OAuth flow, with its client-secret and token files in `.minis/timey/`.
+Mailbox state belongs in `.config/agent/`.
+For YouTube publication, use the timer workflow's OAuth flow, with its client-secret and token files in `.config/timey/`.
 These sessions serve different services and cannot be interchanged
 
 ## Finish and hand back control
