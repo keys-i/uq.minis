@@ -1,0 +1,87 @@
+.form-settings {
+  padding: 18px 0;
+  border-top: 1px solid var(--muted);
+  margin-top: 22px;
+}
+.form-settings > summary {
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.form-settings .form-grid {
+  padding-top: 15px;
+}
+.tactile-input {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.tactile-input input[type="range"] {
+  flex: 1;
+  min-width: 60px;
+  min-height: 44px;
+  accent-color: var(--accent);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.tactile-input input[type="number"] {
+  width: 85px;
+  flex: none;
+}
+.room-picker {
+  grid-column: 1/-1;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.room-picker > legend {
+  font-family: DynaPuff, cursive;
+  margin-bottom: 18px;
+}
+.room-options {
+  max-height: 350px;
+  overflow-y: auto;
+  border-block: 1px solid var(--muted);
+  margin-block: 12px;
+  scrollbar-gutter: stable;
+}
+.room-options > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--muted);
+  padding: 12px 0;
+}
+.room-options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+  min-height: 44px;
+}
+.room-options small {
+  display: block;
+  margin-top: 5px;
+}
+.room-options input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--accent);
+}
+.room-options > div > div {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+.room-options a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}

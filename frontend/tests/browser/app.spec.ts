@@ -548,15 +548,11 @@ test("changing videos keeps a decoded backdrop and a legible themed picker", asy
   expect(pixel[2]).toBeGreaterThan(150);
   await picker.hover();
   await page.screenshot({ path: test.info().outputPath("backdrop-light.png"), fullPage: true });
-  const theme = page.getByRole("button", { name: /App theme/ });
+  const theme = page.getByRole("combobox", { name: "App theme" });
   await theme.focus();
-  await expect(page.getByRole("tooltip")).toHaveText("Switch to dark mode");
   await expect(theme).not.toHaveAttribute("title");
-  await theme.click();
-  await expect(page.getByRole("tooltip")).toHaveCount(0);
-  await theme.blur();
-  await theme.focus();
-  await expect(page.getByRole("tooltip")).toHaveText("Switch to light mode");
+  await theme.selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByRole("group", { name: "Background preview", exact: true }).hover();
   await picker.hover();
   expect(await picker.evaluate((node) => getComputedStyle(node).color)).toBe(
@@ -774,8 +770,8 @@ test("home artwork loads and theme changes leave habitat clocks alone", async ({
   const lights = await page
     .locator(".habitat")
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-light")));
-  await page.getByRole("button", { name: /App theme/ }).click();
-  await expect(page.getByRole("button", { name: /switch to light/ })).toBeVisible();
+  await page.getByRole("combobox", { name: "App theme" }).selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   expect(
     await page
       .locator(".habitat")
@@ -792,6 +788,21 @@ test("home artwork loads and theme changes leave habitat clocks alone", async ({
   await animal.click();
   await expect(page.locator('[data-animal="otter"]')).not.toHaveAttribute("data-action", "listen");
   await page.screenshot({ path: test.info().outputPath("home.png"), fullPage: true });
+});
+
+test("the mobile mini shelf stays a compact two-column field guide", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const cards = page.locator(".mini-card");
+  await expect(cards).toHaveCount(6);
+  const layout = await cards.evaluateAll((nodes) => ({
+    rows: new Set(nodes.map((node) => Math.round(node.getBoundingClientRect().top))).size,
+    shelf: nodes[0].closest(".expedition-board")?.getBoundingClientRect().height ?? 0,
+    overflow: document.documentElement.scrollWidth - innerWidth,
+  }));
+  expect(layout.rows).toBe(3);
+  expect(layout.shelf).toBeLessThan(900);
+  expect(layout.overflow).toBeLessThanOrEqual(1);
 });
 
 test("course paths remain keyboard-readable and highlight prerequisites without inline SVG", async ({
@@ -964,7 +975,7 @@ test("guests open ordinary minis while only Eventy asks for UQ", async ({ page }
   await page.getByRole("button", { name: "Timey", exact: true }).click();
   await expect(page.getByRole("form", { name: "Timer studio" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Check UQ access" })).toHaveCount(0);
-  await expect(page).toHaveURL(/\?m=timey$/);
+  await expect(page).toHaveURL(/\/mini\/timey$/);
   await expect(page.getByRole("heading", { name: "Timey", exact: true })).toBeVisible();
   expect(privateRequests).not.toContain("/api/plan");
   for (const name of ["Scrappy", "Planny", "Buzzy", "Clubby"]) {
@@ -998,7 +1009,7 @@ test("navigation keeps the page visible while an editor module loads", async ({ 
   try {
     await page.goto("/");
     await page.getByRole("button", { name: "Timey", exact: true }).click();
-    await expect(page).toHaveURL(/\?m=timey$/);
+    await expect(page).toHaveURL(/\/mini\/timey$/);
     await expect(page.getByRole("heading", { name: /Big plans/ })).toBeVisible();
     await expect(page.getByText("Opening Timey…", { exact: true })).toHaveCount(0);
   } finally {

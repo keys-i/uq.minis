@@ -1,5 +1,105 @@
 /* == A card shelf that makes one tool easier to understand at a time == */
+.expedition-board {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(18px, 2.5vw, 32px);
+  border-radius: 42px 26px 46px 30px;
+  background: linear-gradient(165deg, #d8e7d2 0 42%, #c9ddd0 73%, #b8d7d4 100%);
+  box-shadow:
+    inset 0 2px 0 #ffffffb8,
+    inset 0 -3px 0 #4664562b,
+    0 13px 30px color-mix(in srgb, var(--shadow, #2736401f) 70%, transparent);
+}
+.expedition-board::after {
+  position: absolute;
+  right: -4%;
+  bottom: -8%;
+  z-index: 2;
+  width: 32%;
+  height: 35%;
+  background:
+    radial-gradient(ellipse at 85% 95%, #476b58 0 18%, transparent 19%),
+    radial-gradient(ellipse at 64% 100%, #6f9273 0 22%, transparent 23%),
+    radial-gradient(ellipse at 42% 110%, #9cb88f 0 29%, transparent 30%);
+  content: "";
+  opacity: 0.7;
+  pointer-events: none;
+  transform-origin: 100% 100%;
+  animation: board-breathe 9s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
+}
+.expedition-atmosphere,
+.expedition-atmosphere > span {
+  position: absolute;
+  pointer-events: none;
+}
+.expedition-atmosphere {
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+.expedition-atmosphere .range {
+  right: -5%;
+  left: -5%;
+  clip-path: polygon(
+    0 65%,
+    8% 52%,
+    18% 70%,
+    31% 36%,
+    46% 63%,
+    59% 31%,
+    72% 58%,
+    87% 27%,
+    100% 57%,
+    100% 100%,
+    0 100%
+  );
+}
+.range-one {
+  top: 4%;
+  height: 44%;
+  background: #91b3a5;
+  opacity: 0.42;
+  animation: range-drift 16s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
+}
+.range-two {
+  top: 19%;
+  height: 43%;
+  background: #6d9483;
+  opacity: 0.28;
+  transform: scaleX(-1);
+  animation: range-drift 22s cubic-bezier(0.37, 0, 0.63, 1) -7s infinite alternate-reverse;
+}
+.expedition-atmosphere .track {
+  top: 8%;
+  left: 49%;
+  width: 45%;
+  height: 92%;
+  border-right: 4px dashed #fff9d98c;
+  border-radius: 48% 52% 44% 56%;
+  transform: rotate(17deg);
+}
+.expedition-atmosphere .reed {
+  bottom: -5%;
+  width: 28px;
+  height: 34%;
+  border-left: 7px solid #476b58;
+  border-radius: 50%;
+  transform-origin: 50% 100%;
+  animation: reed-sway 5.8s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
+}
+.reed-one {
+  left: 4%;
+  transform: rotate(-10deg);
+}
+.reed-two {
+  right: 6%;
+  transform: rotate(12deg);
+  animation-delay: -2.4s;
+}
 .mini-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 18px;
 }
@@ -8,7 +108,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
   min-width: 0;
-  transition: grid-template-columns 260ms cubic-bezier(0.2, 0.75, 0.25, 1);
+  transition: grid-template-columns 420ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .mini-grid .mini-card {
   display: grid;
@@ -16,17 +116,28 @@
   min-width: 0;
   height: 340px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--line) 32%, transparent);
-  border-radius: 24px;
+  border: 2px solid color-mix(in srgb, var(--line) 42%, transparent);
+  border-radius: 28px 20px 30px 22px;
   background: var(--panel);
   box-shadow: 0 3px 12px color-mix(in srgb, var(--shadow, #2736401f) 55%, transparent);
   transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    border-color 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 340ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 340ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.mini-row:nth-child(odd) .mini-card:nth-child(2) {
+  border-radius: 20px 30px 22px 28px;
+}
+.mini-row:nth-child(even) .mini-card:nth-child(1) {
+  border-radius: 30px 23px 28px 19px;
+}
+.mini-row:nth-child(even) .mini-card:nth-child(3) {
+  border-radius: 21px 28px 20px 31px;
 }
 .mini-grid .mini-card.is-featured {
   border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
   box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow, #27364024) 70%, transparent);
+  transform: translateY(-4px);
 }
 .mini-grid .mini-art {
   position: relative;
@@ -76,8 +187,8 @@
   grid-template-rows: 0fr;
   opacity: 0;
   transition:
-    grid-template-rows 220ms ease,
-    opacity 140ms ease;
+    grid-template-rows 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .mini-grid .preview-copy > div {
   min-height: 0;
@@ -120,6 +231,30 @@
 @keyframes card-caret {
   50% {
     opacity: 0;
+  }
+}
+@keyframes range-drift {
+  from {
+    transform: translate3d(-6px, 3px, 0);
+  }
+  to {
+    transform: translate3d(8px, -3px, 0);
+  }
+}
+@keyframes reed-sway {
+  from {
+    rotate: -3deg;
+  }
+  to {
+    rotate: 4deg;
+  }
+}
+@keyframes board-breathe {
+  from {
+    transform: rotate(-0.4deg) translate3d(-2px, 2px, 0);
+  }
+  to {
+    transform: rotate(0.6deg) translate3d(3px, -2px, 0);
   }
 }
 .mini-grid .mini-card:has(.card-title:focus-visible) {
@@ -178,33 +313,75 @@
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .mini-grid .mini-mark {
-    transition: transform 180ms ease;
+    transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
   }
   .mini-grid .mini-card.is-featured .mini-mark {
     transform: rotate(5deg) scale(1.04);
   }
 }
 @media (max-width: 760px) {
+  .expedition-board {
+    margin-inline: -8px;
+    padding: 12px;
+    border-radius: 28px 18px 32px 20px;
+  }
+  .expedition-atmosphere .track {
+    display: none;
+  }
   .mini-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 10px;
   }
   .mini-row {
     display: contents;
   }
   .mini-grid .mini-card {
-    height: 330px;
+    height: auto;
+    min-height: 210px;
+    aspect-ratio: 0.72;
+    border-radius: 20px 15px 22px 16px;
+  }
+  .mini-grid .mini-card.is-featured {
+    transform: none;
+  }
+  .mini-grid .mini-card h2 {
+    font-size: clamp(1.05rem, 5.6vw, 1.35rem);
+  }
+  .mini-grid .mini-card .card-body {
+    padding: 11px 12px 12px;
   }
   .mini-grid .preview-copy,
   .mini-grid .mini-card.is-featured .preview-copy {
-    grid-template-rows: 1fr;
-    opacity: 1;
+    grid-template-rows: 0fr;
+    opacity: 0;
   }
-  .mini-grid .mini-card h2 {
-    font-size: 1.55rem;
+  .mini-grid .mini-mark {
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+  }
+  .mini-grid .animal-tools {
+    top: 7px;
+    left: 7px;
+    max-width: calc(100% - 48px);
+  }
+  .mini-grid .animal-details {
+    min-height: 36px;
+    padding: 2px 7px 2px 3px;
+  }
+  .mini-grid .animal-portrait {
+    width: 26px;
+    height: 26px;
+  }
+  .mini-grid .animal-details strong {
+    max-width: 10ch;
+    font-size: 0.66rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .expedition-board::after,
+  .expedition-atmosphere > span,
   .mini-row,
   .mini-grid .mini-card,
   .mini-grid .mini-mark,
@@ -215,7 +392,17 @@
     animation: none;
   }
 }
+@media (prefers-reduced-data: reduce) {
+  .expedition-atmosphere,
+  .expedition-board::after {
+    display: none;
+  }
+}
 @media (forced-colors: active) {
+  .expedition-board {
+    background: Canvas;
+    box-shadow: none;
+  }
   .mini-grid .mini-card,
   .mini-grid .mini-card.is-featured,
   .mini-grid .mini-mark {

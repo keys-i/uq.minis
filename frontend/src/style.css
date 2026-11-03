@@ -276,8 +276,7 @@ small,
   pointer-events: auto;
 }
 .brand .nav-label,
-.sidebar nav .nav-label,
-.menu-calendar .nav-label {
+.sidebar nav .nav-label {
   position: absolute;
   left: 48px;
   width: 162px;
@@ -353,8 +352,7 @@ small,
   box-shadow: none;
   font-size: 0.96rem;
 }
-.sidebar nav button .icon,
-.menu-calendar .icon {
+.sidebar nav button .icon {
   flex: none;
 }
 .sidebar nav button small {
@@ -412,14 +410,6 @@ small,
 }
 .sidebar-bottom button {
   font-size: 0.8rem;
-}
-.menu-calendar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px;
 }
 main {
   min-width: 0;
@@ -530,11 +520,6 @@ main {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
   align-items: stretch;
-}
-.course-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px;
 }
 .discovery-card {
   position: relative;
@@ -766,12 +751,6 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   width: 100px;
   flex: none;
   min-height: 44px;
-}
-.access-panel .access-hint {
-  font-size: 0.85rem;
-  line-height: 1.5;
-  margin: 20px 0 0;
-  color: var(--muted);
 }
 .site-footer nav {
   display: flex;
@@ -1022,45 +1001,6 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   font-weight: 900;
   margin-bottom: 3px;
 }
-.course-art {
-  position: relative;
-  min-height: 155px;
-  padding: 20px;
-  background: var(--lilac);
-  border-bottom: 2px solid var(--line);
-}
-.course-art > span {
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-.course-art strong {
-  display: flex;
-  gap: 0.2em;
-  margin-top: 20px;
-  padding-right: 65px;
-  font-size: clamp(1.5rem, 2.5vw, 2.4rem);
-  letter-spacing: -0.05em;
-  font-weight: 900;
-}
-.course-art b {
-  font-weight: inherit;
-  color: #594485;
-}
-.course-logo {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  width: 55px;
-  height: 55px;
-  object-fit: contain;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  padding: 5px;
-  background: #fff;
-}
-.course-card .card-body {
-  padding-top: 20px;
-}
 .card-open {
   position: static;
   transform: none;
@@ -1077,11 +1017,6 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   text-align: left;
   line-height: inherit;
   letter-spacing: inherit;
-}
-.course-card .check-field {
-  min-height: 44px;
-  cursor: pointer;
-  margin: 0;
 }
 .discovery-card:has(.card-title:focus-visible),
 .discovery-card:has(.card-open:focus-visible) {
@@ -1106,10 +1041,6 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   border: 2px solid var(--line);
   border-radius: 15px;
   background: var(--panel);
-}
-.result-list {
-  display: grid;
-  gap: 22px;
 }
 .feed-header {
   display: flex;
@@ -1737,11 +1668,6 @@ select {
   padding: 23px;
   margin-bottom: 20px;
 }
-.course-sheet .prereqs {
-  font-size: 0.9rem;
-  white-space: pre-wrap;
-  margin: 16px 0;
-}
 .course-sheet .row {
   justify-content: space-between;
 }
@@ -1929,14 +1855,10 @@ dialog::backdrop {
   font-size: 1.6rem;
   box-shadow: 1px 2px 0 var(--line);
 }
-.dialog-message {
-  margin-bottom: 20px;
-}
 
 /* == Direct-action motion == */
 @media (prefers-reduced-motion: no-preference) {
-  button,
-  .mini-card {
+  button {
     transition:
       transform 140ms ease,
       box-shadow 140ms ease,
@@ -1961,12 +1883,6 @@ dialog::backdrop {
   }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .mini-mark {
-    transition: transform 180ms ease;
-  }
-  .mini-card:hover .mini-mark {
-    transform: rotate(5deg);
-  }
   .discovery-card {
     transition:
       transform 160ms ease,
@@ -2134,31 +2050,10 @@ dialog::backdrop {
     width: 105px;
     max-width: 100%;
   }
-  .mini-grid,
   .feed-grid,
-  .club-grid,
-  .course-grid {
+  .club-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 20px;
-  }
-  .mini-row {
-    display: contents;
-  }
-  .mini-card.is-featured {
-    grid-column: auto;
-    display: flex;
-  }
-  .mini-card.is-featured .mini-art {
-    height: 248px;
-    min-height: 248px;
-    border-right: 0;
-    border-bottom: 1px solid #30483b33;
-  }
-  .mini-card.is-featured .card-body {
-    padding: 20px;
-  }
-  .mini-card.is-featured h2 {
-    font-size: 1.5rem;
   }
   .wildlife-toolbar > span {
     font-size: 0.85rem;
@@ -2314,7 +2209,6 @@ dialog::backdrop {
 }
 @media (forced-colors: active) {
   button,
-  .mini-card,
   .discovery-card,
   .card-logo,
   .date-stamp,
@@ -2534,48 +2428,6 @@ dialog::backdrop {
   height: 40px;
   object-fit: contain;
 }
-.minis-rating {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  background: var(--sun);
-  color: var(--button-ink, #263c32);
-  border-radius: 12px;
-  flex-wrap: wrap;
-  max-width: 185px;
-}
-.minis-rating > .icon {
-  width: 22px;
-  height: 22px;
-}
-.minis-rating > div {
-  display: grid;
-  gap: 2px;
-}
-.minis-rating strong {
-  font-size: 1.3rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-.minis-rating strong small {
-  font-size: 0.65rem;
-  margin-inline-start: 5px;
-  color: inherit;
-}
-.minis-rating span,
-.minis-rating > small {
-  font-size: 0.7rem;
-  color: inherit;
-}
-.minis-rating > small {
-  width: 100%;
-  text-align: center;
-}
-.minis-rating.is-unrated {
-  background: var(--paper);
-  color: var(--muted);
-}
 .course-faculty {
   color: var(--accent);
   font-weight: 700;
@@ -2589,16 +2441,6 @@ dialog::backdrop {
   overflow: hidden;
   margin: 0 0 9px;
   font-size: 0.9rem;
-}
-.course-period {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--muted);
-}
-.course-period .icon {
-  width: 19px;
-  height: 19px;
 }
 .evidence-range {
   min-width: 150px;
@@ -2755,15 +2597,6 @@ dialog::backdrop {
 }
 .course-evidence > summary {
   color: var(--text);
-}
-.readiness-status {
-  font-weight: 800;
-  padding: 12px 15px;
-  background: var(--lilac);
-  border-radius: 12px;
-}
-.readiness-status[data-status="ready"] {
-  background: var(--mint);
 }
 .trail {
   border-block: 1px solid var(--muted);
@@ -2938,21 +2771,10 @@ dialog::backdrop {
   outline: 3px solid #51247a;
   outline-offset: 2px;
 }
-.portal-loading {
-  margin: 20px 0;
-}
-.portal-window:has(.portal-loading:not(.sr-only)) .portal-screen {
-  display: none;
-}
 @media (max-width: 500px) {
   .portal-head > span {
     font-size: 0.85rem;
   }
-}
-.club-provenance {
-  display: block;
-  font-size: 0.73rem;
-  margin-top: 16px;
 }
 @media (max-width: 700px) {
   .research-results {
@@ -2998,6 +2820,15 @@ input,
 textarea {
   caret-color: var(--accent);
 }
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--panel) inset;
+  caret-color: var(--accent);
+}
 .language-trigger,
 .theme-toggle,
 .picker-trigger {
@@ -3032,6 +2863,24 @@ textarea {
   border-radius: 24px;
   gap: 8px;
   min-height: 46px;
+}
+.theme-toggle select {
+  min-height: 34px;
+  padding: 4px 20px 4px 2px;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 800;
+  cursor: pointer;
+}
+.theme-toggle > .menu-chevron {
+  width: 12px;
+  height: 12px;
+  margin-left: -21px;
+  pointer-events: none;
 }
 .theme-window {
   display: block;
@@ -3070,6 +2919,51 @@ textarea {
 }
 .theme-toggle:active .theme-window {
   scale: 0.92;
+}
+
+.not-found {
+  display: grid;
+  min-height: 62dvh;
+  place-content: center;
+  justify-items: start;
+  padding: clamp(28px, 8vw, 90px);
+  border-radius: 34px 22px 38px 26px;
+  background: var(--sky);
+}
+.not-found p {
+  margin: 14px 0 24px;
+}
+.button-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 10px 17px;
+  border: 2px solid var(--line);
+  border-radius: 13px;
+  color: var(--button-ink);
+  background: var(--sun);
+  box-shadow: 0 3px 0 var(--line);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+::view-transition-old(root) {
+  animation: mini-view-out 170ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+::view-transition-new(root) {
+  animation: mini-view-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes mini-view-out {
+  to {
+    opacity: 0;
+    transform: translate3d(-12px, 0, 0) scale(0.99);
+  }
+}
+@keyframes mini-view-in {
+  from {
+    opacity: 0;
+    transform: translate3d(22px, 0, 0) scale(1.01);
+  }
 }
 .language-menu,
 .picker-menu {
@@ -3322,6 +3216,13 @@ textarea {
 [data-theme="dark"] .welcome {
   background: var(--panel);
 }
+[data-theme="dark"] .expedition-board {
+  background: linear-gradient(165deg, #1e332b 0 42%, #243c34 73%, #203c40 100%);
+  box-shadow:
+    inset 0 2px 0 #ffffff12,
+    inset 0 -3px 0 #050b0870,
+    0 13px 30px #050b0870;
+}
 [data-theme="dark"]
   :is(
     .brand-mark,
@@ -3388,12 +3289,6 @@ textarea {
 [data-theme="dark"] .danger {
   background: #493235;
   color: var(--error);
-}
-[data-theme="dark"] .course-art {
-  background: var(--mint);
-}
-[data-theme="dark"] .course-art b {
-  color: var(--text);
 }
 [data-theme="dark"] :is(.preview-copy p, .nudgy, .rule-note, .event) {
   background: var(--mint);
@@ -3514,168 +3409,6 @@ textarea {
   transition: none !important;
 }
 
-/* == Club discovery and its noticeboard == */
-.club-discovery {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
-  gap: 30px;
-  align-items: start;
-}
-.club-discovery .club-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-.club-discovery .card-art {
-  aspect-ratio: 1.9;
-}
-.club-discovery .club-search {
-  margin-top: 0;
-}
-.mobile-noticeboard {
-  display: none;
-}
-.club-feed {
-  scroll-margin-top: 24px;
-  padding: 22px 20px;
-  background: var(--paper);
-  border: 2px solid var(--line);
-  border-radius: 16px;
-  min-width: 0;
-}
-.club-feed-heading {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 18px;
-}
-.club-feed-heading h2 {
-  font-size: 1.15rem;
-  margin: 0;
-}
-.club-feed-heading > .icon {
-  color: var(--accent);
-}
-.club-feed .feed-tabs {
-  display: flex;
-  margin-bottom: 10px;
-}
-.club-feed .feed-tabs > button {
-  flex: 1;
-  padding-inline: 7px;
-  font-size: 0.85rem;
-}
-.noticeboard-post {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 12px;
-  padding: 22px 0;
-  border-bottom: 1px dashed var(--muted);
-}
-.noticeboard-post:last-child {
-  border-bottom: 0;
-}
-.noticeboard-post > div > p:first-child {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-.noticeboard-post img {
-  width: 25px;
-  height: 25px;
-  object-fit: contain;
-  border-radius: 5px;
-  background: #fff;
-  flex: none;
-}
-.noticeboard-post h3 {
-  font-family: "Comic Neue", cursive;
-  font-size: 1rem;
-  line-height: 1.35;
-  margin-bottom: 8px;
-}
-.noticeboard-post h3 a {
-  color: var(--text);
-  text-decoration: none;
-}
-.noticeboard-post h3 a:hover {
-  text-decoration: underline;
-}
-.noticeboard-post small {
-  font-size: 0.73rem;
-}
-.noticeboard-post .quiet {
-  font-size: 0.8rem;
-  min-height: 44px;
-  margin-top: 6px;
-  line-height: 1.4;
-}
-.noticeboard-notes {
-  font-size: 0.78rem;
-  line-height: 1.5;
-  margin: 10px 0 0;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-.noticeboard-date time {
-  display: grid;
-  text-align: center;
-  gap: 3px;
-  background: var(--sun);
-  color: var(--button-ink, #263c32);
-  border-radius: 9px;
-  padding: 8px 3px;
-}
-.noticeboard-date strong {
-  font-size: 1.3rem;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.noticeboard-date span {
-  font-size: 0.7rem;
-}
-.directory-tools {
-  margin-top: 30px;
-  border-top: 1px solid var(--muted);
-  padding: 18px 0;
-}
-.directory-tools > summary {
-  min-height: 44px;
-  cursor: pointer;
-  font-weight: 700;
-}
-@media (max-width: 1100px) {
-  .club-discovery {
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 20px;
-  }
-  .club-discovery .club-grid {
-    grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 760px) {
-  .mobile-noticeboard {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    min-height: 44px;
-    margin-bottom: 18px;
-  }
-  .club-discovery {
-    grid-template-columns: 1fr;
-  }
-  .noticeboard-posts {
-    max-height: 440px;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-  }
-  .club-discovery .club-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 @media (max-width: 520px) {
   .club-discovery .club-grid {
     grid-template-columns: 1fr;
@@ -3684,116 +3417,7 @@ textarea {
     gap: 10px;
   }
 }
-.form-settings {
-  padding: 18px 0;
-  border-top: 1px solid var(--muted);
-  margin-top: 22px;
-}
-.form-settings > summary {
-  min-height: 44px;
-  cursor: pointer;
-  font-weight: 700;
-}
-.form-settings .form-grid {
-  padding-top: 15px;
-}
-.tactile-input {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-.tactile-input input[type="range"] {
-  flex: 1;
-  min-width: 60px;
-  min-height: 44px;
-  accent-color: var(--accent);
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-.tactile-input input[type="number"] {
-  width: 85px;
-  flex: none;
-}
-.room-picker {
-  grid-column: 1/-1;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
-}
-.room-picker > legend {
-  font-family: DynaPuff, cursive;
-  margin-bottom: 18px;
-}
-.room-options {
-  max-height: 350px;
-  overflow-y: auto;
-  border-block: 1px solid var(--muted);
-  margin-block: 12px;
-  scrollbar-gutter: stable;
-}
-.room-options > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 1px solid var(--muted);
-  padding: 12px 0;
-}
-.room-options label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  cursor: pointer;
-  min-height: 44px;
-}
-.room-options small {
-  display: block;
-  margin-top: 5px;
-}
-.room-options input[type="radio"] {
-  width: 20px;
-  height: 20px;
-  flex: none;
-  accent-color: var(--accent);
-}
-.room-options > div > div {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
-}
-.room-options a {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-}
-
 /* == Course selection, calendar and account == */
-.course-start {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 20px 0;
-  margin-bottom: 24px;
-  border-block: 1px solid var(--edge, var(--line));
-}
-.course-start > div {
-  flex: 1;
-}
-.course-start h2 {
-  margin-bottom: 8px;
-}
-.course-start p {
-  margin: 0;
-}
-.course-start .icon {
-  width: 32px;
-  height: 32px;
-}
 .menu-account {
   position: relative;
   display: flex;
@@ -3837,9 +3461,6 @@ textarea {
   align-items: center;
   flex-wrap: wrap;
   gap: 7px;
-  margin: 0;
-}
-.course-badges {
   margin: 12px 0;
 }
 .course-badges .pill {
@@ -4035,8 +3656,6 @@ textarea {
     min-width: 180px;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-}
 @media (forced-colors: active) {
   .prerequisite-tree .trail-node {
     border-color: ButtonText;
@@ -4217,13 +3836,4 @@ button.quiet:not(:disabled):hover {
   flex: 1 1 100%;
   margin: 0;
   font-size: 0.9rem;
-}
-.earlier-years > summary {
-  width: fit-content;
-  padding: 10px 14px;
-  margin: 12px 0;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 700;
 }

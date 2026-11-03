@@ -13,6 +13,7 @@ import * as artwork from "../src/wildlife/animal.tsx";
 import * as calendar from "../src/study/calendar.tsx";
 import * as places from "../src/wildlife/place.tsx";
 import * as navigation from "../src/shared/menu.tsx";
+import * as footer from "../src/shared/footer.tsx";
 import * as display from "../src/shared/display.tsx";
 import * as research from "../src/study/research.tsx";
 import * as language from "../src/shared/language.tsx";
@@ -200,19 +201,19 @@ test("navigation has a touch menu and a useful footer without play or pause butt
     .replaceAll('"', "");
   assert.match(css, /grid-template-columns:76pxminmax\(0,1fr\)/);
   assert.doesNotMatch(css, /\.sidebar>\*\{opacity:0/);
-  const footer = renderToStaticMarkup(React.createElement(navigation.Footer));
-  assert.match(footer, /Accessibility/);
-  assert.match(footer, /Made with/);
-  assert.match(footer, /love by/);
-  assert.match(footer, /keys-i/);
-  assert.match(footer, /aria-label="UQ minis on GitHub"/);
-  assert.match(footer, /role="dialog"/);
-  assert.match(footer, />Contrast</);
-  assert.match(footer, /Reading size/);
-  assert.match(footer, />Voices</);
-  assert.doesNotMatch(footer, /Source<|Report a bug|Use Tab to/);
-  assert.match(footer, />Motion</);
-  assert.doesNotMatch(footer, /Play animals|Pause animals|animal-pause/);
+  const html = renderToStaticMarkup(React.createElement(footer.Footer));
+  assert.match(html, /Accessibility/);
+  assert.match(html, /Made with/);
+  assert.match(html, /love by/);
+  assert.match(html, /keys-i/);
+  assert.match(html, /aria-label="UQ minis on GitHub"/);
+  assert.match(html, /role="dialog"/);
+  assert.match(html, />Contrast</);
+  assert.match(html, /Reading size/);
+  assert.match(html, />Voices</);
+  assert.doesNotMatch(html, /Source<|Report a bug|Use Tab to/);
+  assert.match(html, />Motion</);
+  assert.doesNotMatch(html, /Play animals|Pause animals|animal-pause/);
 });
 
 test("residents vary activity without repeating, using their own habitat clocks", () => {
@@ -303,14 +304,14 @@ test("the home shelf preserves reading order while its active card expands", () 
     names,
   );
   assert.match(html, /mini-row/);
-  assert.match(html, /grid-template-columns:1\.65fr 1fr 1fr/);
+  assert.match(html, /grid-template-columns:1\.42fr 1fr 1fr/);
   const residents = [...html.matchAll(/data-resident="([^"]+)"/g)].map((match) => match[1]);
   assert.equal(new Set(residents).size, residents.length);
   const css = readFileSync(new URL("../src/shared/cards.css", import.meta.url), "utf8").replace(
     /\s+/g,
     "",
   );
-  assert.match(css, /transition:grid-template-columns260ms/);
+  assert.match(css, /transition:grid-template-columns420ms/);
   assert.match(css, /\.mini-card\.is-featured\.preview-copy/);
 });
 
@@ -540,8 +541,10 @@ test("pocket filters retain native selection and named popover controls", () => 
   assert.match(html, /aria-label="Close faculty choices"/);
   const theme = renderToStaticMarkup(React.createElement(display.ThemePicker));
   assert.match(theme, /class="theme-toggle"/);
-  assert.match(theme, /switch to dark mode/);
-  assert.doesNotMatch(theme, /<select|<option/);
+  assert.match(theme, /aria-label="App theme"/);
+  assert.match(theme, /<option value="system" selected="">System<\/option>/);
+  assert.match(theme, /<option value="light">Day<\/option>/);
+  assert.match(theme, /<option value="dark">Night<\/option>/);
 });
 
 test("club cards keep useful descriptions, named social icons and local profile controls", () => {

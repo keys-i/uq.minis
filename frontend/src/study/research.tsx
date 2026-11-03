@@ -203,40 +203,6 @@ function Score({ name, value }: { name: string; value?: Metric }) {
   );
 }
 
-function Rating({ value }: { value?: Metric }) {
-  return (
-    <div
-      className={`minis-rating${value?.mean == null ? " is-unrated" : ""}`}
-      aria-label={
-        value?.mean == null
-          ? "No rating yet"
-          : `${value.mean} out of 5, ${value.confidence} evidence`
-      }
-    >
-      <Icon name="star" />
-      <div>
-        <strong>
-          {value?.mean ?? "-"}
-          <small>{value?.mean != null && "/ 5"}</small>
-        </strong>
-        {value?.mean == null && <span>Not rated yet</span>}
-      </div>
-      {value?.mean != null && (
-        <small>
-          {
-            (
-              { strong: "More evidence", building: "Taking shape", early: "Early days" } as Record<
-                string,
-                string
-              >
-            )[value.confidence || ""]
-          }
-        </small>
-      )}
-    </div>
-  );
-}
-
 export function Requirements({
   value,
   detailed = false,
@@ -790,7 +756,6 @@ export function Research({
                 <img src="/api/brand/uq.png" alt="UQ" loading="lazy" decoding="async" />
                 <span dir="ltr">{target === "course" ? row.code : "Professor"}</span>
               </div>
-              {target === "course" && <Rating value={row.metrics.overall} />}
             </div>
             <h3>
               <button

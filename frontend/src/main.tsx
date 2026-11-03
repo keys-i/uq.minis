@@ -3,8 +3,6 @@ import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./app.tsx";
 import { useSession } from "./shared/session.ts";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queries } from "./shared/query.ts";
 import "./style.css";
 import "./shared/cards.css";
 import "./wildlife/scene.css";
@@ -34,9 +32,4 @@ function Workspace() {
   return <App />;
 }
 
-if (!import.meta.env.SSR)
-  createRoot(document.getElementById("root")!).render(
-    <QueryClientProvider client={queries}>
-      <Workspace />
-    </QueryClientProvider>,
-  );
+if (!import.meta.env.SSR) createRoot(document.getElementById("root")!).render(<Workspace />);

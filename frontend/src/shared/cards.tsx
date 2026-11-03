@@ -6,35 +6,7 @@ import { Icon } from "./icons.tsx";
 import { Pal } from "../wildlife/mascot.tsx";
 import { Motion } from "./display.tsx";
 import { typeText } from "./motion.ts";
-
-const descriptions: Record<string, string> = {
-  planny: "Turn assessments into an earlier, manageable plan",
-  scrappy: "Choose courses and compare their requirements",
-  buzzy: "See deadlines and club events in one calendar",
-  clubby: "Find clubs by interest and follow their events",
-  event: "Prepare the forms and risk plan for a club activity",
-  timey: "Make and preview a countdown video for your event",
-  auth: "Finish your uni sign-in in a private window",
-  agent: "Track an event booking and its Outlook replies",
-};
-
-function TypedCopy({ text, active }: { text: string; active: boolean }) {
-  const [typed, setTyped] = useState(active ? "" : text);
-  const { reduced, hidden } = useContext(Motion);
-  useEffect(
-    () => typeText(text, setTyped, active && !reduced && !hidden),
-    [active, hidden, reduced, text],
-  );
-  return (
-    <>
-      <span className="typed-copy" data-typing={active && typed !== text} aria-hidden="true">
-        <span className="typed-measure">{text}</span>
-        <span>{typed}</span>
-      </span>
-      <span className="sr-only">{text}</span>
-    </>
-  );
-}
+import { miniHref } from "./route.ts";
 
 function Picture({
   src,
@@ -57,6 +29,161 @@ function Picture({
       onError={() => setFailed(true)}
     />
   ) : null;
+}
+
+const descriptions: Record<string, string> = {
+  planny: "Turn assessments into an earlier, manageable plan",
+  scrappy: "Choose courses and compare their requirements",
+  buzzy: "See deadlines and club events in one calendar",
+  clubby: "Find clubs by interest and follow their events",
+  event: "Prepare the forms and risk plan for a club activity",
+  timey: "Make and preview a countdown video for your event",
+};
+const miniOrder = ["planny", "scrappy", "buzzy", "clubby", "event", "timey"];
+
+function TypedCopy({ text, active }: { text: string; active: boolean }) {
+  const [typed, setTyped] = useState(active ? "" : text);
+  const { reduced, hidden } = useContext(Motion);
+  useEffect(
+    () => typeText(text, setTyped, active && !reduced && !hidden),
+    [active, hidden, reduced, text],
+  );
+  return (
+    <>
+      <span className="typed-copy" data-typing={active && typed !== text} aria-hidden="true">
+        <span className="typed-measure">{text}</span>
+        <span>{typed}</span>
+      </span>
+      <span className="sr-only">{text}</span>
+    </>
+  );
+}
+
+export function MiniTitle({
+  name,
+  title,
+  open,
+}: {
+  name: string;
+  title: string;
+  open: (name: string) => void;
+}) {
+  return (
+    <a
+      className="card-title"
+      href={miniHref(name)}
+      onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        open(name);
+      }}
+    >
+      {title}
+    </a>
+  );
+}
+
+/** Keep the habitat and its controls separate from the mini navigation link */
+export function MiniCard({
+  name,
+  mini,
+  open,
+  featured = false,
+  feature = () => {},
+  resident,
+}: {
+  name: string;
+  mini: Mini;
+  open: (name: string) => void;
+  featured?: boolean;
+  feature?: (name: string) => void;
+  resident?: number;
+}) {
+  return (
+    <article
+      className={`mini-card${featured ? " is-featured" : ""}`}
+      data-mini={name}
+      onPointerEnter={(event) => {
+        if (!featured && event.pointerType !== "touch") feature(name);
+      }}
+      onFocusCapture={() => feature(name)}
+    >
+      <div className="mini-art">
+        <Pal name={name} resident={resident} />
+        <span className="mini-mark">
+          <Icon name={name} />
+        </span>
+      </div>
+      <div className="card-body">
+        <h2>
+          <MiniTitle name={name} title={mini.title} open={open} />
+        </h2>
+        <div className="preview-copy">
+          <div>
+            <p>
+              <TypedCopy text={descriptions[name] || mini.about} active={featured} />
+            </p>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/** Group cards by visual row without changing their keyboard reading order */
+export function MiniShelf({ tools, open }: { tools: Tools; open: (name: string) => void }) {
+  const entries = Object.entries(tools).sort(
+    ([left], [right]) => miniOrder.indexOf(left) - miniOrder.indexOf(right),
+  );
+  const initial = tools.planny ? "planny" : (entries[0]?.[0] ?? "");
+  const [featured, setFeatured] = useState(initial);
+  const active = tools[featured] ? featured : initial;
+  return (
+    <section
+      className="expedition-board"
+      aria-label="Choose a mini"
+      onPointerLeave={(event) => {
+        if (event.pointerType !== "touch" && !event.currentTarget.contains(document.activeElement))
+          setFeatured(initial);
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFeatured(initial);
+      }}
+    >
+      <div className="expedition-atmosphere" aria-hidden="true">
+        <span className="range range-one" />
+        <span className="range range-two" />
+        <span className="track" />
+        <span className="reed reed-one" />
+        <span className="reed reed-two" />
+      </div>
+      <div className="mini-grid">
+        {Array.from({ length: Math.ceil(entries.length / 3) }, (_, row) => (
+          <div
+            className="mini-row"
+            style={{
+              gridTemplateColumns: Array.from({ length: 3 }, (_, column) =>
+                entries[row * 3 + column]?.[0] === active ? "1.42fr" : "1fr",
+              ).join(" "),
+            }}
+            key={row}
+          >
+            {entries.slice(row * 3, row * 3 + 3).map(([name, mini], column) => (
+              <MiniCard
+                key={name}
+                name={name}
+                mini={mini}
+                open={open}
+                feature={setFeatured}
+                featured={name === active}
+                resident={row * 3 + column}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function Artwork({
@@ -217,153 +344,5 @@ export function ClubCard({
         </div>
       </div>
     </article>
-  );
-}
-
-export function CourseCard({
-  course,
-  action,
-  children,
-}: {
-  course: { course_code: string };
-  action?: React.ReactNode;
-  children?: React.ReactNode;
-}) {
-  return (
-    <article className="discovery-card course-card">
-      <div className="course-art">
-        <span>University of Queensland</span>
-        <strong aria-hidden="true">
-          {course.course_code.slice(0, 4)}
-          <b>{course.course_code.slice(4)}</b>
-        </strong>
-        <img
-          className="course-logo"
-          src="/api/brand/uq.png"
-          alt=""
-          loading="lazy"
-          decoding="async"
-        />
-      </div>
-      <div className="card-body">
-        <h3>{children}</h3>
-        <div className="card-actions">{action}</div>
-      </div>
-    </article>
-  );
-}
-
-export function MiniTitle({
-  name,
-  title,
-  open,
-}: {
-  name: string;
-  title: string;
-  open: (name: string) => void;
-}) {
-  return (
-    <a
-      className="card-title"
-      href={`${import.meta.env.BASE_URL}?m=${name}`}
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        open(name);
-      }}
-    >
-      {title}
-    </a>
-  );
-}
-
-/** Keep the habitat and its controls separate from the mini navigation link */
-export function MiniCard({
-  name,
-  mini,
-  open,
-  featured = false,
-  feature = () => {},
-  resident,
-}: {
-  name: string;
-  mini: Mini;
-  open: (name: string) => void;
-  featured?: boolean;
-  feature?: (name: string) => void;
-  resident?: number;
-}) {
-  return (
-    <article
-      className={`mini-card${featured ? " is-featured" : ""}`}
-      data-mini={name}
-      onPointerEnter={(event) => {
-        if (!featured && event.pointerType !== "touch") feature(name);
-      }}
-      onFocusCapture={() => feature(name)}
-    >
-      <div className="mini-art">
-        <Pal name={name} resident={resident} />
-        <span className="mini-mark">
-          <Icon name={name} />
-        </span>
-      </div>
-      <div className="card-body">
-        <h2>
-          <MiniTitle name={name} title={mini.title} open={open} />
-        </h2>
-        <div className="preview-copy">
-          <div>
-            <p>
-              <TypedCopy text={descriptions[name] || mini.about} active={featured} />
-            </p>
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/** Group cards by visual row without changing their keyboard reading order */
-export function MiniShelf({ tools, open }: { tools: Tools; open: (name: string) => void }) {
-  const entries = Object.entries(tools);
-  const initial = tools.planny ? "planny" : (entries[0]?.[0] ?? "");
-  const [featured, setFeatured] = useState(initial);
-  const active = tools[featured] ? featured : initial;
-  return (
-    <div
-      className="mini-grid"
-      onPointerLeave={(event) => {
-        if (event.pointerType !== "touch" && !event.currentTarget.contains(document.activeElement))
-          setFeatured(initial);
-      }}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFeatured(initial);
-      }}
-    >
-      {Array.from({ length: Math.ceil(entries.length / 3) }, (_, row) => (
-        <div
-          className="mini-row"
-          style={{
-            gridTemplateColumns: Array.from({ length: 3 }, (_, column) =>
-              entries[row * 3 + column]?.[0] === active ? "1.65fr" : "1fr",
-            ).join(" "),
-          }}
-          key={row}
-        >
-          {entries.slice(row * 3, row * 3 + 3).map(([name, mini], column) => (
-            <MiniCard
-              key={name}
-              name={name}
-              mini={mini}
-              open={open}
-              feature={setFeatured}
-              featured={name === active}
-              resident={row * 3 + column}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
   );
 }

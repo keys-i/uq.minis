@@ -373,3 +373,4 @@ function Search({ render }: { render: (row: Club) => React.ReactNode }) {
     </>
   );
 }
+import "./clubs.css";

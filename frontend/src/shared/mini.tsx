@@ -5,6 +5,7 @@ import { api } from "./api.ts";
 const MiniForm = lazy(() => import("./forms.tsx").then((module) => ({ default: module.MiniForm })));
 import { useNotice } from "./notice.ts";
 import { Link } from "./controls.tsx";
+import { useSession } from "./session.ts";
 
 export function Mini({ name, action }: { name: string; action?: string }) {
   const file = (url: string) =>
@@ -13,7 +14,8 @@ export function Mini({ name, action }: { name: string; action?: string }) {
       : url;
   const [schema, setSchema] = useState<MiniResult | null>(null),
     [busy, setBusy] = useState(false),
-    report = useNotice((state) => state.report);
+    report = useNotice((state) => state.report),
+    workspace = useSession((state) => state.workspace);
   useEffect(() => {
     const controller = new AbortController();
     api(`/api/minis/${name}`, miniSchema, undefined, controller.signal)
@@ -87,9 +89,10 @@ export function Mini({ name, action }: { name: string; action?: string }) {
       )}
       <Suspense fallback={<p role="status">Opening your options…</p>}>
         <MiniForm
-          key={name}
+          key={`${name}:${workspace || "local"}:${JSON.stringify(formSchema.fields)}`}
           schema={formSchema}
           busy={busy}
+          draft={action ? undefined : { workspace: workspace || "local", mini: name }}
           submit={async (body) => {
             if (action) body.set("action", action);
             if (

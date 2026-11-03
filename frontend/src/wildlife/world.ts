@@ -1,6 +1,5 @@
 /** Read weather independently of editor loading and keep each habitat's clock local */
 import { useContext, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import * as z from "zod/mini";
 import { api } from "../shared/api.ts";
 import { queries } from "../shared/query.ts";
@@ -86,16 +85,43 @@ export function useWorld(animal: Species, element: React.RefObject<HTMLElement |
     timer = setTimeout(tick, 20_000 + animal.id.charCodeAt(0) * 317);
     return () => clearTimeout(timer);
   }, [animal.id, hidden, visible]);
-  const weather = useQuery(
-    {
-      queryKey: ["weather", animal.id],
-      queryFn: ({ signal }) => api(`/api/weather/${animal.id}`, forecast, undefined, signal),
-      enabled: visible && !hidden,
-      staleTime: 5 * 60_000,
-      refetchInterval: visible && !hidden ? 10 * 60_000 : false,
-    },
-    queries,
-  ).data;
+  const [weather, setWeather] = useState<Weather>();
+  useEffect(() => {
+    if (!visible || hidden) return;
+    const key = ["weather", animal.id],
+      controller = new AbortController();
+    setWeather(queries.getQueryData<Weather>(key));
+    const refresh = () => {
+      void queries
+        .fetchQuery({
+          queryKey: key,
+          queryFn: ({ signal }) =>
+            api(
+              `/api/weather/${animal.id}`,
+              forecast,
+              undefined,
+              AbortSignal.any([signal, controller.signal]),
+            ),
+          staleTime: 5 * 60_000,
+        })
+        .then(
+          (value) => {
+            if (!controller.signal.aborted) setWeather(value);
+          },
+          (error) => {
+            // Weather is optional; keep the last forecast and the local habitat clock
+            if ((error as Error).name !== "AbortError")
+              setWeather(queries.getQueryData<Weather>(key));
+          },
+        );
+    };
+    refresh();
+    const timer = setInterval(refresh, 10 * 60_000);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [animal.id, hidden, visible]);
   const clock = habitatTime(animal, now);
   return { clock: { ...clock, ...lighting(now, clock.hour, weather) }, weather, visible };
 }

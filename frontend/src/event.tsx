@@ -38,3 +38,4 @@ export function Eventy({ follow = false }) {
     </>
   );
 }
+import "./event.css";

@@ -44,7 +44,7 @@ test.each(["/", "/mini/"])("mini links preserve navigation beneath %s", async (b
     open = vi.fn();
   render(<MiniTitle name="planny" title="Planny" open={open} />);
   const link = screen.getByRole("link", { name: "Planny" });
-  expect(link).toHaveAttribute("href", `${base}?m=planny`);
+  expect(link).toHaveAttribute("href", "/mini/planny");
   // Observe the app's decision, then prevent navigation beyond JSDOM's document
   const navigation = vi.fn((event: MouseEvent) => {
     const handled = event.defaultPrevented;

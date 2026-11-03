@@ -1,0 +1,21 @@
+.course-start {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 0;
+  margin-bottom: 24px;
+  border-block: 1px solid var(--edge, var(--line));
+}
+.course-start > div {
+  flex: 1;
+}
+.course-start h2 {
+  margin-bottom: 8px;
+}
+.course-start p {
+  margin: 0;
+}
+.course-start .icon {
+  width: 32px;
+  height: 32px;
+}
