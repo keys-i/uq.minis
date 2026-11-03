@@ -1,12 +1,11 @@
 import { roomsSchema } from "./schema.ts";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { T } from "./language.tsx";
 export type Values = Record<string, string>;
 
 export type { Field, Schema } from "./schema.ts";
 import type { Field, Schema, Room } from "./schema.ts";
 import { api } from "./api.ts";
-import { autocomplete, clearDraft, restoreDraft, saveDraft } from "./draft.ts";
 import { Phrase } from "./phrase.tsx";
 
 function Rooms({ field, catalogue }: { field: Field; catalogue?: string }) {
@@ -155,14 +154,12 @@ export function Input({
         : event.target.value,
     );
   const common = {
-    id: `mini-field-${field.name.replaceAll(/[^a-z0-9_-]/gi, "-")}`,
     name: field.name,
     min: field.min,
     max: field.max,
     step: field.step,
     maxLength: field.maxLength,
     required: field.required,
-    autoComplete: autocomplete(field),
     onChange: update,
   };
   return (
@@ -195,10 +192,9 @@ export function Input({
           />
         </div>
       ) : field.type === "file" ? (
-        <input id={common.id} name={field.name} type="file" required={field.required} />
+        <input name={field.name} type="file" required={field.required} />
       ) : field.type === "checkbox" ? (
         <input
-          id={common.id}
           name={field.name}
           type="checkbox"
           value="on"
@@ -233,39 +229,14 @@ export function initial(schema: Schema): Values {
 export function MiniForm({
   schema,
   busy = false,
-  draft,
   submit,
 }: {
   schema: Schema;
   busy?: boolean;
-  draft?: { workspace: string; mini: string };
   submit: (data: FormData) => void;
 }) {
-  const restored = useRef(
-      draft
-        ? restoreDraft(draft.workspace, draft.mini, schema, initial(schema))
-        : { values: initial(schema), found: false },
-    ).current,
-    [values, setValues] = useState(restored.values),
-    [dirty, setDirty] = useState(false),
-    [saved, setSaved] = useState(restored.found);
-  const change = (name: string, value: string) => {
-    setDirty(true);
-    setValues((old) => ({ ...old, [name]: value }));
-  };
-  useEffect(() => {
-    if (!draft || !dirty) return;
-    const save = () => saveDraft(draft.workspace, draft.mini, schema, values);
-    const timer = setTimeout(() => {
-      save();
-      setSaved(true);
-    }, 250);
-    addEventListener("pagehide", save, { once: true });
-    return () => {
-      clearTimeout(timer);
-      removeEventListener("pagehide", save);
-    };
-  }, [dirty, draft, schema, values]);
+  const [values, setValues] = useState(() => initial(schema));
+  const change = (name: string, value: string) => setValues((old) => ({ ...old, [name]: value }));
   const fields = schema.fields.filter(
     (field) =>
       !field.when ||
@@ -291,10 +262,7 @@ export function MiniForm({
         <Phrase
           fields={schema.fields}
           values={() => values}
-          change={(next) => {
-            setDirty(true);
-            setValues((old) => ({ ...old, ...next }));
-          }}
+          change={(next) => setValues((old) => ({ ...old, ...next }))}
           example={
             schema.fields.some((field) => field.name === "event.title")
               ? "Movie night for 50 people on Friday from 6pm to 8pm"
@@ -338,20 +306,6 @@ export function MiniForm({
         <button disabled={busy} aria-busy={busy}>
           {busy ? "Working - keep this page open" : schema.submit || "Continue"}
         </button>
-        {draft && (dirty || saved) && (
-          <button
-            type="button"
-            className="quiet"
-            onClick={() => {
-              clearDraft(draft.workspace, draft.mini);
-              setValues(initial(schema));
-              setDirty(false);
-              setSaved(false);
-            }}
-          >
-            Clear saved draft
-          </button>
-        )}
       </div>
     </form>
   );

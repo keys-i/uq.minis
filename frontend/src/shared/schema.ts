@@ -36,7 +36,6 @@ export const fieldSchema = z.object({
   max: z.optional(z.number()),
   step: z.optional(z.number()),
   maxLength: z.optional(z.number()),
-  autocomplete: z.optional(z.string()),
   required: z.optional(z.boolean()),
   options: z.optional(z.array(z.tuple([z.union([z.string(), z.number()]), z.string()]))),
   when: z.optional(z.record(z.string(), z.array(z.string()))),
@@ -103,7 +102,6 @@ export const portalSchema = z.union([
 ]);
 export const connectionSchema = z.union([
   z.object({ connected: z.literal(true) }),
-  z.object({ acknowledged: z.literal(true) }),
   z.object({ error: z.string() }),
   portalViewSchema,
 ]);

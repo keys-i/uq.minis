@@ -186,26 +186,23 @@ export function MotionSettings() {
 }
 
 export function ThemePicker() {
-  const { scheme = "light", preferences, change } = useContext(Motion),
+  const { scheme = "light", change } = useContext(Motion),
     dark = scheme === "dark";
   return (
-    <label className="theme-toggle" data-dark={dark}>
+    <button
+      type="button"
+      className="theme-toggle"
+      data-dark={dark}
+      aria-pressed={dark}
+      aria-label={`App theme / switch to ${dark ? "light" : "dark"} mode`}
+      data-tip={`Switch to ${dark ? "light" : "dark"} mode`}
+      onClick={() => change({ theme: dark ? "light" : "dark" })}
+    >
       <span className="theme-window">
         <img className="theme-sun" src={vector("icons/sun")} alt="" />
         <img className="theme-moon" src={vector("icons/moon")} alt="" />
       </span>
-      <select
-        aria-label="App theme"
-        value={preferences.theme}
-        onChange={(event) =>
-          change({ theme: preferencesSchema.shape.theme.parse(event.target.value) })
-        }
-      >
-        <option value="system">System</option>
-        <option value="light">Day</option>
-        <option value="dark">Night</option>
-      </select>
-      <Icon name="chevron" className="menu-chevron" />
-    </label>
+      <span>{dark ? "Dark" : "Light"}</span>
+    </button>
   );
 }

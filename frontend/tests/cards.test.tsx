@@ -30,18 +30,27 @@ test("SVG markup stays in asset files rather than application source", () => {
         assert.doesNotMatch(readFileSync(`${root}/${path}`, "utf8"), /<svg\b/i, path);
 });
 
-test("mini habitats keep whole cartoons and accessible controls", () => {
+test("mini habitats keep whole cartoons and their controls outside the main link", () => {
   for (const name of ["planny", "scrappy", "clubby", "event", "timey", "auth", "agent"]) {
     const html = renderToStaticMarkup(React.createElement(mascots.Pal, { name }));
     assert.match(html, /class="animal animal-/);
     assert.match(html, /aria-hidden="true"/);
-    assert.doesNotMatch(html, /\/api\/habitat|<text\b/);
-    assert.match(html, /popoverTarget="[^"]+" aria-label="My story/);
-    assert.doesNotMatch(html, /Species story/);
+    const mini = renderToStaticMarkup(
+      React.createElement(cards.MiniCard, {
+        name,
+        mini: { title: name, about: "Open this tool" },
+        open: () => {},
+      }),
+    );
+    assert.doesNotMatch(mini, /\/api\/habitat|<text\b/);
+    assert.match(mini, /<article class="mini-card"/);
+    assert.match(mini, /popoverTarget="[^"]+" aria-label="My story/);
+    assert.doesNotMatch(mini, /Species story|<p>Open this tool<\/p>/);
     assert.doesNotMatch(html, /Next animal|animal-next/);
-    assert.match(html, /data-portrait=/);
-    const links = [...html.matchAll(/<a\b[^>]*>(.*?)<\/a>/gs)];
-    assert.ok(links.length >= 1);
+    assert.doesNotMatch(mini, /Next animal|animal-next/);
+    assert.match(mini, /data-portrait=/);
+    const links = [...mini.matchAll(/<a\b[^>]*>(.*?)<\/a>/gs)];
+    assert.ok(links.length >= 2);
     assert.ok(links.every((link) => !/<button|<summary|<a\b/.test(link[1])));
   }
   assert.match(
@@ -81,6 +90,20 @@ test("all residents have complete bounded poses and small portraits", () => {
     );
     assert.ok(animal.source.startsWith("https://"));
   }
+});
+
+test("only the selected mini expands, with Planny as the default", () => {
+  const tools = {
+    planny: { title: "Planny", about: "Plan" },
+    scrappy: { title: "Scrappy", about: "Courses" },
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(cards.MiniShelf, { tools, open: () => {} }),
+  );
+  assert.equal([...html.matchAll(/class="mini-card is-featured"/g)].length, 1);
+  assert.match(html, /class="mini-card is-featured" data-mini="planny"/);
+  assert.doesNotMatch(html, /<p>Plan<\/p>|<p>Courses<\/p>/);
+  assert.doesNotMatch(html, /How it helps|preview-toggle/);
 });
 
 test("every animal has a regional story, useful conservation context and its own response", () => {
@@ -267,6 +290,28 @@ test("display preferences reject corrupt and out-of-range saved values", () => {
     size: 1,
     theme: "system",
   });
+});
+
+test("the home shelf preserves reading order while its active card expands", () => {
+  const names = ["planny", "scrappy", "buzzy", "clubby", "event", "timey"];
+  const tools = Object.fromEntries(names.map((name) => [name, { title: name, about: name }]));
+  const html = renderToStaticMarkup(
+    React.createElement(cards.MiniShelf, { tools, open: () => {} }),
+  );
+  assert.deepEqual(
+    [...html.matchAll(/data-mini="([^"]+)"/g)].map((match) => match[1]),
+    names,
+  );
+  assert.match(html, /mini-row/);
+  assert.match(html, /grid-template-columns:1\.65fr 1fr 1fr/);
+  const residents = [...html.matchAll(/data-resident="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(residents).size, residents.length);
+  const css = readFileSync(new URL("../src/shared/cards.css", import.meta.url), "utf8").replace(
+    /\s+/g,
+    "",
+  );
+  assert.match(css, /transition:grid-template-columns260ms/);
+  assert.match(css, /\.mini-card\.is-featured\.preview-copy/);
 });
 
 test("status badges retain accessible names without visible status labels", () => {
@@ -495,10 +540,8 @@ test("pocket filters retain native selection and named popover controls", () => 
   assert.match(html, /aria-label="Close faculty choices"/);
   const theme = renderToStaticMarkup(React.createElement(display.ThemePicker));
   assert.match(theme, /class="theme-toggle"/);
-  assert.match(theme, /<select aria-label="App theme"/);
-  assert.match(theme, /<option value="system" selected="">System<\/option>/);
-  assert.match(theme, /<option value="light">Day<\/option>/);
-  assert.match(theme, /<option value="dark">Night<\/option>/);
+  assert.match(theme, /switch to dark mode/);
+  assert.doesNotMatch(theme, /<select|<option/);
 });
 
 test("club cards keep useful descriptions, named social icons and local profile controls", () => {

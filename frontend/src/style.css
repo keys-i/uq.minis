@@ -484,6 +484,35 @@ main {
   margin-left: 12px;
   font-size: 0.85rem;
 }
+.welcome {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  background: #fff1bd;
+  border: 0;
+  border-radius: 26px;
+  box-shadow: none;
+  padding: 24px 30px;
+  margin-bottom: 26px;
+}
+.welcome h1 {
+  font-size: clamp(2.5rem, 4vw, 3.4rem);
+  max-width: 14ch;
+  letter-spacing: -0.045em;
+}
+.welcome p {
+  margin: 16px 0 0;
+  font-size: 1rem;
+  max-width: 41ch;
+}
+.welcome .pal {
+  width: clamp(180px, 21vw, 270px);
+  height: auto;
+  aspect-ratio: 320/220;
+  border-radius: 45% 45% 30% 35%;
+  overflow: hidden;
+}
 .wildlife-toolbar {
   display: flex;
   align-items: center;
@@ -1906,7 +1935,8 @@ dialog::backdrop {
 
 /* == Direct-action motion == */
 @media (prefers-reduced-motion: no-preference) {
-  button {
+  button,
+  .mini-card {
     transition:
       transform 140ms ease,
       box-shadow 140ms ease,
@@ -1931,6 +1961,12 @@ dialog::backdrop {
   }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .mini-mark {
+    transition: transform 180ms ease;
+  }
+  .mini-card:hover .mini-mark {
+    transform: rotate(5deg);
+  }
   .discovery-card {
     transition:
       transform 160ms ease,
@@ -1953,6 +1989,12 @@ dialog::backdrop {
   }
   .sidebar nav button small {
     font-size: 0.7rem;
+  }
+  .welcome {
+    padding: 24px;
+  }
+  .welcome .pal {
+    width: 170px;
   }
   .nudgy-control {
     margin-left: 0;
@@ -2064,11 +2106,59 @@ dialog::backdrop {
     font-size: 0.7rem;
     padding: 6px 9px;
   }
+  .welcome {
+    grid-template-columns: minmax(0, 1fr) 95px;
+    padding: 20px 17px;
+    gap: 8px;
+    margin-bottom: 25px;
+    border-radius: 21px;
+  }
+  .welcome > div:not(.pal) {
+    display: contents;
+  }
+  .welcome h1 {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: clamp(1.9rem, 7.2vw, 2.6rem);
+  }
+  .welcome p {
+    grid-column: 1/-1;
+    grid-row: 2;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-top: 12px;
+  }
+  .welcome .pal {
+    grid-column: 2;
+    grid-row: 1;
+    width: 105px;
+    max-width: 100%;
+  }
+  .mini-grid,
   .feed-grid,
   .club-grid,
   .course-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 20px;
+  }
+  .mini-row {
+    display: contents;
+  }
+  .mini-card.is-featured {
+    grid-column: auto;
+    display: flex;
+  }
+  .mini-card.is-featured .mini-art {
+    height: 248px;
+    min-height: 248px;
+    border-right: 0;
+    border-bottom: 1px solid #30483b33;
+  }
+  .mini-card.is-featured .card-body {
+    padding: 20px;
+  }
+  .mini-card.is-featured h2 {
+    font-size: 1.5rem;
   }
   .wildlife-toolbar > span {
     font-size: 0.85rem;
@@ -2224,9 +2314,11 @@ dialog::backdrop {
 }
 @media (forced-colors: active) {
   button,
+  .mini-card,
   .discovery-card,
   .card-logo,
   .date-stamp,
+  .welcome,
   .week,
   .nudgy {
     border-color: CanvasText;
@@ -2941,21 +3033,6 @@ textarea {
   gap: 8px;
   min-height: 46px;
 }
-.theme-toggle select {
-  appearance: none;
-  min-width: 64px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-.theme-toggle .menu-chevron {
-  width: 12px;
-  height: 12px;
-}
 .theme-window {
   display: block;
   width: 48px;
@@ -3242,6 +3319,9 @@ textarea {
 [data-theme="dark"] .habitat-content {
   background: var(--paper);
 }
+[data-theme="dark"] .welcome {
+  background: var(--panel);
+}
 [data-theme="dark"]
   :is(
     .brand-mark,
@@ -3276,6 +3356,14 @@ textarea {
   background: var(--mint);
   border-color: var(--edge);
 }
+[data-theme="dark"] .mini-card {
+  border-color: var(--edge);
+  box-shadow: 0 5px 18px #0c132040;
+}
+[data-theme="dark"] .mini-card.is-featured {
+  border-color: var(--accent);
+  box-shadow: 0 5px 18px #0c132040;
+}
 [data-theme="dark"] .sidebar nav button:not(.active),
 [data-theme="dark"] .planner-tabs button,
 [data-theme="dark"] .feed-tabs button {
@@ -3307,7 +3395,7 @@ textarea {
 [data-theme="dark"] .course-art b {
   color: var(--text);
 }
-[data-theme="dark"] :is(.nudgy, .rule-note, .event) {
+[data-theme="dark"] :is(.preview-copy p, .nudgy, .rule-note, .event) {
   background: var(--mint);
   color: var(--text);
 }
@@ -3420,7 +3508,8 @@ textarea {
 [data-still="true"] .animal *,
 [data-still="true"] .animal-presence,
 [data-still="true"] .badge-symbol,
-[data-still="true"] .place-mark * {
+[data-still="true"] .place-mark *,
+[data-still="true"] .mini-row {
   animation: none !important;
   transition: none !important;
 }
@@ -4137,612 +4226,4 @@ button.quiet:not(:disabled):hover {
   border-radius: 12px;
   cursor: pointer;
   font-weight: 700;
-}
-
-/* == A connected wildlife expedition replaces the home card shelf == */
-.expedition-world {
-  --trail-sky: #dceff5;
-  --trail-cloud: #f9fcf8;
-  --trail-ridge: #b8cfbd;
-  --trail-canopy: #769988;
-  --trail-water: #abd9df;
-  --trail-ground: #486d5c;
-  --trail-path: #765b36;
-  --trail-marker: #f4c95e;
-  --trail-sheet: #fffdf5e8;
-  position: relative;
-  isolation: isolate;
-  min-height: calc(100dvh - 82px);
-  overflow: clip;
-  background: var(--trail-sky);
-}
-.expedition-world > :not(.trail-scenery) {
-  position: relative;
-  z-index: 1;
-}
-.expedition {
-  position: relative;
-  isolation: isolate;
-  min-height: calc(100dvh - 82px);
-  padding: clamp(38px, 6vw, 82px) clamp(18px, 5vw, 76px) 110px;
-}
-.trail-scenery,
-.trail-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.trail-scenery {
-  position: fixed;
-  z-index: 0;
-  overflow: hidden;
-  contain: paint;
-}
-.trail-layer {
-  transform: translate3d(0, 0, 0);
-}
-.trail-layer-sky {
-  background: var(--trail-sky);
-}
-.trail-layer-clouds {
-  inset: 2% -6% auto;
-  height: 34%;
-  opacity: 0.78;
-  background:
-    radial-gradient(ellipse at 14% 38%, var(--trail-cloud) 0 7%, transparent 7.5%),
-    radial-gradient(ellipse at 48% 21%, var(--trail-cloud) 0 9%, transparent 9.5%),
-    radial-gradient(ellipse at 83% 48%, var(--trail-cloud) 0 6%, transparent 6.5%);
-}
-.trail-layer-ridge {
-  inset: 27% -8% 30%;
-  background: var(--trail-ridge);
-  clip-path: polygon(
-    0 58%,
-    13% 31%,
-    26% 54%,
-    43% 18%,
-    59% 55%,
-    75% 28%,
-    100% 61%,
-    100% 100%,
-    0 100%
-  );
-}
-.trail-layer-canopy {
-  inset: 46% -6% 12%;
-  background: var(--trail-canopy);
-  clip-path: polygon(
-    0 35%,
-    7% 18%,
-    14% 38%,
-    23% 12%,
-    33% 39%,
-    43% 15%,
-    55% 43%,
-    68% 11%,
-    78% 39%,
-    90% 17%,
-    100% 34%,
-    100% 100%,
-    0 100%
-  );
-}
-.trail-layer-water {
-  inset: auto -8% 0;
-  height: 30%;
-  opacity: 0.92;
-  background: linear-gradient(
-    175deg,
-    transparent 0 10%,
-    color-mix(in srgb, var(--trail-water) 65%, transparent) 10.5% 16%,
-    var(--trail-water) 16.5%
-  );
-}
-.trail-layer-foreground {
-  inset: auto -8% -4%;
-  height: 18%;
-  background: var(--trail-ground);
-  clip-path: polygon(
-    0 45%,
-    4% 20%,
-    8% 48%,
-    13% 10%,
-    17% 46%,
-    24% 25%,
-    31% 52%,
-    39% 16%,
-    45% 48%,
-    54% 21%,
-    61% 50%,
-    69% 12%,
-    75% 44%,
-    83% 22%,
-    90% 51%,
-    96% 17%,
-    100% 43%,
-    100% 100%,
-    0 100%
-  );
-}
-.expedition-head,
-.expedition nav {
-  position: relative;
-  z-index: 1;
-}
-.expedition-head {
-  width: min(780px, 88%);
-  margin: 0 0 clamp(70px, 10vw, 132px) clamp(12px, 6vw, 92px);
-  padding: 0;
-  text-shadow: 0 2px 0 color-mix(in srgb, var(--trail-cloud) 74%, transparent);
-}
-.expedition-head .eyebrow {
-  color: var(--trail-path);
-}
-.expedition-head h1 {
-  max-width: 12ch;
-  color: #2e5548;
-  font-size: clamp(3rem, 6.4vw, 6.4rem);
-  line-height: 0.94;
-}
-.expedition-head > p:last-child {
-  max-width: 47ch;
-  margin: 16px 0 0;
-  color: #284d43;
-  font-size: 1.03rem;
-  font-weight: 700;
-  text-shadow: 0 1px 5px var(--trail-sky);
-}
-.trail-route {
-  position: relative;
-  width: min(1160px, 100%);
-  margin: 0 auto;
-  padding: 12px 0 56px;
-  list-style: none;
-}
-.trail-route::before {
-  display: none;
-}
-.trail-map {
-  position: absolute;
-  inset: -48px 8% -64px;
-  width: 84%;
-  height: calc(100% + 112px);
-  background: color-mix(in srgb, var(--trail-path) 78%, var(--trail-water));
-  filter: drop-shadow(0 2px 0 color-mix(in srgb, var(--trail-cloud) 72%, transparent));
-  mask: url("../assets/trail.svg") center / 100% 100% no-repeat;
-  pointer-events: none;
-}
-.trail-stop {
-  position: relative;
-  z-index: 1;
-  width: min(66%, 670px);
-  min-height: 260px;
-  margin-bottom: clamp(54px, 8vw, 104px);
-}
-.trail-stop[data-side="left"] {
-  margin-right: auto;
-}
-.trail-stop[data-side="right"] {
-  margin-left: auto;
-}
-.trail-stop::after {
-  display: none;
-}
-.trail-marker {
-  position: absolute;
-  top: 54%;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 40px;
-  border: 2px solid var(--trail-path);
-  border-radius: 5px 13px 6px 11px;
-  background: var(--trail-marker);
-  color: #3e3426;
-  box-shadow: 3px 4px 0 color-mix(in srgb, var(--trail-path) 44%, transparent);
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-  rotate: -4deg;
-}
-.trail-stop[data-side="left"] .trail-marker {
-  right: -10%;
-}
-.trail-stop[data-side="right"] .trail-marker {
-  left: -9%;
-  rotate: 5deg;
-}
-.trail-stop article {
-  display: flex;
-  align-items: flex-end;
-  min-height: 260px;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.trail-stop[data-side="right"] article {
-  flex-direction: row-reverse;
-}
-.trail-stop:focus-within article {
-  border-color: transparent;
-  box-shadow: none;
-}
-.trail-habitat {
-  position: relative;
-  width: min(390px, 66%);
-  min-width: 240px;
-  height: 250px;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--trail-water) 64%, var(--trail-cloud));
-  clip-path: polygon(
-    7% 16%,
-    30% 5%,
-    63% 10%,
-    91% 2%,
-    100% 35%,
-    94% 72%,
-    72% 96%,
-    38% 91%,
-    8% 100%,
-    0 62%
-  );
-  filter: drop-shadow(7px 10px 0 color-mix(in srgb, var(--trail-ground) 24%, transparent));
-}
-.trail-stop:nth-child(3n + 1) .trail-habitat {
-  clip-path: polygon(
-    0 24%,
-    18% 5%,
-    54% 0,
-    82% 13%,
-    100% 8%,
-    95% 58%,
-    82% 92%,
-    46% 100%,
-    15% 88%,
-    5% 61%
-  );
-}
-.trail-stop:nth-child(3n + 2) .trail-habitat {
-  clip-path: polygon(4% 8%, 38% 0, 71% 12%, 96% 5%, 100% 48%, 88% 87%, 57% 95%, 25% 100%, 0 72%);
-}
-.trail-resident-loading {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background:
-    radial-gradient(
-      ellipse at 64% 58%,
-      color-mix(in srgb, var(--trail-ground) 46%, transparent) 0 12%,
-      transparent 13%
-    ),
-    linear-gradient(
-      170deg,
-      transparent 54%,
-      color-mix(in srgb, var(--trail-ground) 42%, transparent) 55%
-    );
-}
-.trail-habitat .animal-details {
-  max-width: calc(100% - 12px);
-}
-.trail-copy {
-  position: relative;
-  z-index: 2;
-  min-width: 0;
-  width: min(275px, 48%);
-  margin: 0 0 18px -42px;
-  padding: 20px 23px 22px;
-  background: var(--trail-sheet);
-  clip-path: polygon(3% 8%, 91% 0, 100% 15%, 96% 92%, 72% 96%, 7% 100%, 0 78%);
-  filter: drop-shadow(4px 6px 0 color-mix(in srgb, var(--trail-path) 34%, transparent));
-  rotate: -1.2deg;
-}
-.trail-stop[data-side="right"] .trail-copy {
-  margin-right: -38px;
-  margin-left: 0;
-  clip-path: polygon(0 13%, 9% 2%, 96% 6%, 100% 82%, 89% 98%, 11% 94%, 3% 78%);
-  rotate: 1deg;
-}
-.trail-copy::before {
-  content: "";
-  position: absolute;
-  top: 9px;
-  right: 16%;
-  width: 42px;
-  height: 8px;
-  background: color-mix(in srgb, var(--trail-marker) 72%, transparent);
-  rotate: 3deg;
-}
-.trail-copy > span:first-child {
-  display: block;
-  margin-bottom: 7px;
-  color: var(--trail-path);
-  font-size: 0.79rem;
-  font-weight: 800;
-}
-.trail-copy h2 {
-  margin-bottom: 9px;
-  font-size: clamp(1.35rem, 2.2vw, 1.8rem);
-}
-.trail-copy h2 a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--text);
-  text-decoration: none;
-}
-.trail-copy h2 a:hover {
-  color: var(--target);
-}
-.trail-copy p {
-  margin-bottom: 15px;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
-  text-wrap: pretty;
-}
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .trail-habitat,
-  .trail-copy {
-    transition:
-      translate 180ms ease,
-      filter 180ms ease;
-  }
-  .trail-stop:hover .trail-habitat {
-    translate: 0 -5px;
-    filter: drop-shadow(8px 13px 0 color-mix(in srgb, var(--trail-ground) 28%, transparent));
-  }
-  .trail-stop:hover .trail-copy {
-    translate: 0 -2px;
-  }
-}
-
-@media (max-width: 900px) {
-  .trail-map {
-    inset: -36px auto -48px -2px;
-    width: 62px;
-    height: calc(100% + 84px);
-  }
-  .trail-stop,
-  .trail-stop[data-side="left"],
-  .trail-stop[data-side="right"] {
-    width: calc(100% - 66px);
-    margin-right: 0;
-    margin-left: 66px;
-  }
-  .trail-stop .trail-marker,
-  .trail-stop[data-side="left"] .trail-marker,
-  .trail-stop[data-side="right"] .trail-marker {
-    right: auto;
-    left: -57px;
-  }
-}
-
-@media (max-width: 580px) {
-  .expedition {
-    min-height: 0;
-    padding: 34px 12px 68px;
-  }
-  .expedition-head {
-    width: calc(100% - 26px);
-    margin: 0 0 76px 14px;
-    padding: 0;
-  }
-  .expedition-head h1 {
-    font-size: clamp(2.55rem, 13vw, 4rem);
-  }
-  .trail-stop,
-  .trail-stop[data-side="left"],
-  .trail-stop[data-side="right"] {
-    width: calc(100% - 44px);
-    min-height: 310px;
-    margin-left: 44px;
-    margin-bottom: 58px;
-  }
-  .trail-stop .trail-marker,
-  .trail-stop[data-side="left"] .trail-marker,
-  .trail-stop[data-side="right"] .trail-marker {
-    top: 48%;
-    left: -40px;
-    width: 30px;
-    height: 36px;
-  }
-  .trail-stop article {
-    display: block;
-    min-height: 310px;
-  }
-  .trail-stop[data-side="right"] article {
-    display: block;
-  }
-  .trail-habitat {
-    width: 100%;
-    min-width: 0;
-    height: 230px;
-  }
-  .trail-habitat .animal-tools {
-    right: 6px;
-    left: 6px;
-  }
-  .trail-habitat .animal-details {
-    padding-inline: 7px;
-  }
-  .trail-habitat .animal-details > span:nth-child(2) {
-    display: none;
-  }
-  .trail-copy {
-    width: calc(100% - 22px);
-    margin: -62px 0 0 11px;
-    padding: 19px 20px 21px;
-  }
-  .trail-stop[data-side="right"] .trail-copy {
-    margin: -62px 0 0 11px;
-  }
-  .trail-copy h2 {
-    font-size: 1.25rem;
-  }
-  .trail-copy p {
-    font-size: 0.82rem;
-  }
-}
-
-:root[data-theme="dark"] .expedition-world {
-  --trail-sky: #182127;
-  --trail-cloud: #2b363b;
-  --trail-ridge: #334840;
-  --trail-canopy: #294238;
-  --trail-water: #254b56;
-  --trail-ground: #1b3129;
-  --trail-path: #d4b56b;
-  --trail-marker: #f0cf68;
-  --trail-sheet: #242a2ee8;
-}
-:root[data-theme="dark"] .expedition {
-  border-color: #586c66;
-  background: color-mix(in srgb, var(--trail-sky) 78%, transparent);
-}
-[data-theme="dark"] .expedition-head {
-  background: transparent;
-  box-shadow: none;
-}
-[data-theme="dark"] .expedition-head h1 {
-  color: #f3eee2;
-}
-[data-theme="dark"] .expedition-head > p:last-child {
-  color: #d1d7d1;
-}
-[data-theme="dark"] .expedition-head .eyebrow,
-[data-theme="dark"] .trail-copy > span:first-child {
-  color: var(--trail-marker);
-}
-[data-theme="dark"] .trail-habitat {
-  border-color: #586c66;
-}
-
-@media (forced-colors: active) {
-  .expedition-world,
-  .expedition {
-    border-color: CanvasText;
-    background: Canvas;
-  }
-  .trail-scenery {
-    display: none;
-  }
-  .trail-route::before,
-  .trail-stop::after {
-    border-color: CanvasText;
-  }
-  .trail-marker {
-    border-color: CanvasText;
-    background: Highlight;
-    color: HighlightText;
-    box-shadow: none;
-  }
-  .expedition-head,
-  .trail-habitat,
-  .trail-copy {
-    border-color: CanvasText;
-    background: Canvas;
-    box-shadow: none;
-    clip-path: none;
-    filter: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce), (prefers-reduced-data: reduce) {
-  .trail-habitat,
-  .trail-copy {
-    transition: none;
-  }
-}
-@media (prefers-reduced-data: reduce) {
-  .trail-layer-clouds,
-  .trail-layer-foreground {
-    display: none;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  @supports (view-transition-name: none) {
-    ::view-transition-old(root) {
-      animation: trail-leave 150ms ease-in both;
-    }
-    ::view-transition-new(root) {
-      animation: trail-arrive 220ms cubic-bezier(0.22, 0.8, 0.25, 1) both;
-    }
-    ::view-transition-group(*) {
-      animation-duration: 260ms;
-      animation-timing-function: cubic-bezier(0.22, 0.8, 0.25, 1);
-    }
-  }
-}
-@keyframes trail-leave {
-  to {
-    opacity: 0;
-  }
-}
-@keyframes trail-arrive {
-  from {
-    opacity: 0;
-  }
-}
-
-@media (min-width: 701px) {
-  .expedition-world .shell {
-    grid-template-columns: 58px minmax(0, 1fr);
-  }
-  .expedition-world .sidebar,
-  .expedition-world .sidebar:is(:hover, :focus-within, [data-open="true"]) {
-    width: 58px;
-    padding-inline: 6px;
-    border-right-color: color-mix(in srgb, var(--trail-ground) 34%, transparent);
-    background: color-mix(in srgb, var(--trail-cloud) 82%, transparent);
-    box-shadow: none;
-    transition: none;
-  }
-  .expedition-world .sidebar .nav-label {
-    opacity: 0;
-    pointer-events: none;
-    translate: -6px;
-  }
-  .expedition-world .sidebar nav button {
-    justify-content: center;
-    min-height: 46px;
-    padding: 5px;
-  }
-}
-
-.expedition-world main[data-mini]:not([data-mini="home"], [data-mini="timey"]) .habitat-page,
-.expedition-world
-  main[data-mini]:not([data-mini="home"], [data-mini="timey"])
-  .habitat-page[data-kind],
-.expedition-world main[data-mini]:not([data-mini="home"], [data-mini="timey"]) > .site-footer {
-  background: color-mix(in srgb, var(--canvas) 90%, transparent);
-}
-.expedition-world main[data-mini="timey"] .habitat-page {
-  background: transparent;
-}
-.not-found {
-  width: min(620px, 100%);
-  margin: clamp(56px, 14vh, 150px) auto;
-  padding: clamp(26px, 5vw, 54px);
-  border: 2px solid var(--line);
-  border-radius: 24px 24px 8px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  box-shadow: 6px 8px 0 color-mix(in srgb, var(--trail-ground) 22%, transparent);
-}
-.not-found p {
-  margin: 14px 0 24px;
-  color: var(--muted);
-}
-.button-link {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  padding: 10px 17px;
-  border: 2px solid var(--line);
-  border-radius: 13px;
-  background: var(--sun);
-  box-shadow: 0 3px 0 var(--line);
-  color: var(--text);
-  font-weight: 800;
-  text-decoration: none;
 }
