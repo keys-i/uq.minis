@@ -1,12 +1,13 @@
 """Bounded file caches with atomic publication and safe eviction
 
-Cache identities and validation belong to each mini; this module owns
-exclusive publication, access tracking and shared eviction budgets
+Cache meaning and validation belong to each mini; this module owns canonical
+identities, exclusive publication, access tracking and shared eviction budgets
 A failed writer leaves the previous published entry available
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -25,6 +26,23 @@ ENTRIES = 32
 NAME = re.compile(r"[a-f0-9]{16}-[a-f0-9]{16}")
 SNAPSHOT = 4 * 1024**2
 AGE = 7 * 24 * 60 * 60
+
+
+def identity(namespace: str, semantic: Any) -> str:
+    """Hash canonical meaning so changed inputs invalidate their previous cache entry"""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", namespace):
+        raise MiniError("Invalid cache namespace")
+    try:
+        payload = json.dumps(
+            semantic,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    except (TypeError, ValueError) as exc:
+        raise MiniError("Cache identity needs JSON-compatible values") from exc
+    return hashlib.sha256(namespace.encode() + b"\0" + payload).hexdigest()[:16]
 
 
 @contextmanager

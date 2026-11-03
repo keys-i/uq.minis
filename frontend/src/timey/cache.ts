@@ -1,10 +1,13 @@
 /** Optional bounded preview storage accelerates revisits without owning accepted state */
 import { useSession } from "../shared/session.ts";
 
-const shelf = "minis-timey-previews-v1",
+const version = "timey-preview-v2",
+  shelf = "minis-timey-previews",
+  retired = "minis-timey-previews-v1",
   limit = 24,
   bytes = 24 * 1024 ** 2;
-let writing = false;
+let writing = false,
+  migrated = false;
 
 async function save(cache: Cache, key: string, result: Blob) {
   if (writing || result.size > 2 * 1024 ** 2) return;
@@ -48,15 +51,20 @@ export async function remember(
     try {
       const lookup = async () => {
         const entries = [...body.entries()].sort(([a], [b]) => a.localeCompare(b));
+        if (entries.some(([, value]) => typeof value !== "string")) return;
         const owner = useSession.getState();
         const digest = await crypto.subtle.digest(
           "SHA-256",
           new TextEncoder().encode(
-            JSON.stringify(owner.hosted ? [owner.workspace, entries] : entries),
+            JSON.stringify(owner.hosted ? [version, owner.workspace, entries] : [version, entries]),
           ),
         );
         key = `${location.origin}/__timey/preview/${Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("")}`;
         cache = await caches.open(shelf);
+        if (!migrated && typeof caches.delete === "function") {
+          migrated = true;
+          void caches.delete(retired).catch(() => false);
+        }
         const hit = await cache.match(key);
         if (
           hit &&

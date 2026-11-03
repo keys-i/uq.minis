@@ -55,6 +55,25 @@ class TestLock:
 
 
 class TestCache:
+    def test_semantic_identity(self) -> None:
+        first = cache.identity("course-profile-v1", {"code": "CSSE1001", "year": 2026})
+        reordered = cache.identity("course-profile-v1", {"year": 2026, "code": "CSSE1001"})
+        changed = cache.identity("course-profile-v1", {"code": "CSSE1001", "year": 2027})
+        assert first == reordered
+        assert first != changed
+
+    @pytest.mark.parametrize(
+        ("namespace", "semantic"),
+        [
+            ("../cache", {}),
+            ("valid-v1", {"score": float("nan")}),
+            ("valid-v1", object()),
+        ],
+    )
+    def test_semantic_identity_rejects_unsafe_values(self, namespace: str, semantic: Any) -> None:
+        with pytest.raises(MiniError):
+            cache.identity(namespace, semantic)
+
     @pytest.mark.parametrize("state", ["fresh", "stale", "missing", "large", "symlink"])
     def test_snapshot(self, tmp_path: Path, state: str) -> None:
         path = tmp_path / "snapshot.json"
@@ -77,7 +96,10 @@ class TestCache:
 
     @pytest.mark.parametrize("budget", ["entries", "bytes"])
     def test_evict(
-        self, cached: tuple[Path, Path, Path], monkeypatch: pytest.MonkeyPatch, budget: str
+        self,
+        cached: tuple[Path, Path, Path],
+        monkeypatch: pytest.MonkeyPatch,
+        budget: str,
     ) -> None:
         root, source, entry = cached
         if budget == "entries":
@@ -113,7 +135,10 @@ class TestCache:
         root, source, entry = cached
         index = entry / "info.json"
         if isinstance(metadata, dict):
-            metadata = {**json.loads(index.read_text()), **cast(dict[str, Any], metadata)}
+            metadata = {
+                **json.loads(index.read_text()),
+                **cast(dict[str, Any], metadata),
+            }
         index.write_text(metadata if isinstance(metadata, str) else json.dumps(metadata))
         assert not list(cache.entries(root))
         assert source.read_bytes() == b"completed"

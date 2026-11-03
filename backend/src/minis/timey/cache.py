@@ -5,7 +5,6 @@ Coverage checks distinguish complete files from timestamped sections while
 the shared core cache owns locking, publication and eviction budgets
 """
 
-import hashlib
 import re
 from pathlib import Path
 
@@ -14,7 +13,10 @@ from uq_minis.core import cache
 
 def identity(url: str, height: int, audio: bool) -> str:
     """Keep quality, audio and canonical video identity separate"""
-    return hashlib.sha256(f"v1:{url}:{0 if audio else height}:{audio}".encode()).hexdigest()[:16]
+    return cache.identity(
+        "timey-media-v1",
+        {"source": url, "height": 0 if audio else height, "audio": audio},
+    )
 
 
 def find(root: Path, key: str, start: int, seconds: int | None, work: Path | None = None):
@@ -50,7 +52,7 @@ def save(
     duration: float = 0,
 ):
     """Describe a completed clip for atomic storage under the shared cache budgets"""
-    suffix = hashlib.sha256(f"{start}:{seconds}".encode()).hexdigest()[:16]
+    suffix = cache.identity("timey-range-v1", {"start": start, "seconds": seconds})
     cache.save(
         root,
         f"{key}-{suffix}",
