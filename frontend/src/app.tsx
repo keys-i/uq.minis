@@ -8,10 +8,10 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { CalendarSettings } from "./study/calendar.tsx";
 import { Tooltips } from "./shared/tooltip.tsx";
-import { MiniShelf } from "./shared/cards.tsx";
-import { Pal } from "./wildlife/mascot.tsx";
+import { Trail, TrailWorld } from "./wildlife/trail.tsx";
 import { Wildlife, ThemePicker } from "./shared/display.tsx";
 import { Language, LanguagePicker } from "./shared/language.tsx";
 import { Footer, Menu } from "./shared/menu.tsx";
@@ -21,28 +21,54 @@ import { useSession } from "./shared/session.ts";
 import { Button, Dialog } from "./shared/controls.tsx";
 import { Mini } from "./shared/mini.tsx";
 import { Account } from "./shared/account.tsx";
+import { miniHref, miniName, requestedMini } from "./shared/route.ts";
 
-const Timey = lazy(() => import("./timey/index.tsx").then((module) => ({ default: module.Timey })));
-const Eventy = lazy(() => import("./event.tsx").then((module) => ({ default: module.Eventy })));
-const Planner = lazy(() =>
-  import("./study/planner.tsx").then((module) => ({ default: module.Planner })),
-);
-const Buzzy = lazy(() => import("./study/buzzy.tsx").then((module) => ({ default: module.Buzzy })));
-const Clubs = lazy(() => import("./study/clubs.tsx").then((module) => ({ default: module.Clubs })));
-const Courses = lazy(() =>
-  import("./study/course.tsx").then((module) => ({ default: module.Courses })),
+const readyRoutes = new Set(["home"]);
+const lazyRoutes = new Set(["timey", "event", "planny", "buzzy", "clubby", "scrappy"]);
+
+function editor<T>(name: string, load: () => Promise<T>) {
+  return () =>
+    load().then((module) => {
+      readyRoutes.add(name);
+      return module;
+    });
+}
+
+const loadTimey = editor("timey", () => import("./timey/index.tsx"));
+const loadEventy = editor("event", () => import("./event.tsx"));
+const loadPlanner = editor("planny", () => import("./study/planner.tsx"));
+const loadBuzzy = editor("buzzy", () => import("./study/buzzy.tsx"));
+const loadClubs = editor("clubby", () => import("./study/clubs.tsx"));
+const loadCourses = editor("scrappy", () => import("./study/course.tsx"));
+const Timey = lazy(() => loadTimey().then((module) => ({ default: module.Timey })));
+const Eventy = lazy(() => loadEventy().then((module) => ({ default: module.Eventy })));
+const Planner = lazy(() => loadPlanner().then((module) => ({ default: module.Planner })));
+const Buzzy = lazy(() => loadBuzzy().then((module) => ({ default: module.Buzzy })));
+const Clubs = lazy(() => loadClubs().then((module) => ({ default: module.Clubs })));
+const Courses = lazy(() => loadCourses().then((module) => ({ default: module.Courses })));
+const PagePal = lazy(() =>
+  import("./wildlife/mascot.tsx").then((module) => ({ default: module.Pal })),
 );
 
-const route = (name: string) => (name === "agent" ? "event" : name === "auth" ? "home" : name);
-const requested = () => {
-  const query = new URLSearchParams(location.search);
-  return query.get("m") || query.get("mini") || "home";
-};
+function changeView(name: string, update: () => void) {
+  const still =
+    typeof matchMedia === "function" &&
+    matchMedia("(prefers-reduced-motion: reduce), (prefers-reduced-data: reduce)").matches;
+  const tool = miniName(name);
+  if (!document.startViewTransition || still || (lazyRoutes.has(tool) && !readyRoutes.has(tool))) {
+    startTransition(update);
+    return;
+  }
+  document.startViewTransition(() => flushSync(update));
+}
 
 export default function App() {
-  const [tool, setTool] = useState(route(requested()));
+  const initialRoute = useRef(requestedMini()).current;
+  const [route, setRoute] = useState(initialRoute);
+  const tool = miniName(route);
+  const previousRoute = useRef(route);
   const [modal, setModal] = useState<{ title: string; body: React.ReactNode } | null>(null);
-  const legacyAccount = useRef(requested() === "auth");
+  const legacyAccount = useRef(initialRoute === "auth");
   const tools = useStudy((state) => state.tools),
     plan = useStudy((state) => state.plan),
     saving = useStudy((state) => state.saving);
@@ -57,20 +83,7 @@ export default function App() {
   const [planError, setPlanError] = useState("");
   const studying = ["planny", "buzzy", "scrappy", "clubby"].includes(tool);
   const access = hosted === false || !!workspace;
-  useEffect(() => {
-    // Warm the editors after home paints without starting backend workspaces
-    const timer = setTimeout(() => {
-      void Promise.allSettled([
-        import("./timey/index.tsx"),
-        import("./event.tsx"),
-        import("./study/planner.tsx"),
-        import("./study/buzzy.tsx"),
-        import("./study/clubs.tsx"),
-        import("./study/course.tsx"),
-      ]);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+  const known = tool === "home" || Boolean(tools[tool]);
   useEffect(() => {
     const controller = new AbortController();
     useStudy
@@ -97,19 +110,23 @@ export default function App() {
     return () => controller.abort();
   }, [access, report, studying]);
   useEffect(() => {
-    const back = () => startTransition(() => setTool(route(requested())));
+    if (previousRoute.current !== route) {
+      document.querySelector<HTMLElement>("#main")?.focus({ preventScroll: true });
+      previousRoute.current = route;
+    }
+  }, [route]);
+  useEffect(() => {
+    const back = () => {
+      const name = requestedMini();
+      changeView(name, () => setRoute(name));
+    };
     addEventListener("popstate", back);
     return () => removeEventListener("popstate", back);
   }, []);
   function choose(name: string) {
-    name = route(name);
-    startTransition(() => setTool(name));
     clear();
-    history.pushState(
-      null,
-      "",
-      name === "home" ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}?m=${name}`,
-    );
+    history.pushState(null, "", miniHref(name));
+    changeView(name, () => setRoute(name));
   }
   const title = tools[tool]?.title || tool;
   const calendar = () =>
@@ -130,26 +147,9 @@ export default function App() {
         <LanguagePicker />
         <ThemePicker />
       </div>
-      {tool === "home" ? (
-        <>
-          <header className="welcome">
-            <div>
-              <h1>
-                Big plans,
-                <br />
-                wild little helpers
-              </h1>
-              <p>Plan the semester, find your people and leave room for the good stuff</p>
-            </div>
-            <Pal name="hello" controls={false} />
-          </header>
-          <div className="wildlife-toolbar">
-            <span>Pick your next little adventure</span>
-          </div>
-        </>
-      ) : (
+      {tool === "home" || !known ? null : (
         <header className="page-head">
-          <h1>{title}</h1>
+          <h1 style={{ viewTransitionName: `mini-${tool}` }}>{title}</h1>
           {plan && (
             <span className="save-state" role="status">
               {saving ? "Saving…" : "All saved"}
@@ -166,7 +166,23 @@ export default function App() {
         </div>
       )}
       {tool === "home" ? (
-        <MiniShelf tools={tools} open={choose} />
+        <Trail tools={tools} open={choose} />
+      ) : !known ? (
+        <section className="not-found" aria-labelledby="not-found-title">
+          <h1 id="not-found-title">That trail stop isn't here</h1>
+          <p>The address may have changed, or this mini hasn't opened yet</p>
+          <a
+            className="button-link"
+            href={miniHref("home")}
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              choose("home");
+            }}
+          >
+            Back to the trail
+          </a>
+        </section>
       ) : !access && tool !== "timey" && tool !== "event" ? (
         sessionError ? (
           <div className="notice error" role="alert">
@@ -215,13 +231,13 @@ export default function App() {
       ) : tool === "clubby" ? (
         plan && <Clubs plan={plan} change={change} modal={setModal} />
       ) : tool === "event" ? (
-        <Eventy follow={requested() === "agent"} />
+        <Eventy follow={route === "agent"} />
       ) : tool === "timey" ? (
         <Timey />
       ) : tools[tool] ? (
         <Mini key={tool} name={tool} />
       ) : (
-        <p>Choose a mini from the menu</p>
+        <p role="status">Opening {title}…</p>
       )}
     </>
   );
@@ -229,34 +245,38 @@ export default function App() {
     <Language>
       <Wildlife>
         <Tooltips />
-        <a className="skip" href="#main">
-          Skip to your tools
-        </a>
-        <div className={`shell ${tool === "home" ? "home" : ""}`}>
-          <Menu tools={tools} tool={tool} choose={choose} account={account} />
-          <main
-            id="main"
-            tabIndex={-1}
-            data-mini={tool}
-            className={tool === "home" ? "" : "is-habitat"}
-          >
-            <Suspense fallback={<p role="status">Opening {title}…</p>}>
-              {tool === "home" ? (
-                content
-              ) : (
-                <Pal key={tool} name={tool} page thoughts>
-                  {content}
-                </Pal>
-              )}
-            </Suspense>
-            <Footer />
-          </main>
-        </div>
-        {modal && (
-          <Dialog title={modal.title} close={closeModal}>
-            {modal.body}
-          </Dialog>
-        )}
+        <TrailWorld route={route}>
+          <a className="skip" href="#main">
+            Skip to your tools
+          </a>
+          <div className={`shell ${tool === "home" ? "home" : ""}`}>
+            <Menu tools={tools} tool={tool} choose={choose} account={account} />
+            <main
+              id="main"
+              tabIndex={-1}
+              data-mini={tool}
+              className={tool === "home" || !known ? "" : "is-habitat"}
+            >
+              <Suspense fallback={<p role="status">Opening {title}…</p>}>
+                {tool === "home" || !known ? (
+                  content
+                ) : (
+                  <Suspense fallback={<div className="habitat-content">{content}</div>}>
+                    <PagePal key={tool} name={tool} page>
+                      {content}
+                    </PagePal>
+                  </Suspense>
+                )}
+              </Suspense>
+              <Footer />
+            </main>
+          </div>
+          {modal && (
+            <Dialog title={modal.title} close={closeModal}>
+              {modal.body}
+            </Dialog>
+          )}
+        </TrailWorld>
       </Wildlife>
     </Language>
   );

@@ -1,7 +1,6 @@
 import type { Tools } from "../study/model.ts";
 import React, { useId, useState } from "react";
 import { Icon } from "./icons.tsx";
-import { Pal } from "../wildlife/mascot.tsx";
 import { Bubble } from "./bubble.tsx";
 import { MotionSettings } from "./display.tsx";
 
@@ -79,9 +78,6 @@ export function Menu({
           </button>
         ))}
       </nav>
-      <div className="menu-visitor">
-        <Pal name="visitor" controls={false} thoughts />
-      </div>
       <div className="sidebar-bottom">
         <button
           type="button"

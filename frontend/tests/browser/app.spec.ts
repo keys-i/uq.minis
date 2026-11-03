@@ -240,12 +240,24 @@ test("the language picker stays focused on language choices", async ({ page }) =
 test("only Timey keeps the paper background around its mini", async ({ page }) => {
   for (const mini of ["planny", "buzzy", "scrappy", "clubby", "event"]) {
     await page.goto(`/?m=${mini}`);
-    await expect(page.locator(".habitat-page")).toHaveCSS("background-color", "rgb(244, 247, 251)");
     await expect(page.locator(".habitat-content")).toHaveCSS(
       "background-color",
       "rgba(0, 0, 0, 0)",
     );
-    await expect(page.locator(".site-footer")).toHaveCSS("background-color", "rgb(244, 247, 251)");
+    const surfaces = await page.locator(".habitat-page").evaluate((habitat) => {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--paper)";
+      document.body.append(probe);
+      const paper = getComputedStyle(probe).color;
+      probe.remove();
+      return {
+        habitat: getComputedStyle(habitat).backgroundColor,
+        footer: getComputedStyle(document.querySelector(".site-footer")!).backgroundColor,
+        paper,
+      };
+    });
+    expect(surfaces.habitat).not.toBe(surfaces.paper);
+    expect(surfaces.footer).not.toBe(surfaces.paper);
   }
   await page.goto("/?m=timey");
   await expect(page.locator(".habitat-page")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -343,7 +355,7 @@ test("Timey keeps Google failures inside its connection panel", async ({ page })
   expect(Math.abs(popupBox!.height - panelBox!.height)).toBeLessThan(1);
 });
 
-test("the public shelf paints while the catalogue is still pending", async ({ page }) => {
+test("the public trail paints while the catalogue is still pending", async ({ page }) => {
   let finish: (() => Promise<void>) | undefined;
   await page.route("**/api/minis", async (route) => {
     await new Promise<void>((resolve) => {
@@ -354,10 +366,33 @@ test("the public shelf paints while the catalogue is still pending", async ({ pa
     });
   });
   await page.goto("/");
-  await expect(page.locator(".mini-card")).toHaveCount(6);
+  await expect(page.locator(".trail-stop")).toHaveCount(6);
   await expect(page.getByRole("link", { name: "Timey", exact: true })).toBeVisible();
   await expect.poll(() => !!finish).toBe(true);
   await finish!();
+});
+
+test("the expedition world persists through navigation and moves focus", async ({ page }) => {
+  await page.goto("/");
+  const world = page.locator(".expedition-world"),
+    scenery = page.locator("[data-trail-layer]");
+  await expect(world).toHaveAttribute("data-camera", "home");
+  await expect(scenery).toHaveCount(6);
+  await page.locator('.trail-stop a[href="/mini/timey"]').click();
+  await expect(page).toHaveURL(/\/mini\/timey$/);
+  await expect(world).toHaveAttribute("data-camera", "timey");
+  await expect(scenery).toHaveCount(6);
+  await expect(page.locator("#main")).toBeFocused();
+});
+
+test("direct routes start at their camera and unknown stops are useful", async ({ page }) => {
+  await page.goto("/mini/timey");
+  await expect(page.locator(".expedition-world")).toHaveAttribute("data-camera", "timey");
+  await expect(page.locator(".trail-layer-sky")).toHaveCSS("transform", /matrix\(1\.16/);
+  await page.goto("/mini/not-a-mini");
+  await expect(page.getByRole("heading", { name: "That trail stop isn't here" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to the trail" })).toHaveAttribute("href", "/");
+  await expect(page.getByText("Opening your workspace…")).toHaveCount(0);
 });
 
 test("custom revisions, watching and sign-in preserve the project", async ({ page }) => {
@@ -548,15 +583,10 @@ test("changing videos keeps a decoded backdrop and a legible themed picker", asy
   expect(pixel[2]).toBeGreaterThan(150);
   await picker.hover();
   await page.screenshot({ path: test.info().outputPath("backdrop-light.png"), fullPage: true });
-  const theme = page.getByRole("button", { name: /App theme/ });
-  await theme.focus();
-  await expect(page.getByRole("tooltip")).toHaveText("Switch to dark mode");
-  await expect(theme).not.toHaveAttribute("title");
-  await theme.click();
-  await expect(page.getByRole("tooltip")).toHaveCount(0);
-  await theme.blur();
-  await theme.focus();
-  await expect(page.getByRole("tooltip")).toHaveText("Switch to light mode");
+  const theme = page.getByRole("combobox", { name: "App theme" });
+  await theme.selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await theme.selectOption("system");
   await page.getByRole("group", { name: "Background preview", exact: true }).hover();
   await picker.hover();
   expect(await picker.evaluate((node) => getComputedStyle(node).color)).toBe(
@@ -750,32 +780,25 @@ test("home artwork loads and theme changes leave habitat clocks alone", async ({
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Big plans/ })).toBeVisible();
-  await expect(page.locator(".mini-card")).toHaveCount(6);
+  await expect(page.getByRole("heading", { name: "Big plans, one connected path" })).toBeVisible();
+  await expect(page.locator(".expedition")).toBeVisible();
+  await expect(page.locator(".trail-stop")).toHaveCount(6);
+  await expect(page.locator("[data-trail-layer]")).toHaveCount(6);
+  await expect(page.locator(".mini-card")).toHaveCount(0);
   const residents = await page
-    .locator(".mini-card .pal")
+    .locator(".trail-stop .pal")
     .evaluateAll((cards) => cards.map((card) => card.getAttribute("data-resident")));
   expect(new Set(residents).size).toBe(residents.length);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  const card = page.locator('[data-mini="buzzy"]');
-  await card.hover();
-  await expect(card).toHaveClass(/is-featured/);
-  await expect(card.locator(".preview-copy")).toContainText(
-    "See deadlines and club events in one calendar",
-  );
-  const widths = await page
-    .locator(".mini-card")
-    .evaluateAll((cards) =>
-      Object.fromEntries(cards.map((card) => [card.getAttribute("data-mini"), card.clientWidth])),
-    );
-  expect(widths.buzzy).toBeGreaterThan(widths.planny);
+  await page.getByRole("link", { name: "Buzzy", exact: true }).hover();
+  await expect(page.locator('.trail-stop a[href="/mini/buzzy"]')).toBeVisible();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("svg")).toHaveCount(0);
   const lights = await page
     .locator(".habitat")
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-light")));
-  await page.getByRole("button", { name: /App theme/ }).click();
-  await expect(page.getByRole("button", { name: /switch to light/ })).toBeVisible();
+  await page.getByRole("combobox", { name: "App theme" }).selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   expect(
     await page
       .locator(".habitat")
@@ -964,7 +987,7 @@ test("guests open ordinary minis while only Eventy asks for UQ", async ({ page }
   await page.getByRole("button", { name: "Timey", exact: true }).click();
   await expect(page.getByRole("form", { name: "Timer studio" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Check UQ access" })).toHaveCount(0);
-  await expect(page).toHaveURL(/\?m=timey$/);
+  await expect(page).toHaveURL(/\/mini\/timey$/);
   await expect(page.getByRole("heading", { name: "Timey", exact: true })).toBeVisible();
   expect(privateRequests).not.toContain("/api/plan");
   for (const name of ["Scrappy", "Planny", "Buzzy", "Clubby"]) {
@@ -998,7 +1021,7 @@ test("navigation keeps the page visible while an editor module loads", async ({ 
   try {
     await page.goto("/");
     await page.getByRole("button", { name: "Timey", exact: true }).click();
-    await expect(page).toHaveURL(/\?m=timey$/);
+    await expect(page).toHaveURL(/\/mini\/timey$/);
     await expect(page.getByRole("heading", { name: /Big plans/ })).toBeVisible();
     await expect(page.getByText("Opening Timey…", { exact: true })).toHaveCount(0);
   } finally {
@@ -1226,4 +1249,11 @@ test("one wildlife canvas works without eval and yields to reduced motion", asyn
   await expect(page.locator("[data-rendered=true]")).toHaveCount(0);
   await expect(page.locator(".cartoon-still").first()).toHaveCSS("opacity", "1");
   expect(errors).toEqual([]);
+});
+
+test("mini habitats keep pats without imagined-thought mode", async ({ page }) => {
+  await page.goto("/?m=planny");
+  await expect(page.getByRole("heading", { name: "Planny", exact: true })).toBeVisible();
+  await expect(page.locator(".habitat-page .animal-touch")).not.toHaveAttribute("aria-expanded");
+  await expect(page.locator(".habitat-page .animal-thought")).toHaveCount(0);
 });

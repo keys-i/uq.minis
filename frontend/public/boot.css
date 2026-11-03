@@ -1,0 +1,86 @@
+:root {
+  --boot-sky: #dceff5;
+  --boot-cloud: #f9fcf8;
+  --boot-ridge: #b8cfbd;
+  --boot-canopy: #769988;
+  --boot-water: #abd9df;
+  --boot-ground: #486d5c;
+}
+:root[data-theme="dark"] {
+  --boot-sky: #182127;
+  --boot-cloud: #2b363b;
+  --boot-ridge: #334840;
+  --boot-canopy: #294238;
+  --boot-water: #254b56;
+  --boot-ground: #1b3129;
+}
+.boot-world,
+.boot-layer {
+  position: fixed;
+  inset: 0;
+}
+.boot-world {
+  z-index: 100;
+  overflow: hidden;
+  background: var(--boot-sky);
+  opacity: 1;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+.boot-layer {
+  transform-origin: center;
+}
+.boot-sky {
+  background: var(--boot-sky);
+}
+.boot-clouds {
+  inset: 2% -6% auto;
+  height: 34%;
+  background:
+    radial-gradient(ellipse at 14% 38%, var(--boot-cloud) 0 7%, transparent 7.5%),
+    radial-gradient(ellipse at 48% 21%, var(--boot-cloud) 0 9%, transparent 9.5%),
+    radial-gradient(ellipse at 83% 48%, var(--boot-cloud) 0 6%, transparent 6.5%);
+}
+.boot-ridge {
+  inset: 27% -8% 30%;
+  background: var(--boot-ridge);
+  clip-path: polygon(0 58%, 13% 31%, 26% 54%, 43% 18%, 59% 55%, 75% 28%, 100% 61%, 100% 100%, 0 100%);
+}
+.boot-canopy {
+  inset: 46% -6% 12%;
+  background: var(--boot-canopy);
+  clip-path: polygon(0 35%, 7% 18%, 14% 38%, 23% 12%, 33% 39%, 43% 15%, 55% 43%, 68% 11%, 78% 39%, 90% 17%, 100% 34%, 100% 100%, 0 100%);
+}
+.boot-water {
+  inset: auto -8% 0;
+  height: 30%;
+  background: linear-gradient(175deg, transparent 0 10%, color-mix(in srgb, var(--boot-water) 65%, transparent) 10.5% 16%, var(--boot-water) 16.5%);
+}
+.boot-foreground {
+  inset: auto -8% -4%;
+  height: 18%;
+  background: var(--boot-ground);
+  clip-path: polygon(0 45%, 4% 20%, 8% 48%, 13% 10%, 17% 46%, 24% 25%, 31% 52%, 39% 16%, 45% 48%, 54% 21%, 61% 50%, 69% 12%, 75% 44%, 83% 22%, 90% 51%, 96% 17%, 100% 43%, 100% 100%, 0 100%);
+}
+.boot-mark {
+  position: fixed;
+  top: 42px;
+  left: 42px;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 3px solid #29483e;
+  border-radius: 14px 14px 7px;
+  background: #f4c95e;
+  color: #29483e;
+  font: 700 28px/1 system-ui, sans-serif;
+}
+:root[data-hydrated="true"] .boot-world {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-world {
+    transition-duration: 100ms;
+  }
+}

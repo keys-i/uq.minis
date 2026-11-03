@@ -6,7 +6,6 @@ import { useSession } from "./shared/session.ts";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queries } from "./shared/query.ts";
 import "./style.css";
-import "./shared/cards.css";
 import "./wildlife/scene.css";
 import "./shared/bubble.css";
 
@@ -14,6 +13,16 @@ import "./shared/bubble.css";
 function Workspace() {
   const hosted = useSession((state) => state.hosted);
   const user = useSession((state) => state.user);
+  useEffect(() => {
+    const boot = document.getElementById("boot");
+    requestAnimationFrame(() => {
+      document.documentElement.dataset.hydrated = "true";
+    });
+    const remove = () => boot?.remove();
+    boot?.addEventListener("transitionend", remove, { once: true });
+    const fallback = setTimeout(remove, 250);
+    return () => clearTimeout(fallback);
+  }, []);
   useEffect(() => {
     void useSession.getState().load();
   }, []);
