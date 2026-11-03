@@ -67,3 +67,13 @@ def test_hosted_observability_is_bounded_and_private(capsys: pytest.CaptureFixtu
         "status",
         "duration_ms",
     }
+
+
+def test_frontend_serves_known_mini_deep_links_only(tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("<main>UQ minis</main>")
+    application = app.create(frontend=tmp_path)
+    with TestClient(application, base_url="http://127.0.0.1:8765") as connection:
+        client = cast(httpx.Client, connection)
+        assert client.get("/planny").text == "<main>UQ minis</main>"
+        assert client.get("/timey").headers["content-type"].startswith("text/html")
+        assert client.get("/unknown-mini").status_code == 404

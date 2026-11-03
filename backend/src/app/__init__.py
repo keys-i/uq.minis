@@ -338,6 +338,13 @@ def create(
 
     built = frontend or Path(__file__).resolve().parents[3] / "out/artifacts/frontend"
     if built.is_dir():
+        index = built / "index.html"
+
+        def mini_shell() -> FileResponse:
+            return FileResponse(index, media_type="text/html")
+
+        for mini in ("planny", "scrappy", "buzzy", "clubby", "event", "timey"):
+            app.add_api_route(f"/{mini}", mini_shell, include_in_schema=False)
         app.mount("/", StaticFiles(directory=built, html=True), name="frontend")
     else:
 
