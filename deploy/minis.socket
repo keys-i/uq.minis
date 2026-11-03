@@ -1,0 +1,15 @@
+[Unit]
+Description=Private UQ minis gateway socket
+Before=minis.service caddy.service
+
+[Socket]
+ListenStream=/run/minis-edge/uq.sock
+SocketUser=caddy
+SocketGroup=minis-edge
+SocketMode=0660
+DirectoryMode=0750
+RemoveOnStop=yes
+Service=minis.service
+
+[Install]
+WantedBy=sockets.target

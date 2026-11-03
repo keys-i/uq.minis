@@ -1,0 +1,73 @@
+{
+	admin unix//run/minis-edge/admin.sock|0600
+	auto_https off
+	persist_config off
+	log {
+		output stderr
+		format json
+		level INFO
+	}
+}
+
+http://minis-origin.keysi.dev {
+	bind unix//run/minis-edge/caddy.sock|0660
+	encode zstd gzip
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin-allow-popups"
+		Cross-Origin-Resource-Policy "same-origin"
+	}
+	@uq_security path /mini /mini/* /api /api/* /download /download/* /calendar.ics
+	header @uq_security Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob: https://resources.getqpay.com https://resources.hellorubric.com https://i.ytimg.com; font-src 'self' data:; media-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' wss://uni.keysi.dev; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+
+	@soc path /soc /soc/*
+	handle @soc {
+		reverse_proxy unix//run/soc-minis/app.sock {
+			header_up Host uni.keysi.dev
+			header_up X-Forwarded-Proto https
+			header_up X-Request-ID {http.request.uuid}
+			header_up -X-Minis-Internal
+		}
+	}
+
+	handle /mini {
+		rewrite * /
+		reverse_proxy unix//run/minis-edge/uq.sock {
+			header_up Host uni.keysi.dev
+			header_up X-Forwarded-Proto https
+			header_up X-Request-ID {http.request.uuid}
+			header_up -X-Minis-Internal
+		}
+	}
+
+	handle_path /mini/* {
+		reverse_proxy unix//run/minis-edge/uq.sock {
+			header_up Host uni.keysi.dev
+			header_up X-Forwarded-Proto https
+			header_up X-Request-ID {http.request.uuid}
+			header_up -X-Minis-Internal
+		}
+	}
+
+	@uq path /api /api/* /download /download/* /calendar.ics
+	handle @uq {
+		reverse_proxy unix//run/minis-edge/uq.sock {
+			header_up Host uni.keysi.dev
+			header_up X-Forwarded-Proto https
+			header_up X-Request-ID {http.request.uuid}
+			header_up -X-Minis-Internal
+		}
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+}
+
+import /etc/caddy/minis.d/*.caddy

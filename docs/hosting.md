@@ -1,6 +1,7 @@
 # Hosting Minis
 
-Minis is live at [uni.keysi.dev/mini/](https://uni.keysi.dev/mini/)
+The production target is currently unverified after the previous Oracle account ended
+The intended public routes are [uni.keysi.dev/mini/](https://uni.keysi.dev/mini/) and [uni.keysi.dev/soc/](https://uni.keysi.dev/soc/)
 Its home page and mini catalogue open before sign-in, without starting an account worker
 Ordinary minis use a private browser workspace without UQ sign-in
 Only Eventy requires a verified UQ account, with separate files and independently saved Forms or mailbox access
@@ -12,12 +13,12 @@ Cast remains connected to its existing `questrelay` Worker at [cast.keysi.dev](h
 Run from this checkout
 
 ```sh
-uv run --directory backend dev deploy ubuntu@159.13.47.6 --dry-run
-uv run --directory backend dev deploy ubuntu@159.13.47.6
+MINIS_SSH_KEY=~/.ssh/minis uv run --directory backend dev deploy user@host --dry-run
+MINIS_SSH_KEY=~/.ssh/minis uv run --directory backend dev deploy user@host
 ```
 
 The deployment checks the backend and frontend, builds React beneath `/mini/`, then uploads only the wheel, locked dependencies, built assets and service definitions
-It uses only `~/.ssh/oracle`, requires the verified host key and keeps local drafts, credentials and `.config/` files off the server
+It uses `MINIS_SSH_KEY` or `~/.ssh/minis`, requires the verified host key and keeps local drafts, credentials and `.config/` files off the server
 The server switches releases atomically and restores the previous code and service definitions if readiness fails
 A deployment ends UQ sign-in sessions, so Eventy visitors need to verify UQ access again
 The guest workspace cookie survives gateway restarts, while its saved files remain outside releases
@@ -30,7 +31,7 @@ Ordinary frontend and backend changes only need the deployment command above
 
 ## Account and filesystem boundaries
 
-`minis.service` listens on `127.0.0.1:8765` and owns the UQ portal access check
+`minis.service` accepts only the systemd-owned `/run/minis-edge/uq.sock` and owns the UQ portal access check
 Its opaque eight-hour hosted cookie is Secure, HttpOnly and host-only through the `__Host-` prefix
 Only a response from UQ's protected session page establishes identity
 The in-site sign-in browser closes after completion, cancellation or timeout without retaining its UQ cookies
@@ -54,14 +55,14 @@ Local desktop mode retains its existing paths and draft key
 
 ## Network and capacity
 
-The Always Free `keysi-services` VM runs Ubuntu 24.04 Minimal on the AMD E2.1.Micro shape in Sydney AD-1
-It has 1 GB RAM, its existing encrypted boot disk and a 2 GiB swap file on that disk
-The ARM A1 launch attempts returned out-of-capacity errors
-SSH remains restricted to `110.174.128.145/32`, using the verified Oracle host key
-Application ports remain closed to inbound Internet traffic
+The next host must run Linux with systemd and keep application ports closed to inbound Internet traffic
+SSH should be key-only over the chosen private administration network with root and password login disabled
 
-The remotely managed `keysi-minis` Cloudflare Tunnel connects outbound from `cloudflared-minis.service`
-Its connector token is root-only at `/etc/cloudflared/minis.token` and is supplied through a systemd credential
+The locally managed Cloudflare Tunnel connects outbound from `cloudflared-minis.service`
+Its root-only credential JSON lives at `/etc/cloudflared/minis.json` and reaches the dynamic service through `LoadCredential`
+`/etc/cloudflared/minis.env` supplies only `MINIS_TUNNEL_ID=<uuid>`
+The checked-in ingress is authoritative and sends the connector to `/run/minis-edge/caddy.sock`
+Caddy alone can reach `/run/soc-minis/app.sock`, while cloudflared cannot traverse the separate `soc-minis` socket group
 `minis-origin.keysi.dev` points to the tunnel, and the proxied university hostname retains its `keys-i.github.io` CNAME
 The Worker routes only `/mini`, `/mini/*`, `/api/*`, `/download/*` and `/calendar.ics` to Minis
 Its ordinary homepage and notes continue to use Pages
@@ -78,13 +79,14 @@ Reading local mini setup fields does not consume upstream capacity
 Uploads use ordered 8 MiB parts, preserving the 512 MiB upload limit through Cloudflare's free proxy
 Workspace processes have memory, task and 512 MiB individual-file limits
 Mutations stop when free disk space falls below 6 GiB, while read requests remain available for backups
-The free VM is suitable for a small initial deployment and has limited rendering and simultaneous sign-in capacity
+The earlier 1 GB VM measurements remain capacity evidence only and do not validate an unchosen replacement host
 
 ## Verification and recovery
 
-The current local implementation passed backend lint, formatting, compilation, strict typing and 1,743 tests at 86% coverage
-Frontend formatting, typing, lint and 134 unit tests passed
-All 17 browser workflows passed, including resident selection, idle sleep, waking and the no-eval renderer fallback
+The current local implementation passed backend lint, formatting, compilation, strict typing and 1,776 tests at 86% coverage
+Frontend formatting, typing, lint, all 156 unit tests and the production build passed
+Twenty-six of 27 browser workflows passed before the final surface-invariant correction, then the corrected Timey regression passed independently
+A complete post-fix browser rerun remains unverified because this workspace cannot open the local test port
 Wheel and source-archive metadata checks passed, including the bundled species catalogue and native server entry
 The final deployment status must be verified separately from these local checks
 Live guest checks confirmed separate plans, rejected cross-workspace headers, Eventy-only UQ gates and retained plan data after restarting a private worker
@@ -106,7 +108,7 @@ The same probe at 448 MiB took 9.71 and 14.41 seconds, with 592 and 554 reclaim 
 Each probe reserved a fresh `/api/session/login` check, read the first `/api/session/window` form packet, verified its text/password/submit controls and closed without entering credentials
 These short samples measure backend form preparation and memory pressure, rather than guaranteeing UQ or MFA response times
 Versioned frontend assets use public immutable caching, while HTML, sessions and private API responses remain uncached
-Timey opens at `/mini/?m=timey`, with `?mini=timey` retained for existing bookmarks
+Timey opens canonically at `/mini/timey`, with `?m=timey` and `?mini=timey` retained for existing bookmarks
 The editor renders before its settings request and the fixed form schema no longer starts a private worker
 After-paint module warming and a stable Suspense boundary preserve the current page while navigation resolves
 Three fresh headless Chromium contexts measured 313–316 ms from click to the editor's second animation frame before the boundary fix, then 42–114 ms afterwards with a 47 ms median

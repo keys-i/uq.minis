@@ -1,13 +1,16 @@
 [Unit]
 Description=Cloudflare connector for UQ minis
+Requires=caddy.service
 Wants=network-online.target
-After=network-online.target
+After=network-online.target caddy.service
 
 [Service]
 Type=simple
 DynamicUser=yes
-LoadCredential=token:/etc/cloudflared/minis.token
-ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate run --token-file ${CREDENTIALS_DIRECTORY}/token
+SupplementaryGroups=minis-edge
+EnvironmentFile=/etc/cloudflared/minis.env
+LoadCredential=credentials:/etc/cloudflared/minis.json
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --config /etc/cloudflared/minis.yml run --credentials-file ${CREDENTIALS_DIRECTORY}/credentials ${MINIS_TUNNEL_ID}
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=yes
@@ -15,7 +18,20 @@ PrivateTmp=yes
 PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
 MemoryMax=128M
 TasksMax=64
 

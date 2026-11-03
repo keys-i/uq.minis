@@ -1,10 +1,13 @@
 import json
 import os
 from pathlib import Path
+from typing import cast
 from unittest.mock import Mock
 
+import httpx
 import pytest
 import uvicorn
+from fastapi.testclient import TestClient
 
 from uq_minis import app, web
 from uq_minis.core.common import MiniError
@@ -30,3 +33,37 @@ def test_activation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(MiniError, match="port"):
         web.run(80)
     assert run.call_count == 1
+
+
+def test_hosted_observability_is_bounded_and_private(capsys: pytest.CaptureFixture[str]) -> None:
+    application = app.create(origin="https://uni.keysi.dev")
+    with TestClient(application, base_url="https://uni.keysi.dev") as connection:
+        client = cast(httpx.Client, connection)
+        health = client.get("/api/health", headers={"X-Request-ID": "bad"})
+        assert health.json() == {"status": "ok", "service": "uq-minis"}
+        assert health.headers["X-Request-ID"] != "bad"
+        assert "style-src-elem 'self'" in health.headers["Content-Security-Policy"]
+        assert "style-src-attr 'unsafe-inline'" in health.headers["Content-Security-Policy"]
+        assert "'unsafe-eval'" not in health.headers["Content-Security-Policy"]
+        assert health.headers["Permissions-Policy"].startswith("camera=()")
+        assert health.headers["Cross-Origin-Opener-Policy"] == "same-origin-allow-popups"
+        correlated = client.get("/api/health", headers={"X-Request-ID": "request-1234"})
+        assert correlated.headers["X-Request-ID"] == "request-1234"
+        metrics = client.get("/internal/metrics")
+        assert metrics.headers["Cache-Control"] == "no-store"
+        assert "uq_minis_http_requests_total 3" in metrics.text
+        assert "request_id" not in metrics.text and "path=" not in metrics.text
+    events = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith('{"event":"http_request"')
+    ]
+    assert events
+    assert set(events[-1]) == {
+        "event",
+        "request_id",
+        "method",
+        "path",
+        "status",
+        "duration_ms",
+    }

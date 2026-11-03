@@ -1,0 +1,11 @@
+[Unit]
+Description=Check the optional remote Minis mTLS identity expiry
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=30m
+Persistent=true
+Unit=minis-mtls-rotate.service
+
+[Install]
+WantedBy=timers.target

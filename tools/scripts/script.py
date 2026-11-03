@@ -168,14 +168,14 @@ def test(context: typer.Context) -> None:
 
 @app.command()
 def deploy(host: str, dry_run: bool = False) -> None:
-    """Check and publish Minis using only ~/.ssh/oracle, preserving server state"""
-    from tools.scripts.deploy import publish, target
+    """Check and publish Minis through one explicit SSH key, preserving server state"""
+    from tools.scripts.deploy import publish, ssh_key, target
 
     host = target(host)
     if dry_run:
         CONSOLE.print(
             f"Check backend and frontend, build an allowlisted release, upload to {host} "
-            "using ~/.ssh/oracle, then activate with a health check and rollback on failure",
+            f"using {ssh_key()}, then activate with a health check and rollback on failure",
             markup=False,
         )
         return

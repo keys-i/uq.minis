@@ -8,13 +8,17 @@ domain operations to private accounts with the same origin and upload boundaries
 from __future__ import annotations
 
 import importlib
+import json
 import re
+import secrets
+import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from uq_minis.app import session
@@ -22,6 +26,17 @@ from uq_minis.app.art import router as art
 from uq_minis.app.core import TOOLS, Workspace
 from uq_minis.core.art import RESIDENTS
 from uq_minis.core.common import MiniError
+
+REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{8,64}")
+CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; style-src-elem 'self'; "
+    "style-src-attr 'unsafe-inline'; "
+    "img-src 'self' data: blob: https://resources.getqpay.com "
+    "https://resources.hellorubric.com https://i.ytimg.com; "
+    "font-src 'self' data:; media-src 'self' data: blob:; worker-src 'self' blob:; "
+    "connect-src 'self' wss://uni.keysi.dev; object-src 'none'; frame-src 'none'; "
+    "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+)
 
 
 def create(
@@ -64,6 +79,12 @@ def create(
     app = FastAPI(title="UQ minis", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.workspace = context
     app.state.identity = session.Identity(origin=origin, delegate=delegate)
+    app.state.http_metrics = {
+        "requests": 0,
+        "errors": 0,
+        "in_flight": 0,
+        "duration_ms": 0.0,
+    }
     from uq_minis.app.weather import install as weather
 
     weather(app)
@@ -99,6 +120,27 @@ def create(
             "configured": translate.configured(),
             "provider": "Microsoft Translator",
         }
+
+    @app.get("/api/health", include_in_schema=False)
+    def health() -> dict[str, str]:
+        """Report process readiness without disclosing dependency or account state"""
+        return {"status": "ok", "service": "uq-minis"}
+
+    @app.get("/internal/metrics", include_in_schema=False)
+    def metrics() -> PlainTextResponse:
+        """Expose label-free process metrics only through the private Unix socket"""
+        values = app.state.http_metrics
+        lines = (
+            f"uq_minis_http_requests_total {values['requests']}",
+            f"uq_minis_http_errors_total {values['errors']}",
+            f"uq_minis_http_in_flight {values['in_flight']}",
+            f"uq_minis_http_duration_milliseconds_total {values['duration_ms']:.3f}",
+        )
+        return PlainTextResponse(
+            "\n".join(lines) + "\n",
+            media_type="text/plain; version=0.0.4",
+            headers={"Cache-Control": "no-store"},
+        )
 
     if not origin:
         from uq_minis.app.connect import install as connect
@@ -190,7 +232,7 @@ def create(
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
             "Referrer-Policy": "no-referrer",
-            "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://resources.getqpay.com https://resources.hellorubric.com https://i.ytimg.com; connect-src 'self' https: http:; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+            "Content-Security-Policy": CSP,
         })
         if request.url.path.startswith("/api/weather/") and response.status_code == 200:
             response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=300"
@@ -208,6 +250,57 @@ def create(
         if request.url.path == "/api/brand/uq.png" and response.status_code == 200:
             response.headers["Cache-Control"] = "private, max-age=300"
         return response
+
+    @app.middleware("http")
+    async def observe(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """Correlate requests and retain only bounded aggregate process telemetry"""
+        supplied = request.headers.get("x-request-id", "")
+        request_id = supplied if REQUEST_ID.fullmatch(supplied) else secrets.token_hex(16)
+        values = app.state.http_metrics
+        values["requests"] += 1
+        values["in_flight"] += 1
+        started = monotonic()
+        status = 500
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            response.headers.update({
+                "X-Request-ID": request_id,
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "DENY",
+                "Referrer-Policy": "no-referrer",
+                "Permissions-Policy": (
+                    "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+                ),
+                "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+                "Cross-Origin-Resource-Policy": "same-origin",
+            })
+            response.headers.setdefault("Content-Security-Policy", CSP)
+            return response
+        finally:
+            duration = (monotonic() - started) * 1000
+            values["in_flight"] -= 1
+            values["duration_ms"] += duration
+            if status >= 500:
+                values["errors"] += 1
+            if origin:
+                print(
+                    json.dumps(
+                        {
+                            "event": "http_request",
+                            "request_id": request_id,
+                            "method": request.method,
+                            "path": request.url.path,
+                            "status": status,
+                            "duration_ms": round(duration, 3),
+                        },
+                        separators=(",", ":"),
+                    ),
+                    file=sys.stdout,
+                    flush=True,
+                )
 
     async def expected(request: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(

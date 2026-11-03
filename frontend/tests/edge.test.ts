@@ -13,6 +13,7 @@ test("the Minis edge preserves paths, queries and request bodies while leaving P
     "/api/plan",
     "/download/opaque",
     "/calendar.ics",
+    "/soc/eventy",
   ]) {
     const request = new Request(`https://uni.keysi.dev${path}?key=opaque`, {
       method: "POST",
@@ -22,9 +23,7 @@ test("the Minis edge preserves paths, queries and request bodies while leaving P
     expect((await edge.fetch(request)).status).toBe(200);
     const proxied = sent.at(-1)!;
     expect(new URL(proxied.url).hostname).toBe("minis-origin.keysi.dev");
-    expect(new URL(proxied.url).pathname).toBe(
-      path.startsWith("/mini") ? path.slice(5) || "/" : path,
-    );
+    expect(new URL(proxied.url).pathname).toBe(path);
     expect(new URL(proxied.url).search).toBe("?key=opaque");
     expect(proxied.headers.get("Origin")).toBe("https://uni.keysi.dev");
     expect(await proxied.text()).toBe("data");

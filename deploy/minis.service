@@ -1,7 +1,8 @@
 [Unit]
 Description=UQ minis UQ sign-in gateway
+Requires=minis.socket
 Wants=network-online.target
-After=network-online.target
+After=network-online.target minis.socket
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
@@ -28,11 +29,20 @@ KillSignal=SIGINT
 TimeoutStopSec=30
 NoNewPrivileges=yes
 PrivateTmp=yes
+PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
 RestrictSUIDSGID=yes
+RestrictRealtime=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+LockPersonality=yes
 ReadWritePaths=/var/lib/minis
-
-[Install]
-WantedBy=multi-user.target

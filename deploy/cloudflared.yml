@@ -1,0 +1,7 @@
+ingress:
+  - hostname: minis-origin.keysi.dev
+    service: unix:/run/minis-edge/caddy.sock
+    originRequest:
+      httpHostHeader: minis-origin.keysi.dev
+      connectTimeout: 10s
+  - service: http_status:404

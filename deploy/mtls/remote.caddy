@@ -1,0 +1,23 @@
+https://:9443 {
+	tls /etc/minis/mtls/current/server.crt /etc/minis/mtls/current/server.key {
+		client_auth {
+			mode require_and_verify
+			trust_pool file {
+				pem_file /etc/minis/mtls/root_ca.crt
+			}
+		}
+	}
+
+	@metrics path /internal/metrics
+	handle @metrics {
+		reverse_proxy unix//run/minis-edge/uq.sock {
+			header_up Host uni.keysi.dev
+			header_up X-Forwarded-Proto https
+			header_up X-Request-ID {http.request.uuid}
+		}
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+}

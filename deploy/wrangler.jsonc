@@ -7,8 +7,12 @@
   "routes": [
     { "pattern": "uni.keysi.dev/mini", "zone_name": "keysi.dev" },
     { "pattern": "uni.keysi.dev/mini/*", "zone_name": "keysi.dev" },
+    { "pattern": "uni.keysi.dev/api", "zone_name": "keysi.dev" },
     { "pattern": "uni.keysi.dev/api/*", "zone_name": "keysi.dev" },
+    { "pattern": "uni.keysi.dev/download", "zone_name": "keysi.dev" },
     { "pattern": "uni.keysi.dev/download/*", "zone_name": "keysi.dev" },
-    { "pattern": "uni.keysi.dev/calendar.ics", "zone_name": "keysi.dev" }
+    { "pattern": "uni.keysi.dev/calendar.ics", "zone_name": "keysi.dev" },
+    { "pattern": "uni.keysi.dev/soc", "zone_name": "keysi.dev" },
+    { "pattern": "uni.keysi.dev/soc/*", "zone_name": "keysi.dev" }
   ]
 }

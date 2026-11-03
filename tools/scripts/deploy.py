@@ -7,6 +7,7 @@ The server must already have uv, FFmpeg and Playwright's OS libraries
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import tarfile
@@ -30,6 +31,11 @@ def target(host: str) -> str:
     return host
 
 
+def ssh_key() -> Path:
+    """Return the explicit deployment key or the Minis default"""
+    return Path(os.environ.get("MINIS_SSH_KEY", "~/.ssh/minis")).expanduser()
+
+
 def bundle(root: Path, output: Path) -> None:
     """Archive an allowlist of build outputs, rejecting links before upload"""
     wheels = list((output / "wheel").glob("*.whl"))
@@ -39,11 +45,21 @@ def bundle(root: Path, output: Path) -> None:
         wheels[0]: wheels[0].name,
         output / "requirements.txt": "requirements.txt",
         root / "deploy/install.sh": "install.sh",
+        root / "deploy/Caddyfile": "Caddyfile",
+        root / "deploy/caddy.service": "caddy.service",
+        root / "deploy/cloudflared.yml": "cloudflared.yml",
         root / "deploy/minis.service": "minis.service",
+        root / "deploy/minis.socket": "minis.socket",
+        root / "deploy/minis.tmpfiles": "minis.tmpfiles",
         root / "deploy/minis@.socket": "minis@.socket",
         root / "deploy/minis@.service": "minis@.service",
         root / "deploy/minis.rules": "minis.rules",
+        root / "deploy/tunnel.service": "tunnel.service",
     }
+    entries.update({
+        path: "mtls/" + path.relative_to(root / "deploy/mtls").as_posix()
+        for path in (root / "deploy/mtls").rglob("*")
+    })
     frontend = output / "frontend"
     if not (frontend / "index.html").is_file():
         raise typer.BadParameter("Build the frontend before deploying")
@@ -73,11 +89,9 @@ def publish(root: Path, host: str) -> None:
         CalledProcessError: A build, transfer, installation or health check fails
     """
     host = target(host)
-    key = Path.home() / ".ssh/oracle"
+    key = ssh_key()
     if not key.is_file() or key.stat().st_mode & 0o077:
-        raise typer.BadParameter(
-            "Use ~/.ssh/oracle with private permissions: chmod 600 ~/.ssh/oracle"
-        )
+        raise typer.BadParameter(f"Use {key} with private permissions or set MINIS_SSH_KEY")
     options = [
         "-F",
         "/dev/null",

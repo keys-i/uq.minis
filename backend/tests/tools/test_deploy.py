@@ -39,10 +39,18 @@ def test_bundle(tmp_path: Path) -> None:
         "build/frontend/index.html": "app",
         "build/frontend/assets/app.js": "script",
         "deploy/install.sh": "installer",
+        "deploy/Caddyfile": "router",
+        "deploy/caddy.service": "router unit",
+        "deploy/cloudflared.yml": "tunnel config",
         "deploy/minis.service": "unit",
+        "deploy/minis.socket": "gateway socket",
+        "deploy/minis.tmpfiles": "runtime directory",
         "deploy/minis@.service": "tenant",
         "deploy/minis@.socket": "socket",
         "deploy/minis.rules": "policy",
+        "deploy/tunnel.service": "tunnel unit",
+        "deploy/mtls/remote.caddy": "optional remote profile",
+        "deploy/mtls/rotate.sh": "rotation",
         ".minis/auth/.env": "never upload",
         "frontend/.env": "never upload",
     }
@@ -56,10 +64,18 @@ def test_bundle(tmp_path: Path) -> None:
             "minis.whl",
             "requirements.txt",
             "install.sh",
+            "Caddyfile",
+            "caddy.service",
+            "cloudflared.yml",
             "minis.service",
+            "minis.socket",
+            "minis.tmpfiles",
             "minis@.service",
             "minis@.socket",
             "minis.rules",
+            "tunnel.service",
+            "mtls/remote.caddy",
+            "mtls/rotate.sh",
             "frontend/index.html",
             "frontend/assets/app.js",
         }
@@ -69,11 +85,14 @@ def test_bundle(tmp_path: Path) -> None:
         deploy.bundle(tmp_path, build)
 
 
-def test_plan(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     process = Mock(side_effect=AssertionError("A dry run must not build or contact a host"))
     monkeypatch.setattr(subprocess, "run", process)
+    key = tmp_path / "deploy-key"
+    monkeypatch.setenv("MINIS_SSH_KEY", str(key))
     result = CliRunner().invoke(script.app, ["deploy", "ubuntu@203.0.113.10", "--dry-run"])
-    assert result.exit_code == 0 and "~/.ssh/oracle" in result.output
+    assert result.exit_code == 0 and "deploy-key" in result.output
+    assert deploy.ssh_key() == key
     process.assert_not_called()
 
 
@@ -87,16 +106,34 @@ def test_activation(tmp_path: Path, healthy: bool, delay: int) -> None:
     (stage / "minis.service").write_text("new unit")
     for name in ("minis@.service", "minis@.socket", "minis.rules"):
         (stage / name).write_text("new template")
+    for name in (
+        "minis.socket",
+        "minis.tmpfiles",
+        "caddy.service",
+        "tunnel.service",
+        "Caddyfile",
+        "cloudflared.yml",
+    ):
+        (stage / name).write_text(f"new {name}")
+    (stage / "mtls").mkdir()
+    (stage / "mtls/README.md").write_text("disabled profile")
+    (stage / "mtls/rotate.sh").write_text("#!/bin/sh\n")
     (stage / "requirements.txt").write_text("")
     (stage / "minis.whl").touch()
-    state, root, units, binaries = (tmp_path / name for name in ("state", "opt", "units", "bin"))
-    for path in (state, root, units, binaries):
+    state, root, units, binaries, configs, share = (
+        tmp_path / name for name in ("state", "opt", "units", "bin", "configs", "share")
+    )
+    for path in (state, root, units, binaries, configs, share):
         path.mkdir()
+    for name in ("caddy", "cloudflared", "tmpfiles"):
+        (configs / name).mkdir()
     (state / "private").write_text("preserve this")
     previous = root / "old"
     previous.mkdir()
     (root / "current").symlink_to(previous, target_is_directory=True)
     (units / "minis.service").write_text("old unit")
+    (units / "caddy.service").write_text("old caddy unit")
+    (configs / "caddy/Caddyfile").write_text("old router")
     checks = shlex.quote(str(tmp_path / "checks"))
     commands = {
         "id": "printf 0",
@@ -104,8 +141,12 @@ def test_activation(tmp_path: Path, healthy: bool, delay: int) -> None:
         "chown": "exit 0",
         "flock": "exit 0",
         "ffmpeg": "exit 0",
+        "caddy": "exit 0",
+        "cloudflared": "exit 0",
+        "systemd-tmpfiles": "exit 0",
+        "usermod": "exit 0",
         "sleep": "exit 0",
-        "systemctl": "exit 0",
+        "systemctl": '[ "$1" = is-active ] && [ "$3" = soc-minis.service ] && exit 3\nexit 0',
         "curl": f"""attempts=0
 [ ! -f {checks} ] || read -r attempts < {checks}
 attempts=$((attempts + 1))
@@ -125,11 +166,17 @@ exit 1""",
     for old, new in (
         ("/opt/minis", root),
         ("/var/lib/minis", state),
+        ("/var/lib/caddy", configs / "caddy-state"),
         ("/etc/systemd/system", units),
         ("/etc/polkit-1/rules.d", units),
+        ("/etc/caddy", configs / "caddy"),
+        ("/etc/cloudflared", configs / "cloudflared"),
+        ("/etc/tmpfiles.d", configs / "tmpfiles"),
+        ("/usr/local/share/minis", share),
         ("/tmp/minis.", tmp_path / "stage."),
     ):
         source = source.replace(old, str(new))
+        source = source.replace("install -d -o caddy -g minis-edge -m 700", "install -d -m 700")
     installer = tmp_path / "install.sh"
     installer.write_text(source)
     revision = "a" * 32
@@ -144,3 +191,76 @@ exit 1""",
     assert (state / "private").read_text() == "preserve this"
     assert (root / "current").resolve() == (root / "releases" / revision if healthy else previous)
     assert (units / "minis.service").read_text() == ("new unit" if healthy else "old unit")
+    assert (configs / "caddy/Caddyfile").read_text() == (
+        "new Caddyfile" if healthy else "old router"
+    )
+    if healthy:
+        assert (units / "minis.socket").read_text() == "new minis.socket"
+        assert (root / "releases" / revision / "mtls/README.md").is_file()
+        assert os.access(root / "releases" / revision / "mtls/rotate.sh", os.X_OK)
+
+
+def test_private_router_contracts() -> None:
+    caddy = (ROOT / "deploy/Caddyfile").read_text()
+    cloudflared = (ROOT / "deploy/cloudflared.yml").read_text()
+    tunnel = (ROOT / "deploy/tunnel.service").read_text()
+    gateway = (ROOT / "deploy/minis.socket").read_text()
+    assert "bind unix//run/minis-edge/caddy.sock|0660" in caddy
+    assert "reverse_proxy unix//run/minis-edge/uq.sock" in caddy
+    assert "reverse_proxy unix//run/soc-minis/app.sock" in caddy
+    assert "@soc path /soc /soc/*" in caddy
+    assert "@uq path /api /api/* /download /download/* /calendar.ics" in caddy
+    assert "handle_path /mini/*" in caddy
+    assert 'respond "Not found" 404' in caddy
+    assert "127.0.0.1:8765" not in caddy
+    assert "service: unix:/run/minis-edge/caddy.sock" in cloudflared
+    assert "LoadCredential=credentials:/etc/cloudflared/minis.json" in tunnel
+    assert "--credentials-file ${CREDENTIALS_DIRECTORY}/credentials" in tunnel
+    assert "${MINIS_TUNNEL_ID}" in tunnel
+    assert "token-file" not in tunnel
+    assert "ListenStream=/run/minis-edge/uq.sock" in gateway
+    assert "SocketMode=0660" in gateway and "SocketGroup=minis-edge" in gateway
+    installer = (ROOT / "deploy/install.sh").read_text()
+    assert "--unix-socket /run/soc-minis/app.sock" in installer
+    assert "http://localhost/soc/api/health/ready" in installer
+
+
+def test_origin_security_and_service_hardening() -> None:
+    caddy = (ROOT / "deploy/Caddyfile").read_text()
+    assert "style-src-elem 'self'" in caddy
+    assert "style-src-attr 'unsafe-inline'" in caddy
+    assert "@uq_security path /mini /mini/* /api /api/*" in caddy
+    assert "'unsafe-eval'" not in caddy
+    assert "frame-ancestors 'none'" in caddy
+    assert 'Strict-Transport-Security "max-age=31536000"' in caddy
+    assert "includeSubDomains" not in caddy
+    assert 'Cross-Origin-Opener-Policy "same-origin-allow-popups"' in caddy
+    assert "X-Request-ID {http.request.uuid}" in caddy
+    for name in ("caddy.service", "tunnel.service", "minis.service", "minis@.service"):
+        unit = (ROOT / "deploy" / name).read_text()
+        assert "NoNewPrivileges=yes" in unit
+        assert "ProtectSystem=strict" in unit
+        assert "ProtectHome=yes" in unit
+        assert "CapabilityBoundingSet=" in unit
+    assert "RestrictAddressFamilies=AF_UNIX\n" in (ROOT / "deploy/caddy.service").read_text()
+    assert "SupplementaryGroups=minis-edge soc-minis" in (ROOT / "deploy/caddy.service").read_text()
+
+
+def test_remote_mtls_profile_is_inert_and_rotates_before_expiry() -> None:
+    main = (ROOT / "deploy/Caddyfile").read_text()
+    remote = (ROOT / "deploy/mtls/remote.caddy").read_text()
+    rotation = (ROOT / "deploy/mtls/rotate.sh").read_text()
+    service = (ROOT / "deploy/mtls/rotate.service").read_text()
+    timer = (ROOT / "deploy/mtls/rotate.timer").read_text()
+    installer = (ROOT / "deploy/install.sh").read_text()
+    assert "remote.caddy" not in main
+    assert "require_and_verify" in remote and "root_ca.crt" in remote
+    for threshold in ("336h", "168h", "72h"):
+        assert f"--expires-in {threshold}" in rotation
+    assert "step ca renew" in rotation and "caddy validate" in rotation
+    assert "mktemp -d" in rotation and "openssl verify" in rotation
+    assert 'mv -Tf "$next" "$current"' in rotation
+    assert "/current/server.crt" in remote and "/current/server.key" in remote
+    assert "ConditionPathExists=/etc/minis/remote-mtls.enabled" in service
+    assert "Persistent=true" in timer and "RandomizedDelaySec=30m" in timer
+    assert "enable minis-mtls-rotate" not in installer

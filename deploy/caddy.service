@@ -1,0 +1,44 @@
+[Unit]
+Description=Private origin router for Keysi services
+Requires=minis.socket
+After=minis.socket
+Before=cloudflared-minis.service
+
+[Service]
+Type=notify
+User=caddy
+Group=minis-edge
+SupplementaryGroups=minis-edge soc-minis
+WorkingDirectory=/var/lib/caddy
+StateDirectory=caddy
+StateDirectoryMode=0700
+Environment=XDG_DATA_HOME=/var/lib/caddy
+ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile --adapter caddyfile
+ExecReload=/usr/bin/caddy reload --address unix//run/minis-edge/admin.sock --config /etc/caddy/Caddyfile --adapter caddyfile --force
+TimeoutStopSec=5
+LimitNOFILE=1048576
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ReadWritePaths=/run/minis-edge
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
