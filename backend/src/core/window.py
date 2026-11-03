@@ -6,9 +6,11 @@ The transport never reads input values, saves passwords or permits downloads
 
 from __future__ import annotations
 
+import asyncio
 import base64
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager, suppress
+from hashlib import sha256
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit
 
@@ -22,7 +24,11 @@ class Window:
     """Own the live page and its bounded, accessible control references"""
 
     def __init__(
-        self, page: Page, allowed: Callable[[str], bool], label: str, form_host: str = ""
+        self,
+        page: Page,
+        allowed: Callable[[str], bool],
+        label: str,
+        form_host: str = "",
     ) -> None:
         """Start without retained screenshots or credential values"""
         self.page = page
@@ -31,14 +37,63 @@ class Window:
         self.form_host = form_host
         self.controls: dict[str, tuple[Locator, str]] = {}
 
-    async def view(self) -> dict[str, Any]:
-        """Describe the provider form or relay its pixels without reading credential values"""
+    async def _active(self) -> Page:
+        """Select the provider's active allowed page"""
         pages = [page for page in self.page.context.pages if not page.is_closed()]
         if not pages or len(pages) > 4:
             raise MiniError("The sign-in window closed; try signing in again")
         self.page = pages[-1]
         if not self.allowed(self.page.url):
             raise MiniError("The provider opened an unsupported sign-in page; cancel and try again")
+        return self.page
+
+    async def revision(self) -> str:
+        """Describe meaningful visible state without capturing provider pixels"""
+        from playwright.async_api import Error
+
+        failure: Error | None = None
+        for _attempt in range(5):
+            page = await self._active()
+            try:
+                snapshots = [
+                    cast(
+                        str,
+                        await frame.evaluate("""() => JSON.stringify([
+                          location.href, document.title, scrollX, scrollY, innerWidth,
+                          innerHeight, (document.body?.innerText || '').slice(0, 4096),
+                          [...document.querySelectorAll(
+                            'h1,h2,[role=alert],input,textarea,select,button,a[href],img,canvas,svg'
+                          )].filter(el => {
+                            const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+                            return r.width > 0 && r.height > 0 && r.bottom > 0
+                              && r.top < innerHeight && s.visibility !== 'hidden'
+                              && s.display !== 'none';
+                          }).slice(0, 64).map(el => {
+                            const r = el.getBoundingClientRect();
+                            return [el.tagName, el.type || '',
+                              el.getAttribute('aria-label') || el.alt || el.title
+                                || el.placeholder || el.innerText || '', !!el.disabled,
+                              !!el.checked, Math.round(r.x), Math.round(r.y),
+                              Math.round(r.width), Math.round(r.height),
+                              el.tagName === 'IMG' ? el.currentSrc : ''];
+                          })
+                        ])"""),
+                    )
+                    for frame in page.frames[:8]
+                    if self.allowed(frame.url)
+                ]
+                return sha256("\0".join(snapshots).encode()).hexdigest()
+            except Error as exc:
+                if page.is_closed():
+                    raise MiniError("The sign-in window closed; try signing in again") from exc
+                failure = exc
+                await asyncio.sleep(0.05)
+        assert failure is not None
+        raise failure
+
+    async def view(self) -> dict[str, Any]:
+        """Describe the provider form or relay its pixels without reading credential values"""
+        await self._active()
         controls: list[dict[str, Any]] = []
         self.controls.clear()
         for frame in self.page.frames:
@@ -168,7 +223,13 @@ class Window:
             await control.click(timeout=2000)
         elif kind == "enter":
             await control.press("Enter", timeout=2000)
-        elif kind == "fill" and field not in {"button", "submit", "checkbox", "radio", "select"}:
+        elif kind == "fill" and field not in {
+            "button",
+            "submit",
+            "checkbox",
+            "radio",
+            "select",
+        }:
             value = event.get("value")
             if not isinstance(value, str) or len(value) > 4096:
                 raise MiniError("The sign-in value is too long")
@@ -217,6 +278,7 @@ async def window(url: str, allowed: Callable[[str], bool], label: str) -> AsyncG
                     service_workers="block",
                     accept_downloads=False,
                     viewport={"width": 760, "height": 480},
+                    device_scale_factor=2,
                 )
                 await context.route("**/*", guard)
                 page = await context.new_page()

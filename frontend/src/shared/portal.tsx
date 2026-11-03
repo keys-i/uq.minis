@@ -34,8 +34,9 @@ export function Portal({
     failed = useEffectEvent(fail);
   useEffect(() => {
     if (provider === "YouTube") {
-      const controller = new AbortController();
       let ended = false,
+        waiting = false,
+        request: AbortController | null = null,
         timer: ReturnType<typeof setTimeout>;
       const events: object[] = [{ kind: "open" }];
       queued.current = (event) => {
@@ -50,33 +51,42 @@ export function Portal({
           if (previous >= 0) events.splice(previous, 1);
         }
         events.push(event);
+        if (waiting) request?.abort();
+        else if (request === null) {
+          clearTimeout(timer);
+          timer = setTimeout(poll, 0);
+        }
         return true;
       };
       const poll = async () => {
+        const event = events.shift();
+        request = new AbortController();
+        waiting = event === undefined;
         try {
-          const result = await api(path, connectionSchema, events.shift(), controller.signal);
+          const result = await api(path, connectionSchema, event, request.signal);
           if ("connected" in result || "error" in result) {
             ended = true;
             if ("connected" in result) finished("");
             else failed(result.error);
-          } else {
+          } else if (!("acknowledged" in result)) {
             setSubmitting(false);
             setView(result);
           }
         } catch (error) {
-          if (!controller.signal.aborted) {
+          if (!ended && (error as Error).name !== "AbortError") {
             ended = true;
             failed((error as Error).message);
           }
         }
-        if (!ended && !controller.signal.aborted)
-          timer = setTimeout(poll, events.length ? 150 : 700);
+        request = null;
+        waiting = false;
+        if (!ended) timer = setTimeout(poll, events.length ? 0 : 200);
       };
       void poll();
       return () => {
         ended = true;
         clearTimeout(timer);
-        controller.abort();
+        request?.abort();
         queued.current = null;
         void api(path, acknowledgement, { kind: "cancel" }).catch(() => {});
       };

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, call
 
 import httpx
 import pytest
@@ -42,7 +42,12 @@ def test_private_connection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
             "httpOnly": True,
             "expires": -1,
         },
-        {"name": "unrelated", "value": "ignore", "domain": ".evil.test", "secure": True},
+        {
+            "name": "unrelated",
+            "value": "ignore",
+            "domain": ".evil.test",
+            "secure": True,
+        },
     ]
     connect.save(cookies)
     path = connect.cookiefile()
@@ -83,10 +88,15 @@ def test_actions() -> None:
     with cast(
         httpx.Client,
         TestClient(
-            create(), base_url="http://127.0.0.1:8765", headers={"Origin": "http://127.0.0.1:8765"}
+            create(),
+            base_url="http://127.0.0.1:8765",
+            headers={"Origin": "http://127.0.0.1:8765"},
         ),
     ) as client:
-        assert client.get("/api/timey/youtube").json() == {"connected": False, "open": False}
+        assert client.get("/api/timey/youtube").json() == {
+            "connected": False,
+            "open": False,
+        }
         bodies: list[object] = [
             [],
             {"kind": "finish"},
@@ -120,6 +130,7 @@ def test_finish(monkeypatch: pytest.MonkeyPatch) -> None:
         SimpleNamespace(
             page=page,
             view=AsyncMock(return_value={"image": "frame"}),
+            revision=AsyncMock(return_value="accounts"),
         ),
     )
 
@@ -134,12 +145,62 @@ def test_finish(monkeypatch: pytest.MonkeyPatch) -> None:
     with cast(
         httpx.Client,
         TestClient(
-            create(), base_url="http://127.0.0.1:8765", headers={"Origin": "http://127.0.0.1:8765"}
+            create(),
+            base_url="http://127.0.0.1:8765",
+            headers={"Origin": "http://127.0.0.1:8765"},
         ),
     ) as client:
         assert client.post("/api/timey/youtube", json={"kind": "open"}).status_code == 200
         page.url = "https://www.youtube.com/"
         response = client.get("/api/timey/youtube?view=1")
         assert response.json() == {"connected": True}
-        assert client.get("/api/timey/youtube").json() == {"connected": True, "open": False}
+        assert client.get("/api/timey/youtube").json() == {
+            "connected": True,
+            "open": False,
+        }
         assert closed == [True]
+
+
+@pytest.mark.anyio
+async def test_connection_reuses_idle_pixels_and_acknowledges_typing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = SimpleNamespace(
+        url="https://accounts.google.com/ServiceLogin",
+        context=SimpleNamespace(cookies=AsyncMock(return_value=[])),
+    )
+    render = AsyncMock(return_value={"image": "frame"})
+    revision = AsyncMock(return_value="steady")
+    action = AsyncMock()
+    calls = Mock()
+    calls.attach_mock(revision, "revision")
+    calls.attach_mock(render, "view")
+    browser = cast(
+        Window,
+        SimpleNamespace(
+            page=page,
+            view=render,
+            revision=revision,
+            act=action,
+        ),
+    )
+    session = connection.Connection()
+    session.browser = browser
+    assert await session._render() == {"image": "frame"}
+    assert calls.mock_calls[:2] == [call.revision(), call.view()]
+    monkeypatch.setattr(connection, "VIEW_WAIT", 0)
+    assert await session.view() == {"acknowledged": True}
+    render.assert_awaited_once()
+
+    disconnected = AsyncMock(return_value=True)
+    assert await session.view(disconnected) == {"acknowledged": True}
+    disconnected.assert_awaited_once()
+
+    result = await session.act({"kind": "fill", "id": "email", "value": "member@example.org"})
+    assert result == {"acknowledged": True}
+    render.assert_awaited_once()
+    action.assert_awaited_once()
+
+    revision.return_value = "next page"
+    assert await session.view() == {"image": "frame"}
+    assert render.await_count == 2

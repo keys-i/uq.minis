@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, expect, test, vi } from "vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { Portal } from "../src/shared/portal.tsx";
+import { json } from "./fixtures.ts";
 
 afterEach(cleanup);
 
@@ -91,4 +92,73 @@ test("UQ form retains early input, submits once and clears its password", async 
   expect(complete).toHaveBeenCalledWith("s1234567@student.uq.edu.au");
   mounted.unmount();
   expect(connection().close).toHaveBeenCalled();
+});
+
+test("YouTube typing interrupts the idle view and avoids another pixel frame", async () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const calls: { body?: Record<string, unknown>; signal?: AbortSignal }[] = [];
+  const view = {
+    mode: "window",
+    image: "frame",
+    host: "accounts.google.com",
+    title: "Google sign-in",
+    text: "",
+    width: 760,
+    height: 480,
+    controls: [
+      {
+        id: "email",
+        type: "email",
+        label: "Email",
+        x: 100,
+        y: 100,
+        width: 300,
+        height: 48,
+        disabled: false,
+        checked: false,
+        options: [],
+      },
+    ],
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((_path: string, init?: RequestInit) => {
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+      calls.push({ body, signal: init?.signal || undefined });
+      if (body?.kind === "open") return Promise.resolve(json(view));
+      if (body?.kind === "resize") return Promise.resolve(json(view));
+      if (body?.kind === "fill") return Promise.resolve(json({ acknowledged: true }));
+      if (body?.kind === "cancel") return Promise.resolve(json({}));
+      return new Promise<Response>((_resolve, reject) =>
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("Cancelled", "AbortError")),
+          { once: true },
+        ),
+      );
+    }),
+  );
+  const mounted = render(
+    <Portal
+      provider="YouTube"
+      path="/api/timey/youtube?view=1"
+      complete={vi.fn()}
+      fail={vi.fn()}
+      cancel={vi.fn()}
+    />,
+  );
+  const email = await screen.findByLabelText("Email");
+  await waitFor(() => expect(calls.some((call) => call.body === undefined)).toBe(true));
+  const idle = calls.find((call) => call.body === undefined)!;
+  fireEvent.change(email, { target: { value: "member@example.org" } });
+  await waitFor(() => expect(calls.some((call) => call.body?.kind === "fill")).toBe(true));
+  expect(idle.signal?.aborted).toBe(true);
+  expect(calls.filter((call) => call.body?.kind === "fill")).toHaveLength(1);
+  mounted.unmount();
 });

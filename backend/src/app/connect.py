@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
+from time import monotonic
 from typing import Any, cast
 
 from fastapi import FastAPI, HTTPException, Request
@@ -16,6 +18,8 @@ from fastapi import FastAPI, HTTPException, Request
 from uq_minis.core.common import MiniError
 from uq_minis.core.window import Window, window
 from uq_minis.minis.timey import connect
+
+VIEW_WAIT = 10
 
 
 class Connection:
@@ -27,6 +31,8 @@ class Connection:
         self.browser: Window | None = None
         self.lock = asyncio.Lock()
         self.timer: asyncio.TimerHandle | None = None
+        self.cached: dict[str, Any] | None = None
+        self.revision = ""
 
     async def close(self) -> None:
         """Release the browser before forgetting its ephemeral control references"""
@@ -36,9 +42,11 @@ class Connection:
                 self.timer = None
             await self.stack.aclose()
             self.browser = None
+            self.cached = None
+            self.revision = ""
 
-    async def _view(self) -> dict[str, Any]:
-        """Finish a valid provider return before exposing the next bounded view"""
+    async def _connected(self) -> bool:
+        """Save a completed provider return without exposing its cookies"""
         assert self.browser is not None
         if connect.allowed(self.browser.page.url) and self.browser.page.url.startswith(
             "https://www.youtube.com/"
@@ -46,15 +54,43 @@ class Connection:
             cookies = cast(list[dict[str, Any]], await self.browser.page.context.cookies())
             if connect.authenticated(cookies):
                 connect.save(cookies)
-                return {"connected": True}
-        return await self.browser.view()
+                return True
+        return False
 
-    async def view(self) -> dict[str, Any]:
-        """Read the active provider page while retaining connection ownership"""
-        async with self.lock:
-            if self.browser is None:
-                raise MiniError("The YouTube window closed; open the connection again to continue")
-            return await self._view()
+    async def _render(self) -> dict[str, Any]:
+        """Capture provider pixels only after meaningful state changes"""
+        assert self.browser is not None
+        if await self._connected():
+            return {"connected": True}
+        revision = await self.browser.revision()
+        rendered = await self.browser.view()
+        self.cached = rendered
+        self.revision = revision
+        return rendered
+
+    async def view(
+        self, disconnected: Callable[[], Awaitable[bool]] | None = None
+    ) -> dict[str, Any]:
+        """Wait for a meaningful page change while allowing user actions through"""
+        deadline = monotonic() + VIEW_WAIT
+        while True:
+            if disconnected is not None and await disconnected():
+                if self.cached is None:
+                    raise MiniError("The YouTube window closed; open the connection again")
+                return {"acknowledged": True}
+            async with self.lock:
+                if self.browser is None:
+                    raise MiniError(
+                        "The YouTube window closed; open the connection again to continue"
+                    )
+                if await self._connected():
+                    return {"connected": True}
+                revision = await self.browser.revision()
+                if self.cached is None or revision != self.revision:
+                    return await self._render()
+            if monotonic() >= deadline:
+                return {"acknowledged": True}
+            await asyncio.sleep(0.2)
 
     async def act(self, event: dict[str, Any]) -> dict[str, Any]:
         """Apply one bounded action to this workspace's current provider page"""
@@ -83,7 +119,9 @@ class Connection:
                 return {"connected": True}
             if kind != "open":
                 await self.browser.act(event)
-            return await self._view()
+            if kind == "fill":
+                return {"acknowledged": True}
+            return await self._render()
 
 
 def install(app: FastAPI) -> None:
@@ -110,7 +148,7 @@ def install(app: FastAPI) -> None:
             raise HTTPException(503, "The YouTube connection is starting; try again shortly")
         if request.method == "GET":
             if request.query_params.get("view") == "1":
-                result = await connection.view()
+                result = await connection.view(request.is_disconnected)
                 if result.get("connected") is True:
                     await connection.close()
                 return result
