@@ -423,7 +423,7 @@ main {
 .shell.home main {
   max-width: none;
   min-height: 100dvh;
-  padding: clamp(20px, 2.2vw, 34px) clamp(16px, 2.8vw, 52px) 0;
+  padding: clamp(20px, 2.2vw, 34px) clamp(12px, 1.8vw, 32px) 0;
   background: #496b50 url("../assets/habitats/forest.webp") center / cover no-repeat;
 }
 .shell.home .page-tools {
@@ -510,9 +510,9 @@ main {
 }
 .shell.home main[data-mini="home"] > .site-footer {
   border-top: 0;
-  background: transparent;
+  background: #14382c;
   color: #fffdf2;
-  text-shadow: 0 2px 10px #07180fbf;
+  text-shadow: none;
 }
 .shell.home .site-footer :is(a, button) {
   color: inherit;
@@ -617,9 +617,11 @@ main.is-habitat {
 main[data-mini]:not([data-mini="timey"]) .habitat-content {
   background: transparent;
 }
-main[data-mini]:not([data-mini="timey"]) :is(.habitat-page, .habitat-page[data-kind]),
-main[data-mini]:not([data-mini="timey"]) > .site-footer {
+main[data-mini]:not([data-mini="timey"]) :is(.habitat-page, .habitat-page[data-kind]) {
   background: var(--canvas);
+}
+main[data-mini]:not([data-mini="timey"]) > .site-footer {
+  background: #14382c;
 }
 .habitat-clearing {
   position: relative;
@@ -707,32 +709,72 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   }
 }
 .site-footer {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
   flex-wrap: wrap;
-  margin-top: 32px;
-  padding: 18px 0;
-  border-top: 1px solid #b9c9bb;
-  font-size: 0.78rem;
+  min-height: 164px;
+  margin-top: 20px;
+  padding: 34px clamp(22px, 4vw, 64px);
+  overflow: hidden;
+  border: 0;
+  border-radius: 34px 24px 0 0;
+  color: #fffdf2;
+  background: #14382c;
 }
-.site-footer .made-with {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-  font-size: 0.9rem;
+.tectonic-field,
+.tectonic-plate {
+  position: absolute;
+  pointer-events: none;
 }
-.made-with .icon {
-  width: 15px;
-  height: 15px;
+.tectonic-field {
+  inset: -28px;
+  z-index: -1;
+  overflow: hidden;
 }
-.github-link {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
+.tectonic-plate {
+  filter: blur(8px);
+  opacity: 0.78;
+  transform: translate3d(0, 0, 0);
+}
+.tectonic-plate::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+.plate-west {
+  inset: -8% 48% 4% -8%;
+}
+.plate-west::before {
+  clip-path: polygon(0 4%, 82% 0, 100% 28%, 78% 62%, 88% 100%, 0 91%);
+  background: #265d47;
+}
+.plate-east {
+  inset: 4% -8% -12% 45%;
+}
+.plate-east::before {
+  clip-path: polygon(18% 0, 100% 9%, 100% 100%, 5% 92%, 0 55%, 28% 31%);
+  background: #789d72;
+}
+.plate-ridge {
+  inset: 52% 25% -18% 18%;
+  opacity: 0.45;
+}
+.plate-ridge::before {
+  clip-path: polygon(2% 30%, 35% 0, 62% 19%, 100% 9%, 92% 100%, 8% 86%);
+  background: #d4a93b;
+}
+.site-footer > .footer-wordmark {
+  color: inherit;
+  font-family: "DynaPuff", "Comic Sans MS", cursive;
+  font-size: clamp(1.7rem, 4vw, 3.25rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-decoration: none;
 }
 .access-panel {
   width: min(520px, 94vw);
@@ -784,6 +826,7 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   min-height: 44px;
 }
 .site-footer nav {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px 22px;
@@ -795,13 +838,78 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   display: flex;
   align-items: center;
   min-height: 44px;
-  font-size: 0.78rem;
-  font-weight: 700;
+  color: inherit;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+.site-footer nav > a,
+.site-footer nav > button {
+  position: relative;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, #fffdf2 13%, transparent);
+  text-decoration: none;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.site-footer nav > button.quiet {
+  color: inherit;
+}
+@media (hover: hover) and (pointer: fine) {
+  .site-footer nav > :is(a, button):hover {
+    color: #14382c;
+    background: #fff1bd;
+    transform: translateY(-3px) rotate(-1deg);
+  }
+  .tectonic-footer:hover .plate-west,
+  .tectonic-footer:focus-within .plate-west {
+    animation: plate-west-shift 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .tectonic-footer:hover .plate-east,
+  .tectonic-footer:focus-within .plate-east {
+    animation: plate-east-shift 820ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .tectonic-footer:hover .plate-ridge,
+  .tectonic-footer:focus-within .plate-ridge {
+    animation: plate-ridge-shift 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@keyframes plate-west-shift {
+  55% {
+    transform: translate3d(11px, -6px, 0) rotate(-0.6deg);
+  }
+}
+@keyframes plate-east-shift {
+  55% {
+    transform: translate3d(-13px, 7px, 0) rotate(0.8deg);
+  }
+}
+@keyframes plate-ridge-shift {
+  55% {
+    transform: translate3d(2px, -12px, 0) scale(1.03);
+  }
+}
+@media (max-width: 620px) {
+  .site-footer {
+    min-height: 214px;
+    align-content: center;
+    padding: 30px 20px;
+  }
+  .site-footer > .footer-wordmark {
+    flex-basis: 100%;
+  }
+  .site-footer nav {
+    width: 100%;
+  }
 }
 .is-habitat > .site-footer {
   margin: 0;
-  padding: 18px clamp(18px, 3vw, 48px);
-  background: var(--paper);
+  padding: 34px clamp(22px, 4vw, 64px);
+  border-radius: 0;
+  background: #14382c;
 }
 
 /* == Real club and course cards == */
@@ -2291,6 +2399,16 @@ dialog::backdrop {
   .shell.home .wildlife-toolbar {
     color: CanvasText;
     text-shadow: none;
+  }
+  .site-footer,
+  .shell.home main[data-mini="home"] > .site-footer,
+  main[data-mini]:not([data-mini="timey"]) > .site-footer {
+    border-top: 2px solid CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+  .tectonic-field {
+    display: none;
   }
 }
 

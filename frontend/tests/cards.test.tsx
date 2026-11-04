@@ -203,10 +203,10 @@ test("navigation has a touch menu and a useful footer without play or pause butt
   assert.doesNotMatch(css, /\.sidebar>\*\{opacity:0/);
   const html = renderToStaticMarkup(React.createElement(footer.Footer));
   assert.match(html, /Accessibility/);
-  assert.match(html, /Made with/);
-  assert.match(html, /love by/);
-  assert.match(html, /keys-i/);
-  assert.match(html, /aria-label="UQ minis on GitHub"/);
+  assert.match(html, /href="https:\/\/keysi\.dev"/);
+  assert.match(html, /href="https:\/\/github\.com\/keys-i"/);
+  assert.match(html, /href="https:\/\/linkedin\.com\/in\/radhesh-g"/);
+  assert.match(html, />LinkedIn</);
   assert.match(html, /role="dialog"/);
   assert.match(html, />Contrast</);
   assert.match(html, /Reading size/);

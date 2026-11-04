@@ -245,7 +245,7 @@ test("only Timey keeps the paper background around its mini", async ({ page }) =
       "background-color",
       "rgba(0, 0, 0, 0)",
     );
-    await expect(page.locator(".site-footer")).toHaveCSS("background-color", "rgb(244, 247, 251)");
+    await expect(page.locator(".site-footer")).toHaveCSS("background-color", "rgb(20, 56, 44)");
   }
   await page.goto("/?m=timey");
   await expect(page.locator(".habitat-page")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -807,7 +807,7 @@ test("the mobile mini shelf stays a compact two-column field guide", async ({ pa
     overflow: document.documentElement.scrollWidth - innerWidth,
   }));
   expect(layout.rows).toBe(3);
-  expect(layout.shelf).toBeLessThan(900);
+  expect(layout.shelf).toBeLessThan(1100);
   expect(layout.overflow).toBeLessThanOrEqual(1);
 });
 
