@@ -1,0 +1,26 @@
+# == Branch and subprocess coverage ==
+
+[tool]
+
+[tool.coverage]
+
+[tool.coverage.run]
+"data_file" = "../out/coverage/.coverage"
+"branch" = true
+"source" = ["uq_minis", "tools"]
+"concurrency" = ["thread", "greenlet", "multiprocessing"]
+"patch" = ["subprocess"]
+
+
+[tool.coverage.xml]
+"output" = "../out/coverage/coverage.xml"
+
+
+[tool.coverage.html]
+"directory" = "../out/coverage/html"
+
+
+[tool.coverage.report]
+"show_missing" = true
+"skip_covered" = true
+"exclude_also" = ["if TYPE_CHECKING:", "if __name__ == .__main__.:"]

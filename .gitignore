@@ -9,6 +9,7 @@ dist/
 # == Coverage ==
 .coverage*
 coverage.*
+!tools/config/coverage.toml
 htmlcov/
 
 # == Generated documents ==
