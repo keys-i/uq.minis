@@ -18,6 +18,7 @@
 
 [vite]
 "cacheDir" = "../out/.cache/vite"
+"base" = "./"
 
 [vite.build]
 "assetsInlineLimit" = 0

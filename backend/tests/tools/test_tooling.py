@@ -14,7 +14,9 @@ from uq_minis import cli
 def test_layout() -> None:
     root = BACKEND
     config = tomllib.loads((root / "pyproject.toml").read_text())
+    frontend = tomllib.loads((root.parent / "tools/config/frontend.toml").read_text())
     assert set(config["project"]["scripts"]) == {"mini", "dev", "minis-web"}
+    assert frontend["vite"]["base"] == "./"
     assert not (root / "src/uq_minis").exists()
     assert not list((root / "src/minis").glob("*/cli.py"))
     assert not (root / "skills").exists()
