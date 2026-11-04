@@ -111,7 +111,13 @@ def test_session_confirmation() -> None:
             True,
             "",
         ),
-        (portal.PORTAL, "a@uq.edu.au" + "x" * 65536, True, ""),
+        pytest.param(
+            portal.PORTAL,
+            "a@uq.edu.au" + "x" * 65536,
+            True,
+            "",
+            id="oversized-attributes",
+        ),
     ],
 )
 def test_portal_identity_requires_a_protected_uq_page(

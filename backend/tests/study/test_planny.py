@@ -1,4 +1,5 @@
 import json
+import os
 from collections.abc import Iterator
 from email.message import Message
 from os.path import relpath
@@ -48,7 +49,8 @@ def test_private_revisioned_saves(tmp_path: Path, document: dict[str, Any]) -> N
     path = tmp_path / "planny" / "plan.json"
     saved = plan.save(path, document)
     assert saved["revision"] == 1
-    assert path.stat().st_mode & 0o777 == 0o600
+    if os.name == "posix":
+        assert path.stat().st_mode & 0o777 == 0o600
     assert plan.load(path) == saved
     with pytest.raises(MiniError, match="Another tab"):
         plan.save(path, document)

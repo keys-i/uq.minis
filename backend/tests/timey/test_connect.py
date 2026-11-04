@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -56,7 +57,8 @@ def test_private_connection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         and "private-session" in path.read_text()
         and "ignore" not in path.read_text()
     )
-    assert not path.stat().st_mode & 0o077
+    if os.name == "posix":
+        assert not path.stat().st_mode & 0o077
     for invalid in (
         {**cookies[0], "expires": 1},
         {**cookies[0], "domain": "accounts.google.com"},

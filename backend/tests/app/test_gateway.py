@@ -1,4 +1,5 @@
 import asyncio
+import os
 import shutil
 from pathlib import Path
 from time import monotonic
@@ -173,7 +174,8 @@ def test_leases(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
             assert first.key not in pool.active
         async with pool.lease("a@uq.edu.au") as recovered:
             assert recovered.secret == first.secret
-        assert (tmp_path / f"{first.key}.json").stat().st_mode & 0o077 == 0
+        if os.name == "posix":
+            assert (tmp_path / f"{first.key}.json").stat().st_mode & 0o077 == 0
         with pytest.raises(MiniError):
             async with pool.lease("../../root"):
                 pass

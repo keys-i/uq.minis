@@ -151,7 +151,7 @@ def test_samples(canvas: Canvas, keys: Keys, fails: bool) -> None:
             raise MiniError("Font is offline")
         return art.Preview(Text("Second font sample"), "Second font sample")
 
-    keys("first", "\x15second", interval=0.45)
+    keys("first", "\x15second", interval=0.75)
     assert (
         ask("Font", suggestions={"first": "First", "second": "Second"}, previewer=provider)
         == "second"
@@ -1013,6 +1013,7 @@ def test_paths(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     for name in ("dir", "dir with spaces"):
         folder = tmp_path / name / "nest"
         folder.mkdir(parents=True)
@@ -1114,7 +1115,7 @@ def test_calendar(
     canvas: Canvas, keys: Keys, width: int, rows: int, inputs: tuple[str, ...], expected: date
 ) -> None:
     frames = canvas(width, rows)
-    keys(*inputs)
+    keys(*inputs, interval=0.3)
     assert day("Event date", default=date(2026, 1, 31)) == expected
     view = "\n".join(row for frame in frames for row in frame)
     assert "Window too small" not in view and "Tab unit" in view

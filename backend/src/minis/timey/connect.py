@@ -7,6 +7,7 @@ The connection may still be rejected by Google or YouTube's download checks
 from __future__ import annotations
 
 import math
+import os
 from http.cookiejar import Cookie, MozillaCookieJar
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -63,7 +64,12 @@ def cookiefile() -> Path | None:
     _safe()
     if not COOKIES.exists():
         return None
-    if not COOKIES.is_file() or COOKIES.stat().st_size > 262144 or COOKIES.stat().st_mode & 0o077:
+    if (
+        not COOKIES.is_file()
+        or COOKIES.stat().st_size > 262144
+        or os.name == "posix"
+        and COOKIES.stat().st_mode & 0o077
+    ):
         raise MiniError("Reconnect YouTube to repair its private connection file")
     try:
         jar = MozillaCookieJar(str(COOKIES))
