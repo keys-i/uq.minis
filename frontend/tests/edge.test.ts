@@ -113,7 +113,7 @@ test("the UQ Worker exposes health, redirects and its pinned installer", async (
   );
   assert.equal(install.status, 200);
   assert.match(install.headers.get("Content-Type") || "", /text\/x-shellscript/);
-  assert.match(await install.text(), /uv.*tool install.*611f93645d40cad80959124842202dd0d9a58434/s);
+  assert.match(await install.text(), /uv.*tool install.*bc944d13ccedcaeeea760ca37fecd3f8dc180033/s);
 });
 
 test("guest sessions isolate plans and reject stale or unsafe writes", async () => {

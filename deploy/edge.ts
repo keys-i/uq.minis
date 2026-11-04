@@ -60,7 +60,7 @@ else
   UV="\${HOME}/.local/bin/uv"
 fi
 
-"\${UV}" tool install --upgrade --python 3.15 'uq-minis[agent,browser,timey] @ git+https://github.com/keys-i/uq.minis.git@611f93645d40cad80959124842202dd0d9a58434#subdirectory=backend'
+"\${UV}" tool install --upgrade --python 3.15 'uq-minis[agent,browser,timey] @ git+https://github.com/keys-i/uq.minis.git@bc944d13ccedcaeeea760ca37fecd3f8dc180033#subdirectory=backend'
 echo "Installed UQ Minis. Run: mini list"
 `;
 
