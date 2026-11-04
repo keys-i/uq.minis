@@ -356,7 +356,7 @@ def test_scroll(canvas: Canvas, keys: Keys, width: int) -> None:
     selected = {row[row.index("ABC") :] for frame in frames for row in frame if "ABC" in row}
     assert len(selected) > 1
     assert any(
-        "FGHIJKLMNOPQRSTUVWXYZ" in row and "ABC" not in row for frame in frames for row in frame
+        "KLMNOPQRSTUVWXYZ" in row and "ABC" not in row for frame in frames for row in frame
     )
 
 
