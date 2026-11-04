@@ -254,7 +254,7 @@ small,
     width 440ms cubic-bezier(0.22, 0.8, 0.25, 1),
     box-shadow 440ms;
 }
-.sidebar:is(:hover, :focus-within, [data-open="true"]) {
+.sidebar:is(:has(a:hover, button:hover), :has(:focus-visible), [data-open="true"]) {
   width: 242px;
   border-right-color: var(--line);
   box-shadow: 8px 0 24px #263c321a;
@@ -270,7 +270,7 @@ small,
     translate 440ms cubic-bezier(0.22, 0.8, 0.25, 1),
     opacity 220ms;
 }
-.sidebar:is(:hover, :focus-within, [data-open="true"]) .nav-label {
+.sidebar:is(:has(a:hover, button:hover), :has(:focus-visible), [data-open="true"]) .nav-label {
   opacity: 1;
   translate: 0;
   pointer-events: auto;
@@ -386,7 +386,7 @@ small,
     height 440ms,
     min-height 440ms;
 }
-.sidebar:is(:hover, :focus-within, [data-open="true"]) .menu-visitor {
+.sidebar:is(:has(a:hover, button:hover), :has(:focus-visible), [data-open="true"]) .menu-visitor {
   height: 170px;
   min-height: 170px;
 }
@@ -403,7 +403,9 @@ small,
     max-height 440ms,
     opacity 220ms;
 }
-.sidebar:is(:hover, :focus-within, [data-open="true"]) .sidebar-bottom p {
+.sidebar:is(:has(a:hover, button:hover), :has(:focus-visible), [data-open="true"])
+  .sidebar-bottom
+  p {
   max-height: 50px;
   opacity: 1;
   margin-bottom: 5px;
@@ -1921,7 +1923,7 @@ dialog::backdrop {
     display: block;
   }
   .sidebar,
-  .sidebar:is(:hover, :focus-within, [data-open="true"]) {
+  .sidebar:is(:has(a:hover, button:hover), :has(:focus-visible), [data-open="true"]) {
     display: block;
     position: relative;
     width: 100%;
@@ -1981,7 +1983,7 @@ dialog::backdrop {
     padding-bottom: 15px;
   }
   .menu-visitor,
-  .sidebar:is(:hover, :focus-within, [data-open="true"]) .menu-visitor {
+  .sidebar:is(:has(a:hover, button:hover), :has(:focus-visible), [data-open="true"]) .menu-visitor {
     position: absolute;
     right: 8px;
     bottom: 5px;
@@ -2001,7 +2003,9 @@ dialog::backdrop {
     margin-top: 0;
   }
   .sidebar-bottom p,
-  .sidebar:is(:hover, :focus-within, [data-open="true"]) .sidebar-bottom p {
+  .sidebar:is(:has(a:hover, button:hover), :has(:focus-visible), [data-open="true"])
+    .sidebar-bottom
+    p {
     display: none;
   }
   .sidebar-bottom button {

@@ -746,6 +746,9 @@ test("home artwork loads and theme changes leave habitat clocks alone", async ({
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  const sidebar = page.locator(".sidebar");
+  await sidebar.hover({ position: { x: 5, y: 5 } });
+  await expect.poll(() => sidebar.evaluate((node) => node.getBoundingClientRect().width)).toBe(76);
   await expect(page.getByRole("heading", { name: /Big plans/ })).toBeVisible();
   await expect(page.locator(".mini-card")).toHaveCount(6);
   const residents = await page
@@ -759,12 +762,15 @@ test("home artwork loads and theme changes leave habitat clocks alone", async ({
   await expect(card.locator(".preview-copy")).toContainText(
     "See deadlines and club events in one calendar",
   );
-  const widths = await page
-    .locator(".mini-card")
-    .evaluateAll((cards) =>
-      Object.fromEntries(cards.map((card) => [card.getAttribute("data-mini"), card.clientWidth])),
-    );
-  expect(widths.buzzy).toBeGreaterThan(widths.planny);
+  await expect
+    .poll(async () =>
+      card.evaluate(
+        (node) =>
+          node.clientWidth -
+          document.querySelector<HTMLElement>('[data-mini="planny"]')!.clientWidth,
+      ),
+    )
+    .toBeGreaterThan(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("svg")).toHaveCount(0);
   const lights = await page
