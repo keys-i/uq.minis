@@ -169,7 +169,7 @@ jobs:
           from uq_minis.core.art import habitats, poses
           from uq_minis.minis.event.rooms import read
 
-          assert set(tool_names()) == {"agent", "auth", "clubby", "event", "planny", "scrappy", "timey"}
+          assert set(tool_names()) == {"agent", "auth", "buzzy", "clubby", "event", "planny", "scrappy", "timey"}
           assert len(habitats()) == 50
           for name in tool_names():
               result = CliRunner().invoke(app, [name, "--help"])
