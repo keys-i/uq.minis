@@ -150,6 +150,12 @@ def remove(name: str = typer.Argument(autocompletion=complete_mini)) -> None:
 
 
 def list_minis() -> None:
-    """List mini modules"""
-    for path in sorted(_directory().glob("*/__init__.py")):
+    """List source or installed mini modules"""
+    source = ROOT / "src/minis"
+    directory = (
+        source
+        if (ROOT / "pyproject.toml").is_file() and source.is_dir()
+        else Path(__file__).resolve().parents[1] / "minis"
+    )
+    for path in sorted(directory.glob("*/__init__.py")):
         CONSOLE.print(path.parent.name.replace("_", "-"), style="accent", markup=False)

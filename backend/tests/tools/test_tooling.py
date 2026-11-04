@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 from tests import BACKEND
 from tools.scripts import script
 from uq_minis import cli
+from uq_minis.core import mini
 
 
 def test_layout() -> None:
@@ -54,6 +55,13 @@ class TestMini:
     def test_names(self, checkout: Path, args: list[str], runner: CliRunner) -> None:
         assert runner.invoke(cli.app, ["add", *args]).exit_code == 2
         assert not list((checkout / "src/minis").iterdir())
+
+    def test_installed_list(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    ) -> None:
+        monkeypatch.setattr(mini, "ROOT", tmp_path)
+        result = runner.invoke(cli.app, ["list"])
+        assert result.exit_code == 0 and "timey" in result.output
 
 
 class TestDev:
