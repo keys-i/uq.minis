@@ -168,7 +168,8 @@ def test_public_oauth_flow(monkeypatch: pytest.MonkeyPatch) -> None:
         assert "YouTube connected" in callback.text
         assert flow.response == ORIGIN + connection.CALLBACK + f"?state={STATE}&code=one-use"
         assert client.get("/api/timey/youtube").json()["connected"] is True
-        assert connection.TOKEN.stat().st_mode & 0o077 == 0
+        if os.name == "posix":
+            assert connection.TOKEN.stat().st_mode & 0o077 == 0
         replay = client.get(connection.CALLBACK + f"?state={STATE}&code=replay")
         assert replay.status_code == 400
         metrics = client.get("/internal/metrics").text
