@@ -355,9 +355,7 @@ def test_scroll(canvas: Canvas, keys: Keys, width: int) -> None:
     assert ask("Name", choices={"first": label, "second": "Short label"}) == "first"
     selected = {row[row.index("ABC") :] for frame in frames for row in frame if "ABC" in row}
     assert len(selected) > 1
-    assert any(
-        "KLMNOPQRSTUVWXYZ" in row and "ABC" not in row for frame in frames for row in frame
-    )
+    assert any("KLMNOPQRSTUVWXYZ" in row and "ABC" not in row for frame in frames for row in frame)
 
 
 @pytest.mark.parametrize("name", list(art.habitats()))
