@@ -18,5 +18,12 @@
     { "pattern": "uni.keysi.dev/download", "zone_name": "keysi.dev" },
     { "pattern": "uni.keysi.dev/download/*", "zone_name": "keysi.dev" },
     { "pattern": "uni.keysi.dev/calendar.ics", "zone_name": "keysi.dev" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "uq-minis",
+      "database_id": "eafd1ad0-bcbd-4c25-8430-408de77799ee"
+    }
   ]
 }
