@@ -147,10 +147,15 @@ def keys(pipe: PipeInput):
     timers: list[Timer] = []
 
     def send(*texts: str, interval: float = 0.1) -> None:
-        for index, text in enumerate(texts):
-            timer = Timer(0.05 + index * interval, pipe.send_text, args=(text,))
-            timers.append(timer)
-            timer.start()
+        def write() -> None:
+            for index, text in enumerate(texts):
+                if index:
+                    time.sleep(interval)
+                pipe.send_text(text)
+
+        timer = Timer(0.05, write)
+        timers.append(timer)
+        timer.start()
 
     yield send
     for timer in timers:
