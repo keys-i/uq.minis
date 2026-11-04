@@ -54,10 +54,11 @@ async function minis(request: Request, environment: Environment, url: URL): Prom
     return secured(new Response("Method not allowed", { status: 405 }), true);
 
   const pathname = url.pathname.slice("/mini".length) || "/";
-  let response = await environment.ASSETS.fetch(assetRequest(request, pathname));
   const name = pathname.split("/").pop() || "";
-  if (response.status === 404 && !name.includes(".")) {
-    response = await environment.ASSETS.fetch(assetRequest(request, "/index.html"));
+  let response = await environment.ASSETS.fetch(
+    assetRequest(request, name.includes(".") ? pathname : "/index.html"),
+  );
+  if (!name.includes(".")) {
     const headers = new Headers(response.headers);
     headers.set("Cache-Control", "no-cache");
     response = new Response(response.body, {
