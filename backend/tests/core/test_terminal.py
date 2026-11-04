@@ -136,7 +136,7 @@ def test_predictions(canvas: Canvas, keys: Keys, replace: bool) -> None:
 
 
 @pytest.mark.parametrize("fails", [False, True], ids=["sample", "recoverable-error"])
-def test_samples(canvas: Canvas, keys: Keys, fails: bool) -> None:
+def test_samples(canvas: Canvas, keys: Keys, pipe: PipeInput, fails: bool) -> None:
     expected = "Sample unavailable" if fails else "Second font sample"
     frames = canvas(140, 34, reply=(expected, "\n"))
     closed: list[str] = []
@@ -144,6 +144,7 @@ def test_samples(canvas: Canvas, keys: Keys, fails: bool) -> None:
     async def provider(key: str) -> art.Preview:
         if key == "first":
             try:
+                pipe.send_text("\x15second")
                 await asyncio.sleep(10)
             finally:
                 closed.append(key)
@@ -151,7 +152,7 @@ def test_samples(canvas: Canvas, keys: Keys, fails: bool) -> None:
             raise MiniError("Font is offline")
         return art.Preview(Text("Second font sample"), "Second font sample")
 
-    keys("first", "\x15second", interval=0.75)
+    keys("first")
     assert (
         ask("Font", suggestions={"first": "First", "second": "Second"}, previewer=provider)
         == "second"
