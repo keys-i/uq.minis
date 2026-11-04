@@ -238,6 +238,7 @@ The interior stays free for placement anywhere; Alt/Option bypasses snapping at 
 The floating toolbar slips away when idle; video playback controls appear over the footage on hover or keyboard focus
 Arrow keys nudge the selected timer, Shift makes larger steps, Home centres it and +/− change its size
 Built-in YouTube search uses the same five-result search as the CLI; Timey downloads and caches ten seconds from zero or your chosen timestamp, then plays the local clip
+Public YouTube searches and predictions reuse Unicode-equivalent queries for five minutes in a process-local 128-entry, 256 KiB cache; signed-in provider searches bypass it, and raw queries, OAuth values, uploads and publication details are never cache keys or telemetry fields
 Appearance changes reuse that backdrop, and shared controls keep live previews and exports on the same settings
 The player uses central play/pause and ten-second skips, a slim buffered timeline and a volume control, and lets you start the backdrop at the current frame
 Local uploads stream into the existing media cache with a 512 MiB per-file limit and a 16-megapixel image limit; a blank preview shows no timer controls
@@ -307,6 +308,8 @@ Advanced questions cover category, language, licence, embedding, subscriber noti
 
 For the first upload, enable YouTube Data API v3 in your Google Cloud project, configure its OAuth consent screen and create an OAuth client of type **Desktop app**. Download its JSON to `.config/timey/client_secret.json`, or pass `--client-secrets /path/to/client.json`. Add your account as a test user if the consent screen is in testing mode. [Google's OAuth setup](https://developers.google.com/youtube/v3/guides/auth/installed-apps) explains the steps. The browser is used for Google sign-in; subsequent uploads reuse an owner-only token in `.config/timey/youtube.json`
 
+The hosted browser uses the same YouTube upload service with a Google **Web application** client. Register `https://uni.keysi.dev/api/timey/youtube/callback` as its exact redirect URI, publish the consent-screen branding and complete Google's verification for `youtube.upload` before opening it to the public. Store the downloaded Web client JSON at `/etc/minis/google-oauth.json` with mode `0400` or `0600`; systemd passes it to each isolated workspace as a credential. Google tokens remain in that workspace's private `.config/timey/youtube.json` and are removed by Disconnect
+
 ```sh
 # Upload a saved timer later, using its details draft
 uv run --extra timey mini timey out/timey/temple.mp4 --upload-only
@@ -349,6 +352,8 @@ Browser checks use local pages with external requests blocked, and video checks 
 Optional checks are reported as skipped when their dependencies are missing
 
 `dev check` also runs strict basedpyright over source, tools, tests and the artwork generator in an isolated environment, keeping the editable checkout available for interactive use
+
+Hosted edge and private-workspace processes emit correlated JSON request logs with method, route, status and duration but no query string or form body. The operator-only `/internal/metrics` route reports label-free HTTP, semantic-cache and YouTube OAuth counters; cross-host access remains limited to the optional authenticated [mTLS profile](deploy/mtls/README.md)
 
 Coverage measures lines and branches, including greenlets, worker processes and CLI subprocesses. CI runs all extras, Chromium and FFmpeg on Linux, Windows and macOS, with an 85% minimum on Linux. Test results and HTML coverage are kept for seven days, including failed runs
 

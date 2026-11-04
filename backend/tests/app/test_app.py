@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from time import monotonic
 from typing import Any, cast
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 from xml.etree.ElementTree import fromstring
 
 import httpx
@@ -129,25 +129,50 @@ def test_browser_youtube_search_reuses_cli_search(
     monkeypatch.setattr(timey, "search", search)
     result = browser.get("/api/timey/search", params={"query": "forest"})
     assert result.status_code == 200 and result.json()["rows"] == rows
-    search.assert_called_once_with("forest", cookies=tmp_path / "google-cookies.txt")
+    repeated = browser.get("/api/timey/search", params={"query": " FOREST "})
+    assert repeated.status_code == 200 and repeated.json()["rows"] == rows
+    assert search.call_count == 2
+    search.assert_called_with(" FOREST ", cookies=tmp_path / "google-cookies.txt")
 
 
-def test_youtube_actions_require_google_without_locking_local_timey(
+def test_youtube_search_uses_public_access_without_locking_local_timey(
     browser: httpx.Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from uq_minis.minis.timey import connect
 
     monkeypatch.setattr(connect, "cookiefile", lambda: None)
-    search = Mock(side_effect=AssertionError("Search must stop before contacting YouTube"))
+    search = Mock(return_value=[])
     monkeypatch.setattr(timey, "search", search)
     result = browser.get("/api/timey/search", params={"query": "forest"})
-    assert result.status_code == 400 and "Connect Google" in result.text
-    assert (
-        browser.post("/api/timey/clip", data={"source": "https://youtu.be/abcdefghijk"}).status_code
-        == 400
-    )
-    search.assert_not_called()
+    assert result.status_code == 200 and result.json() == {"rows": []}
+    search.assert_called_once_with("forest", cookies=None)
     assert browser.post("/api/timey/preview", data={"style": "minimal"}).status_code == 200
+
+
+def test_public_youtube_lookups_cache_equivalent_queries(
+    browser: httpx.Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from uq_minis.minis.timey import connect
+
+    monkeypatch.setattr(connect, "cookiefile", lambda: None)
+    search = Mock(return_value=[{"title": "Public", "length": "1:00", "url": "video"}])
+    suggest = AsyncMock(return_value=["public suggestion"])
+    monkeypatch.setattr(timey, "search", search)
+    monkeypatch.setattr(timey, "suggest", suggest)
+    first = browser.get("/api/timey/search", params={"query": "  Ｆｏｒｅｓｔ   Sounds  "})
+    second = browser.get("/api/timey/search", params={"query": "forest sounds"})
+    assert first.json() == second.json()
+    search.assert_called_once_with("  Ｆｏｒｅｓｔ   Sounds  ", cookies=None)
+    assert browser.get("/api/timey/suggest", params={"query": "  Ｆｏｒｅｓｔ  "}).json() == {
+        "suggestions": ["public suggestion"]
+    }
+    assert browser.get("/api/timey/suggest", params={"query": "forest"}).json() == {
+        "suggestions": ["public suggestion"]
+    }
+    suggest.assert_awaited_once_with("  Ｆｏｒｅｓｔ  ")
+    metrics = browser.get("/internal/metrics").text
+    assert "uq_minis_semantic_cache_hits_total 2" in metrics
+    assert "uq_minis_semantic_cache_misses_total 2" in metrics
 
 
 def test_browser_font_search_reuses_the_cli_shelf(

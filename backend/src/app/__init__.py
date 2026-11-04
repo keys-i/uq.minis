@@ -14,6 +14,7 @@ import secrets
 import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from threading import Lock
 from time import monotonic
 from typing import Any
 
@@ -25,6 +26,7 @@ from uq_minis.app import session
 from uq_minis.app.art import router as art
 from uq_minis.app.core import TOOLS, Workspace
 from uq_minis.core.art import RESIDENTS
+from uq_minis.core.cache import SemanticCache
 from uq_minis.core.common import MiniError
 
 REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{8,64}")
@@ -37,6 +39,24 @@ CSP = (
     "connect-src 'self' wss://uni.keysi.dev; object-src 'none'; frame-src 'none'; "
     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 )
+
+
+def metric(app: FastAPI, name: str, amount: int | float = 1) -> None:
+    """Update one fixed process metric without racing synchronous routes"""
+    with app.state.metrics_lock:
+        app.state.http_metrics[name] += amount
+
+
+def telemetry(app: FastAPI, name: str) -> None:
+    """Emit one data-free lifecycle event only from hosted processes"""
+    if app.state.telemetry_enabled:
+        print(json.dumps({"event": name}, separators=(",", ":")), file=sys.stdout, flush=True)
+
+
+def _route(request: Request) -> str:
+    """Describe the matched endpoint without logging dynamic path values"""
+    path = getattr(request.scope.get("route"), "path", "")
+    return path if isinstance(path, str) and path.startswith("/") else "/unmatched"
 
 
 def create(
@@ -79,11 +99,18 @@ def create(
     app = FastAPI(title="UQ minis", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.workspace = context
     app.state.identity = session.Identity(origin=origin, delegate=delegate)
+    app.state.metrics_lock = Lock()
+    app.state.semantic_cache = SemanticCache()
+    app.state.telemetry_enabled = bool(origin or delegate)
     app.state.http_metrics = {
         "requests": 0,
         "errors": 0,
         "in_flight": 0,
         "duration_ms": 0.0,
+        "oauth_starts": 0,
+        "oauth_completions": 0,
+        "oauth_failures": 0,
+        "oauth_cancellations": 0,
     }
     from uq_minis.app.weather import install as weather
 
@@ -129,12 +156,23 @@ def create(
     @app.get("/internal/metrics", include_in_schema=False)
     def metrics() -> PlainTextResponse:
         """Expose label-free process metrics only through the private Unix socket"""
-        values = app.state.http_metrics
+        with app.state.metrics_lock:
+            values = dict(app.state.http_metrics)
+        cached = app.state.semantic_cache.stats()
         lines = (
             f"uq_minis_http_requests_total {values['requests']}",
             f"uq_minis_http_errors_total {values['errors']}",
             f"uq_minis_http_in_flight {values['in_flight']}",
             f"uq_minis_http_duration_milliseconds_total {values['duration_ms']:.3f}",
+            f"uq_minis_semantic_cache_hits_total {cached['hits']}",
+            f"uq_minis_semantic_cache_misses_total {cached['misses']}",
+            f"uq_minis_semantic_cache_evictions_total {cached['evictions']}",
+            f"uq_minis_semantic_cache_entries {cached['entries']}",
+            f"uq_minis_semantic_cache_bytes {cached['bytes']}",
+            f"uq_minis_youtube_oauth_starts_total {values['oauth_starts']}",
+            f"uq_minis_youtube_oauth_completions_total {values['oauth_completions']}",
+            f"uq_minis_youtube_oauth_failures_total {values['oauth_failures']}",
+            f"uq_minis_youtube_oauth_cancellations_total {values['oauth_cancellations']}",
         )
         return PlainTextResponse(
             "\n".join(lines) + "\n",
@@ -164,17 +202,21 @@ def create(
 
             allowed = {urlsplit(origin).netloc}
             origins = {origin}
-        if (
-            request.headers.get("host") not in allowed
-            or request.headers.get("sec-fetch-site") == "cross-site"
+        provider_return = (
+            request.method == "GET" and request.url.path == "/api/timey/youtube/callback"
+        )
+        if request.headers.get("host") not in allowed or (
+            request.headers.get("sec-fetch-site") == "cross-site" and not provider_return
         ):
             return JSONResponse(
-                {"error": "Use the local minis address shown in the terminal"}, status_code=400
+                {"error": "Use the local minis address shown in the terminal"},
+                status_code=400,
             )
         if request.method not in {"GET", "HEAD"}:
             if request.headers.get("origin") not in origins:
                 return JSONResponse(
-                    {"error": "Open minis locally before changing data"}, status_code=400
+                    {"error": "Open minis locally before changing data"},
+                    status_code=400,
                 )
             try:
                 length = int(request.headers.get("content-length", "0"))
@@ -259,8 +301,9 @@ def create(
         supplied = request.headers.get("x-request-id", "")
         request_id = supplied if REQUEST_ID.fullmatch(supplied) else secrets.token_hex(16)
         values = app.state.http_metrics
-        values["requests"] += 1
-        values["in_flight"] += 1
+        with app.state.metrics_lock:
+            values["requests"] += 1
+            values["in_flight"] += 1
         started = monotonic()
         status = 500
         try:
@@ -281,18 +324,19 @@ def create(
             return response
         finally:
             duration = (monotonic() - started) * 1000
-            values["in_flight"] -= 1
-            values["duration_ms"] += duration
-            if status >= 500:
-                values["errors"] += 1
-            if origin:
+            with app.state.metrics_lock:
+                values["in_flight"] -= 1
+                values["duration_ms"] += duration
+                if status >= 500:
+                    values["errors"] += 1
+            if app.state.telemetry_enabled:
                 print(
                     json.dumps(
                         {
                             "event": "http_request",
                             "request_id": request_id,
                             "method": request.method,
-                            "path": request.url.path,
+                            "path": _route(request),
                             "status": status,
                             "duration_ms": round(duration, 3),
                         },

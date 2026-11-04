@@ -49,16 +49,22 @@ def test_hosted_observability_is_bounded_and_private(capsys: pytest.CaptureFixtu
         assert health.headers["Cross-Origin-Opener-Policy"] == "same-origin-allow-popups"
         correlated = client.get("/api/health", headers={"X-Request-ID": "request-1234"})
         assert correlated.headers["X-Request-ID"] == "request-1234"
+        assert client.get("/download/do-not-log-this-key").status_code == 401
         metrics = client.get("/internal/metrics")
         assert metrics.headers["Cache-Control"] == "no-store"
-        assert "uq_minis_http_requests_total 3" in metrics.text
+        assert "uq_minis_http_requests_total 4" in metrics.text
+        assert "uq_minis_semantic_cache_hits_total 0" in metrics.text
+        assert "uq_minis_youtube_oauth_failures_total 0" in metrics.text
         assert "request_id" not in metrics.text and "path=" not in metrics.text
+    output = capsys.readouterr().out
     events = [
         json.loads(line)
-        for line in capsys.readouterr().out.splitlines()
+        for line in output.splitlines()
         if line.startswith('{"event":"http_request"')
     ]
     assert events
+    assert any(event["path"] == "/download/{key}" for event in events)
+    assert "do-not-log-this-key" not in output
     assert set(events[-1]) == {
         "event",
         "request_id",

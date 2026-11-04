@@ -10,6 +10,7 @@ import json
 import math
 import re
 import shutil
+import unicodedata
 from collections.abc import AsyncIterable
 from dataclasses import replace
 from io import BytesIO
@@ -51,11 +52,49 @@ def _youtube(source: str) -> bool:
         return False
 
 
-def _google() -> Path:
-    """Require the private Google session shared by Timey's YouTube operations"""
+def _google() -> Path | None:
+    """Use an optional private provider session when one already exists"""
     from uq_minis.minis.timey import connect
 
-    return connect.require()
+    return connect.cookiefile()
+
+
+def _query(value: str) -> str:
+    """Canonicalise equivalent public searches without retaining their text"""
+    return " ".join(unicodedata.normalize("NFKC", value).split()).casefold()
+
+
+def _search(request: Request, query: str) -> list[dict[str, Any]]:
+    """Cache only public YouTube results, never a connected provider session"""
+    from uq_minis.minis import timey
+
+    cookies = _google()
+    if cookies is not None:
+        return timey.search(query, cookies=cookies)
+    meaning = _query(query)
+    cached = request.app.state.semantic_cache.get("timey-search-v1", meaning)
+    if isinstance(cached, list):
+        rows = cast(list[object], cached)
+        if all(isinstance(row, dict) for row in rows):
+            return cast(list[dict[str, Any]], rows)
+    rows = timey.search(query, cookies=None)
+    request.app.state.semantic_cache.put("timey-search-v1", meaning, rows)
+    return rows
+
+
+async def _suggest(request: Request, query: str) -> list[str]:
+    """Cache exact-equivalent public predictions for a short process lifetime"""
+    from uq_minis.minis import timey
+
+    meaning = _query(query)
+    cached = request.app.state.semantic_cache.get("timey-suggest-v1", meaning)
+    if isinstance(cached, list):
+        values = cast(list[object], cached)
+        if all(isinstance(value, str) for value in values):
+            return cast(list[str], values)
+    values = await timey.suggest(query)
+    request.app.state.semantic_cache.put("timey-suggest-v1", meaning, values)
+    return values
 
 
 def _source(form: FormData, context: Workspace, field: str = "source") -> str:
@@ -330,7 +369,7 @@ def _process(request: Request, form: FormData, context: Workspace) -> dict[str, 
     if action not in {"search", "preview", "sample", "render", "upload"}:
         raise MiniError("Choose a listed timer action")
     if action == "search":
-        rows = timey.search(value(form, "query"), cookies=_google())
+        rows = _search(request, value(form, "query"))
         return _show(
             request,
             rows=rows,
@@ -572,21 +611,18 @@ async def publish(request: Request) -> dict[str, Any]:
 
 
 @router.get("/api/timey/search")
-def search(query: str) -> dict[str, Any]:
+def search(request: Request, query: str) -> dict[str, Any]:
     """Use the same bounded five-result YouTube search as the terminal"""
-    from uq_minis.minis import timey
-
-    return {"rows": timey.search(query, cookies=_google())}
+    return {"rows": _search(request, query)}
 
 
 @router.get("/api/timey/suggest")
 async def suggestions(
+    request: Request,
     query: str = Query(default="", max_length=200),
 ) -> dict[str, list[str]]:
     """Offer quick predictions through the same bounded lookup as the CLI"""
-    from uq_minis.minis import timey
-
-    return {"suggestions": await timey.suggest(query)}
+    return {"suggestions": await _suggest(request, query)}
 
 
 @router.get("/api/timey/fonts")

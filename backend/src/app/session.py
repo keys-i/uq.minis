@@ -43,6 +43,8 @@ OUTBOUND = PROTECTED | {
     "/api/timey/search",
     "/api/timey/clip",
     "/api/timey/source",
+    "/api/timey/youtube/start",
+    "/api/timey/youtube/callback",
     "/api/course",
     "/api/profile",
     "/api/catalogues",

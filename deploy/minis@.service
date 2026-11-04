@@ -12,6 +12,7 @@ WorkingDirectory=/var/lib/uq-minis/%i
 StateDirectory=uq-minis/%i
 StateDirectoryMode=0700
 LoadCredential=identity:/var/lib/minis/workspaces/%i.json
+LoadCredential=google-oauth:/etc/minis/google-oauth.json
 Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/minis/browsers
 ExecStart=/opt/minis/current/.venv/bin/minis-web
 UMask=0077

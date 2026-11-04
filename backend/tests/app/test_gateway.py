@@ -82,6 +82,12 @@ def test_guest(tmp_path: Path) -> None:
         for path in ("/api/plan", "/api/minis/scrappy", "/api/minis/clubby"):
             assert client.get(path, headers=headers).status_code == 200
             assert pool.forward.call_args.args[0] == owner
+        callback = client.get(
+            "/api/timey/youtube/callback?state=provider&code=one-use",
+            headers={"Sec-Fetch-Site": "cross-site"},
+        )
+        assert callback.status_code == 200
+        assert pool.forward.call_args.args[0] == owner
         assert client.get("/api/minis/event", headers=headers).status_code == 401
         app.state.identity.sessions["uq"] = (monotonic() + 60, "a@uq.edu.au")
         client.cookies.set(session.HOST_COOKIE, "uq")
@@ -194,6 +200,7 @@ def test_proxy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
             def receive(request: httpx.Request) -> httpx.Response:
                 assert request.headers["cookie"] == "minis_session=" + tenant.secret
                 assert request.headers["origin"] == "http://127.0.0.1:8765"
+                assert request.headers["x-minis-origin"] == "https://uni.keysi.dev"
                 assert "authorization" not in request.headers
                 return httpx.Response(
                     400, json={"error": "real failure"}, headers={"Set-Cookie": "bad=1"}
@@ -210,6 +217,7 @@ def test_proxy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
             "headers": [
                 (b"cookie", b"minis_session=browser"),
                 (b"authorization", b"Bearer browser"),
+                (b"x-minis-origin", b"https://evil.test"),
             ],
         })
         result = await pool.forward("a@uq.edu.au", request, b"{}")

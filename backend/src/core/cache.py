@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from errno import EACCES, EAGAIN, EDEADLK
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Lock
 from typing import Any
 
 from uq_minis.core.common import MiniError, atomic_json
@@ -26,6 +27,9 @@ ENTRIES = 32
 NAME = re.compile(r"[a-f0-9]{16}-[a-f0-9]{16}")
 SNAPSHOT = 4 * 1024**2
 AGE = 7 * 24 * 60 * 60
+SEMANTIC_AGE = 5 * 60
+SEMANTIC_ENTRIES = 128
+SEMANTIC_LIMIT = 256 * 1024
 
 
 def identity(namespace: str, semantic: Any) -> str:
@@ -43,6 +47,87 @@ def identity(namespace: str, semantic: Any) -> str:
     except (TypeError, ValueError) as exc:
         raise MiniError("Cache identity needs JSON-compatible values") from exc
     return hashlib.sha256(namespace.encode() + b"\0" + payload).hexdigest()[:16]
+
+
+class SemanticCache:
+    """Keep small public lookup results in memory by their canonical meaning"""
+
+    def __init__(self) -> None:
+        """Start with no cached results or process counters"""
+        self.values: dict[str, tuple[float, bytes]] = {}
+        self.bytes = 0
+        self.hits = 0
+        self.misses = 0
+        self.evictions = 0
+        self.lock = Lock()
+
+    def get(self, namespace: str, semantic: Any) -> Any | None:
+        """Return an unshared JSON value while expiring stale or corrupt entries"""
+        key = identity(namespace, semantic)
+        with self.lock:
+            found = self.values.pop(key, None)
+            if found is None:
+                self.misses += 1
+                return None
+            expires, payload = found
+            if expires <= time.monotonic():
+                self.bytes -= len(payload)
+                self.misses += 1
+                self.evictions += 1
+                return None
+            try:
+                value = json.loads(payload)
+            except TypeError, ValueError:
+                self.bytes -= len(payload)
+                self.misses += 1
+                self.evictions += 1
+                return None
+            self.values[key] = found
+            self.hits += 1
+            return value
+
+    def put(self, namespace: str, semantic: Any, value: Any) -> None:
+        """Store one bounded JSON result and evict expired or least-recent entries"""
+        payload = json.dumps(
+            value,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+        if len(payload) > SEMANTIC_LIMIT:
+            return
+        key = identity(namespace, semantic)
+        now = time.monotonic()
+        with self.lock:
+            previous = self.values.pop(key, None)
+            if previous is not None:
+                self.bytes -= len(previous[1])
+            for stale, (expires, cached) in list(self.values.items()):
+                if expires <= now:
+                    del self.values[stale]
+                    self.bytes -= len(cached)
+                    self.evictions += 1
+            while self.values and (
+                len(self.values) >= SEMANTIC_ENTRIES or self.bytes + len(payload) > SEMANTIC_LIMIT
+            ):
+                oldest = next(iter(self.values))
+                _, cached = self.values.pop(oldest)
+                self.bytes -= len(cached)
+                self.evictions += 1
+            self.values[key] = (now + SEMANTIC_AGE, payload)
+            self.bytes += len(payload)
+
+    def stats(self) -> dict[str, int]:
+        """Snapshot low-cardinality counters and current resource use"""
+        with self.lock:
+            return {
+                "hits": self.hits,
+                "misses": self.misses,
+                "evictions": self.evictions,
+                "entries": len(self.values),
+                "bytes": self.bytes,
+            }
 
 
 @contextmanager

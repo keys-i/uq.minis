@@ -74,6 +74,52 @@ class TestCache:
         with pytest.raises(MiniError):
             cache.identity(namespace, semantic)
 
+    def test_semantic_cache_copies_hits_and_hides_meaning(self) -> None:
+        semantic = cache.SemanticCache()
+        semantic.put("timey-search-v1", "private search words", {"rows": ["public"]})
+        first = semantic.get("timey-search-v1", "private search words")
+        assert first == {"rows": ["public"]}
+        cast(dict[str, list[str]], first)["rows"].append("changed")
+        assert semantic.get("timey-search-v1", "private search words") == {"rows": ["public"]}
+        assert "private search words" not in repr(semantic.values)
+        assert semantic.stats()["hits"] == 2
+
+    def test_semantic_cache_expires_and_evicts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        semantic = cache.SemanticCache()
+        monkeypatch.setattr(cache, "SEMANTIC_ENTRIES", 2)
+        semantic.put("lookup-v1", "first", [1])
+        semantic.put("lookup-v1", "second", [2])
+        semantic.put("lookup-v1", "third", [3])
+        assert semantic.get("lookup-v1", "first") is None
+        assert semantic.get("lookup-v1", "second") == [2]
+        monkeypatch.setattr(cache, "SEMANTIC_AGE", -1)
+        semantic.put("lookup-v1", "expired", [4])
+        assert semantic.get("lookup-v1", "expired") is None
+        assert semantic.stats() == {
+            "hits": 1,
+            "misses": 2,
+            "evictions": 3,
+            "entries": 1,
+            "bytes": 3,
+        }
+
+    def test_semantic_cache_bounds_bytes_and_ignores_corruption(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        semantic = cache.SemanticCache()
+        monkeypatch.setattr(cache, "SEMANTIC_LIMIT", 3)
+        semantic.put("lookup-v1", "first", [1])
+        semantic.put("lookup-v1", "second", [2])
+        semantic.put("lookup-v1", "too-large", [123])
+        assert semantic.get("lookup-v1", "first") is None
+        assert semantic.get("lookup-v1", "second") == [2]
+        assert semantic.get("lookup-v1", "too-large") is None
+        key = cache.identity("lookup-v1", "broken")
+        semantic.values[key] = (float("inf"), b"{")
+        semantic.bytes += 1
+        assert semantic.get("lookup-v1", "broken") is None
+        assert semantic.stats()["bytes"] == 3
+
     @pytest.mark.parametrize("state", ["fresh", "stale", "missing", "large", "symlink"])
     def test_snapshot(self, tmp_path: Path, state: str) -> None:
         path = tmp_path / "snapshot.json"

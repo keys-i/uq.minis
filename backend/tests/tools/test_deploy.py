@@ -125,8 +125,11 @@ def test_activation(tmp_path: Path, healthy: bool, delay: int) -> None:
     )
     for path in (state, root, units, binaries, configs, share):
         path.mkdir()
-    for name in ("caddy", "cloudflared", "tmpfiles"):
+    for name in ("caddy", "cloudflared", "minis", "tmpfiles"):
         (configs / name).mkdir()
+    oauth = configs / "minis/google-oauth.json"
+    oauth.write_text("{}")
+    oauth.chmod(0o600)
     (state / "private").write_text("preserve this")
     previous = root / "old"
     previous.mkdir()
@@ -146,6 +149,7 @@ def test_activation(tmp_path: Path, healthy: bool, delay: int) -> None:
         "systemd-tmpfiles": "exit 0",
         "usermod": "exit 0",
         "sleep": "exit 0",
+        "stat": "printf 600",
         "systemctl": '[ "$1" = is-active ] && [ "$3" = soc-minis.service ] && exit 3\nexit 0',
         "curl": f"""attempts=0
 [ ! -f {checks} ] || read -r attempts < {checks}
@@ -171,6 +175,7 @@ exit 1""",
         ("/etc/polkit-1/rules.d", units),
         ("/etc/caddy", configs / "caddy"),
         ("/etc/cloudflared", configs / "cloudflared"),
+        ("/etc/minis", configs / "minis"),
         ("/etc/tmpfiles.d", configs / "tmpfiles"),
         ("/usr/local/share/minis", share),
         ("/tmp/minis.", tmp_path / "stage."),
@@ -220,6 +225,10 @@ def test_private_router_contracts() -> None:
     assert "token-file" not in tunnel
     assert "ListenStream=/run/minis-edge/uq.sock" in gateway
     assert "SocketMode=0660" in gateway and "SocketGroup=minis-edge" in gateway
+    assert (
+        "LoadCredential=google-oauth:/etc/minis/google-oauth.json"
+        in (ROOT / "deploy/minis@.service").read_text()
+    )
     installer = (ROOT / "deploy/install.sh").read_text()
     assert "--unix-socket /run/soc-minis/app.sock" in installer
     assert "http://localhost/soc/api/health/ready" in installer

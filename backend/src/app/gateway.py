@@ -46,7 +46,9 @@ HOP = {
     "set-cookie",
     "content-length",
     "content-encoding",
+    "x-minis-origin",
 }
+PUBLIC_ORIGIN = "https://uni.keysi.dev"
 
 
 @dataclass
@@ -198,6 +200,7 @@ class Workspaces:
                 "cookie": f"{session.COOKIE}={tenant.secret}",
                 "origin": "http://127.0.0.1:8765",
                 "accept-encoding": "identity",
+                "x-minis-origin": PUBLIC_ORIGIN,
             })
             async with tenant.client.stream(
                 request.method,
@@ -252,7 +255,12 @@ def install(app: FastAPI) -> None:
                 },
                 status_code=401,
             )
-        if path != "backup" and request.headers.get("x-minis-account") != owner:
+        provider_return = path == "timey/youtube/callback" and request.method == "GET"
+        if (
+            path != "backup"
+            and not provider_return
+            and request.headers.get("x-minis-account") != owner
+        ):
             return JSONResponse(
                 {"error": "Your account changed; reload this tab before continuing"},
                 status_code=409,
@@ -270,7 +278,8 @@ def install(app: FastAPI) -> None:
                 or (job.account != owner and request.headers.get("x-minis-user") != user)
             ):
                 return JSONResponse(
-                    {"error": "This task is unavailable; return to your workspace"}, status_code=404
+                    {"error": "This task is unavailable; return to your workspace"},
+                    status_code=404,
                 )
             if request.method == "DELETE":
                 job.task.cancel()
@@ -282,7 +291,9 @@ def install(app: FastAPI) -> None:
             if job.task.done():
                 return job.task.result()
             return JSONResponse(
-                {}, status_code=202, headers={"Location": f"/api/jobs/{key}", "Retry-After": "0"}
+                {},
+                status_code=202,
+                headers={"Location": f"/api/jobs/{key}", "Retry-After": "0"},
             )
         if path == "calendar":
             record = pool.root / "calendar.json"
@@ -313,7 +324,8 @@ def install(app: FastAPI) -> None:
             incoming.extend(chunk)
             if len(incoming) > 8 * 1024**2:
                 return JSONResponse(
-                    {"error": "Use the file picker to upload large files in parts"}, status_code=413
+                    {"error": "Use the file picker to upload large files in parts"},
+                    status_code=413,
                 )
         body = bytes(incoming)
 
@@ -342,7 +354,9 @@ def install(app: FastAPI) -> None:
         key = secrets.token_urlsafe(24)
         pool.jobs[key] = Job(account, task)
         return JSONResponse(
-            {}, status_code=202, headers={"Location": f"/api/jobs/{key}", "Retry-After": "0"}
+            {},
+            status_code=202,
+            headers={"Location": f"/api/jobs/{key}", "Retry-After": "0"},
         )
 
     @app.api_route("/download/{key}", methods=["GET", "HEAD"])
@@ -364,7 +378,10 @@ def install(app: FastAPI) -> None:
         lease = pool.lease(account)
         tenant = await lease.__aenter__()
         try:
-            headers = {"cookie": f"{session.COOKIE}={tenant.secret}", "accept-encoding": "identity"}
+            headers = {
+                "cookie": f"{session.COOKIE}={tenant.secret}",
+                "accept-encoding": "identity",
+            }
             if selected := request.headers.get("range"):
                 headers["range"] = selected
             upstream = tenant.client.build_request(

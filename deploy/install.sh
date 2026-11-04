@@ -15,6 +15,15 @@ command -v curl >/dev/null
 command -v caddy >/dev/null
 command -v cloudflared >/dev/null
 command -v systemd-tmpfiles >/dev/null
+command -v stat >/dev/null
+if [ ! -f /etc/minis/google-oauth.json ] || [ -L /etc/minis/google-oauth.json ]; then
+    printf 'Provision /etc/minis/google-oauth.json as a Google Web OAuth client before deploying\n' >&2
+    exit 1
+fi
+case "$(stat -c %a /etc/minis/google-oauth.json)" in
+    400|600) ;;
+    *) printf 'Set /etc/minis/google-oauth.json permissions to 0400 or 0600\n' >&2; exit 1 ;;
+esac
 install -d -m 755 /opt/minis/releases
 exec 9>/opt/minis/deploy.lock
 flock -n 9
