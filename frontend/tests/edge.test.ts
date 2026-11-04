@@ -1,35 +1,62 @@
+import assert from "node:assert/strict";
 import { expect, test, vi } from "vitest";
-import edge from "../../deploy/edge.ts";
+import worker from "../../deploy/edge.ts";
 
-test("the Minis edge preserves paths, queries and request bodies while leaving Pages alone", async () => {
-  const sent: Request[] = [];
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (request) => {
-    sent.push(request as Request);
-    return new Response("ok");
+function assets() {
+  return {
+    fetch: vi.fn(async (request: Request) => {
+      const pathname = new URL(request.url).pathname;
+      if (pathname === "/index.html")
+        return new Response("<main>UQ Minis</main>", {
+          headers: { "Content-Type": "text/html", ETag: "release" },
+        });
+      if (pathname === "/assets/app.js")
+        return new Response("export {}", {
+          headers: { "Cache-Control": "public, max-age=31536000" },
+        });
+      return new Response("missing", { status: 404 });
+    }),
+  };
+}
+
+test("the UQ Worker serves scoped assets and deep links without an origin server", async () => {
+  const binding = assets();
+  const deepLink = await worker.fetch(new Request("https://uni.keysi.dev/mini/planny"), {
+    ASSETS: binding,
   });
-  for (const path of [
-    "/mini",
-    "/mini/assets/app.js",
-    "/api/plan",
-    "/download/opaque",
-    "/calendar.ics",
-    "/soc/eventy",
-  ]) {
-    const request = new Request(`https://uni.keysi.dev${path}?key=opaque`, {
-      method: "POST",
-      body: "data",
-      headers: { Origin: "https://uni.keysi.dev" },
-    });
-    expect((await edge.fetch(request)).status).toBe(200);
-    const proxied = sent.at(-1)!;
-    expect(new URL(proxied.url).hostname).toBe("minis-origin.keysi.dev");
-    expect(new URL(proxied.url).pathname).toBe(path);
-    expect(new URL(proxied.url).search).toBe("?key=opaque");
-    expect(proxied.headers.get("Origin")).toBe("https://uni.keysi.dev");
-    expect(await proxied.text()).toBe("data");
-  }
-  const page = new Request("https://uni.keysi.dev/notes");
-  await edge.fetch(page);
-  expect(sent.at(-1)).toBe(page);
-  expect((await edge.fetch(new Request("https://other.test/mini"))).status).toBe(404);
+  assert.equal(deepLink.status, 200);
+  assert.equal(await deepLink.text(), "<main>UQ Minis</main>");
+  assert.equal(deepLink.headers.get("X-Frame-Options"), "DENY");
+  assert.equal(deepLink.headers.get("Cache-Control"), "no-cache");
+  expect(binding.fetch).toHaveBeenNthCalledWith(1, expect.objectContaining({ method: "GET" }));
+  assert.equal(new URL(binding.fetch.mock.calls[0][0].url).pathname, "/planny");
+  assert.equal(new URL(binding.fetch.mock.calls[1][0].url).pathname, "/index.html");
+
+  const asset = await worker.fetch(new Request("https://uni.keysi.dev/mini/assets/app.js"), {
+    ASSETS: binding,
+  });
+  assert.equal(asset.status, 200);
+  assert.equal(asset.headers.get("Cache-Control"), "public, max-age=31536000");
+  assert.equal(new URL(binding.fetch.mock.calls[2][0].url).pathname, "/assets/app.js");
+});
+
+test("the UQ Worker keeps backend failures explicit and private", async () => {
+  const binding = assets();
+  const response = await worker.fetch(new Request("https://uni.keysi.dev/api/health"), {
+    ASSETS: binding,
+  });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+  assert.equal((await response.json()).status, "degraded");
+  expect(binding.fetch).not.toHaveBeenCalled();
+
+  const redirect = await worker.fetch(new Request("https://uni.keysi.dev/mini"), {
+    ASSETS: binding,
+  });
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers.get("Location"), "https://uni.keysi.dev/mini/");
+  assert.equal(
+    (await worker.fetch(new Request("https://example.com/mini/"), { ASSETS: binding })).status,
+    404,
+  );
 });
