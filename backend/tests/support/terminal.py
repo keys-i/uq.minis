@@ -6,7 +6,7 @@ import random
 import time
 from io import StringIO
 from operator import itemgetter
-from threading import Timer
+from threading import Event, Timer
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock
@@ -54,6 +54,11 @@ def entry(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture
+def key_gate():
+    return SimpleNamespace(armed=Event(), ready=Event())
+
+
+@pytest.fixture
 def cursor(monkeypatch: pytest.MonkeyPatch):
     buffer = SimpleNamespace(
         text="",
@@ -79,7 +84,9 @@ def cursor(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture
-def canvas(pipe: PipeInput, screen: Screen, monkeypatch: pytest.MonkeyPatch):
+def canvas(
+    pipe: PipeInput, screen: Screen, key_gate: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+):
     frames: Frames = []
     response: tuple[str, str] | None = None
     native = prompt_toolkit.prompt
@@ -113,10 +120,12 @@ def canvas(pipe: PipeInput, screen: Screen, monkeypatch: pytest.MonkeyPatch):
             app.loop.set_exception_handler(
                 lambda loop, context: current.exit(exception=context["exception"])
             )
+            key_gate.ready.set()
 
         try:
             return native(*args, **{**kwargs, "pre_run": ready})
         finally:
+            key_gate.ready.clear()
             if app:
                 app.after_render -= sample
 
@@ -130,6 +139,8 @@ def canvas(pipe: PipeInput, screen: Screen, monkeypatch: pytest.MonkeyPatch):
     ):
         nonlocal response
         response = reply
+        key_gate.armed.set()
+        key_gate.ready.clear()
         screen(width=width, live=True, no_color=no_color)
         monkeypatch.setattr(
             get_app_session().output, "get_size", lambda: Size(rows=rows, columns=width)
@@ -143,11 +154,13 @@ def canvas(pipe: PipeInput, screen: Screen, monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture
-def keys(pipe: PipeInput):
+def keys(pipe: PipeInput, key_gate: SimpleNamespace):
     timers: list[Timer] = []
 
     def send(*texts: str, interval: float = 0.1) -> None:
         def write() -> None:
+            if key_gate.armed.is_set():
+                key_gate.ready.wait()
             for index, text in enumerate(texts):
                 if index:
                     time.sleep(interval)
