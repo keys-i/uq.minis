@@ -150,13 +150,6 @@ export function MiniShelf({ tools, open }: { tools: Tools; open: (name: string) 
         if (!event.currentTarget.contains(event.relatedTarget)) setFeatured(initial);
       }}
     >
-      <div className="expedition-atmosphere" aria-hidden="true">
-        <span className="range range-one" />
-        <span className="range range-two" />
-        <span className="track" />
-        <span className="reed reed-one" />
-        <span className="reed reed-two" />
-      </div>
       <div className="mini-grid">
         {Array.from({ length: Math.ceil(entries.length / 3) }, (_, row) => (
           <div

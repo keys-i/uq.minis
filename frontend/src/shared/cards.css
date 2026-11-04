@@ -1,107 +1,16 @@
-/* == A card shelf that makes one tool easier to understand at a time == */
+/* == Character cards within the home forest == */
 .expedition-board {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
-  padding: clamp(18px, 2.5vw, 32px);
-  border-radius: 42px 26px 46px 30px;
-  background: linear-gradient(165deg, #d8e7d2 0 42%, #c9ddd0 73%, #b8d7d4 100%);
-  box-shadow:
-    inset 0 2px 0 #ffffffb8,
-    inset 0 -3px 0 #4664562b,
-    0 13px 30px color-mix(in srgb, var(--shadow, #2736401f) 70%, transparent);
-}
-.expedition-board::after {
-  position: absolute;
-  right: -4%;
-  bottom: -8%;
-  z-index: 2;
-  width: 32%;
-  height: 35%;
-  background:
-    radial-gradient(ellipse at 85% 95%, #476b58 0 18%, transparent 19%),
-    radial-gradient(ellipse at 64% 100%, #6f9273 0 22%, transparent 23%),
-    radial-gradient(ellipse at 42% 110%, #9cb88f 0 29%, transparent 30%);
-  content: "";
-  opacity: 0.7;
-  pointer-events: none;
-  transform-origin: 100% 100%;
-  animation: board-breathe 9s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
-}
-.expedition-atmosphere,
-.expedition-atmosphere > span {
-  position: absolute;
-  pointer-events: none;
-}
-.expedition-atmosphere {
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-}
-.expedition-atmosphere .range {
-  right: -5%;
-  left: -5%;
-  clip-path: polygon(
-    0 65%,
-    8% 52%,
-    18% 70%,
-    31% 36%,
-    46% 63%,
-    59% 31%,
-    72% 58%,
-    87% 27%,
-    100% 57%,
-    100% 100%,
-    0 100%
-  );
-}
-.range-one {
-  top: 4%;
-  height: 44%;
-  background: #91b3a5;
-  opacity: 0.42;
-  animation: range-drift 16s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
-}
-.range-two {
-  top: 19%;
-  height: 43%;
-  background: #6d9483;
-  opacity: 0.28;
-  transform: scaleX(-1);
-  animation: range-drift 22s cubic-bezier(0.37, 0, 0.63, 1) -7s infinite alternate-reverse;
-}
-.expedition-atmosphere .track {
-  top: 8%;
-  left: 49%;
-  width: 45%;
-  height: 92%;
-  border-right: 4px dashed #fff9d98c;
-  border-radius: 48% 52% 44% 56%;
-  transform: rotate(17deg);
-}
-.expedition-atmosphere .reed {
-  bottom: -5%;
-  width: 28px;
-  height: 34%;
-  border-left: 7px solid #476b58;
-  border-radius: 50%;
-  transform-origin: 50% 100%;
-  animation: reed-sway 5.8s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
-}
-.reed-one {
-  left: 4%;
-  transform: rotate(-10deg);
-}
-.reed-two {
-  right: 6%;
-  transform: rotate(12deg);
-  animation-delay: -2.4s;
+  padding: clamp(12px, 1.8vw, 28px) 0 clamp(34px, 5vw, 76px);
 }
 .mini-grid {
   position: relative;
   z-index: 1;
   display: grid;
   gap: 18px;
+  width: min(100%, 1640px);
+  margin-inline: auto;
 }
 .mini-row {
   display: grid;
@@ -233,30 +142,6 @@
     opacity: 0;
   }
 }
-@keyframes range-drift {
-  from {
-    transform: translate3d(-6px, 3px, 0);
-  }
-  to {
-    transform: translate3d(8px, -3px, 0);
-  }
-}
-@keyframes reed-sway {
-  from {
-    rotate: -3deg;
-  }
-  to {
-    rotate: 4deg;
-  }
-}
-@keyframes board-breathe {
-  from {
-    transform: rotate(-0.4deg) translate3d(-2px, 2px, 0);
-  }
-  to {
-    transform: rotate(0.6deg) translate3d(3px, -2px, 0);
-  }
-}
 .mini-grid .mini-card:has(.card-title:focus-visible) {
   outline: 3px solid var(--target);
   outline-offset: 4px;
@@ -321,12 +206,7 @@
 }
 @media (max-width: 760px) {
   .expedition-board {
-    margin-inline: -8px;
-    padding: 12px;
-    border-radius: 28px 18px 32px 20px;
-  }
-  .expedition-atmosphere .track {
-    display: none;
+    padding: 8px 0 38px;
   }
   .mini-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -380,8 +260,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .expedition-board::after,
-  .expedition-atmosphere > span,
   .mini-row,
   .mini-grid .mini-card,
   .mini-grid .mini-mark,
@@ -390,12 +268,6 @@
   }
   .typed-copy[data-typing="true"] > span:last-child::after {
     animation: none;
-  }
-}
-@media (prefers-reduced-data: reduce) {
-  .expedition-atmosphere,
-  .expedition-board::after {
-    display: none;
   }
 }
 @media (forced-colors: active) {
