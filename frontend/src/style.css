@@ -510,9 +510,10 @@ main {
 }
 .shell.home main[data-mini="home"] > .site-footer {
   border-top: 0;
-  background: #14382c;
+  margin-inline: calc(clamp(12px, 1.8vw, 32px) * -1);
+  background: transparent;
   color: #fffdf2;
-  text-shadow: none;
+  text-shadow: 0 2px 12px #07180fe6;
 }
 .shell.home .site-footer :is(a, button) {
   color: inherit;
@@ -621,7 +622,7 @@ main[data-mini]:not([data-mini="timey"]) :is(.habitat-page, .habitat-page[data-k
   background: var(--canvas);
 }
 main[data-mini]:not([data-mini="timey"]) > .site-footer {
-  background: #14382c;
+  background: transparent;
 }
 .habitat-clearing {
   position: relative;
@@ -717,13 +718,13 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   gap: 24px;
   flex-wrap: wrap;
   min-height: 164px;
-  margin-top: 20px;
+  margin-top: 0;
   padding: 34px clamp(22px, 4vw, 64px);
   overflow: hidden;
   border: 0;
-  border-radius: 34px 24px 0 0;
-  color: #fffdf2;
-  background: #14382c;
+  border-radius: 0;
+  color: var(--text);
+  background: transparent;
 }
 .tectonic-field,
 .tectonic-plate {
@@ -731,43 +732,40 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   pointer-events: none;
 }
 .tectonic-field {
-  inset: -28px;
-  z-index: -1;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
 }
 .tectonic-plate {
-  filter: blur(8px);
-  opacity: 0.78;
+  opacity: 1;
+  filter: none;
+  background: rgb(255 253 242 / 0.06);
   transform: translate3d(0, 0, 0);
-}
-.tectonic-plate::before {
-  position: absolute;
-  inset: 0;
-  content: "";
+  -webkit-backdrop-filter: blur(13px) saturate(0.82);
+  backdrop-filter: blur(13px) saturate(0.82);
 }
 .plate-west {
   inset: -8% 48% 4% -8%;
-}
-.plate-west::before {
   clip-path: polygon(0 4%, 82% 0, 100% 28%, 78% 62%, 88% 100%, 0 91%);
-  background: #265d47;
+  -webkit-backdrop-filter: blur(18px) saturate(0.76);
+  backdrop-filter: blur(18px) saturate(0.76);
 }
 .plate-east {
   inset: 4% -8% -12% 45%;
-}
-.plate-east::before {
   clip-path: polygon(18% 0, 100% 9%, 100% 100%, 5% 92%, 0 55%, 28% 31%);
-  background: #789d72;
+  -webkit-backdrop-filter: blur(11px) saturate(0.88);
+  backdrop-filter: blur(11px) saturate(0.88);
 }
 .plate-ridge {
   inset: 52% 25% -18% 18%;
-  opacity: 0.45;
-}
-.plate-ridge::before {
   clip-path: polygon(2% 30%, 35% 0, 62% 19%, 100% 9%, 92% 100%, 8% 86%);
-  background: #d4a93b;
+  background: rgb(255 253 242 / 0.1);
+  -webkit-backdrop-filter: blur(24px) saturate(0.7);
+  backdrop-filter: blur(24px) saturate(0.7);
 }
 .site-footer > .footer-wordmark {
+  position: relative;
+  z-index: 1;
   color: inherit;
   font-family: "DynaPuff", "Comic Sans MS", cursive;
   font-size: clamp(1.7rem, 4vw, 3.25rem);
@@ -827,9 +825,10 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
 }
 .site-footer nav {
   position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 8px 22px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .site-footer a,
@@ -845,24 +844,42 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
 .site-footer nav > a,
 .site-footer nav > button {
   position: relative;
-  padding: 9px 14px;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+  place-items: center;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, #fffdf2 13%, transparent);
+  border-radius: 12px;
+  background: transparent;
   text-decoration: none;
   transition:
     color 180ms ease,
-    background-color 180ms ease,
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.site-footer nav .icon {
+  width: 27px;
+  height: 27px;
+  background: currentColor;
+}
+.site-footer nav > .footer-preferences {
+  width: 66px;
+  grid-template-columns: repeat(2, 22px);
+  gap: 3px;
+}
+.site-footer nav > .footer-preferences .icon {
+  width: 22px;
+  height: 22px;
 }
 .site-footer nav > button.quiet {
   color: inherit;
 }
 @media (hover: hover) and (pointer: fine) {
   .site-footer nav > :is(a, button):hover {
-    color: #14382c;
-    background: #fff1bd;
-    transform: translateY(-3px) rotate(-1deg);
+    color: var(--accent);
+    background: transparent;
+    transform: translateY(-4px) rotate(-2deg) scale(1.08);
   }
   .tectonic-footer:hover .plate-west,
   .tectonic-footer:focus-within .plate-west {
@@ -909,7 +926,7 @@ main[data-mini]:not([data-mini="timey"]) > .site-footer {
   margin: 0;
   padding: 34px clamp(22px, 4vw, 64px);
   border-radius: 0;
-  background: #14382c;
+  background: transparent;
 }
 
 /* == Real club and course cards == */

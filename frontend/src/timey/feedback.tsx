@@ -61,7 +61,7 @@ export function message(error: unknown, subject: string) {
     return `The connection dropped while ${subject}. Try again, or use a file from your device`;
   if (error instanceof Error) {
     if (/not a bot|blocking downloads|cookies-from-browser/i.test(error.message))
-      return "YouTube is blocking this download. Connect Google and try again, or add a file from your device";
+      return "YouTube is blocking this download. Try another video, or add a file from your device";
     if (
       /Cannot read this video|Couldn.t prepare this video|ffmpeg|Invalid data found/i.test(
         error.message,

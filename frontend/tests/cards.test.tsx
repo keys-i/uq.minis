@@ -206,7 +206,10 @@ test("navigation has a touch menu and a useful footer without play or pause butt
   assert.match(html, /href="https:\/\/keysi\.dev"/);
   assert.match(html, /href="https:\/\/github\.com\/keys-i"/);
   assert.match(html, /href="https:\/\/linkedin\.com\/in\/radhesh-g"/);
-  assert.match(html, />LinkedIn</);
+  assert.match(html, /aria-label="GitHub"/);
+  assert.match(html, /aria-label="LinkedIn"/);
+  assert.match(html, /aria-label="Accessibility and sound"/);
+  assert.doesNotMatch(html, />GitHub<|>LinkedIn<|>Accessibility &amp; sound</);
   assert.match(html, /role="dialog"/);
   assert.match(html, />Contrast</);
   assert.match(html, /Reading size/);

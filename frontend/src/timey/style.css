@@ -76,24 +76,6 @@
   gap: 14px;
   width: 100%;
 }
-.timer-google-panel:has(.timer-google-window) {
-  min-height: 0;
-  padding: clamp(16px, 2.2vw, 24px);
-}
-.timer-google-window {
-  width: 100%;
-  min-width: 0;
-  text-align: left;
-}
-.timer-google-window .portal-window {
-  max-width: none;
-}
-.timer-google-window .portal-screen {
-  border-radius: 8px;
-}
-.timer-google-gate:has(.timer-google-window) {
-  --opening-size: 70% 90%;
-}
 .timer-google-panel[data-error] .timer-google-content {
   opacity: 0.16;
 }
@@ -186,6 +168,10 @@
     --opening-size: 94% 86%;
     min-height: 360px;
     aspect-ratio: auto;
+  }
+  .timer-google-panel {
+    min-height: 250px;
+    padding: 24px 28px;
   }
 }
 [data-theme="dark"] .timer-editor[data-empty] .timer-google-gate:before {

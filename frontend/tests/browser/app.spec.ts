@@ -245,36 +245,19 @@ test("only Timey keeps the paper background around its mini", async ({ page }) =
       "background-color",
       "rgba(0, 0, 0, 0)",
     );
-    await expect(page.locator(".site-footer")).toHaveCSS("background-color", "rgb(20, 56, 44)");
+    await expect(page.locator(".site-footer")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   }
   await page.goto("/?m=timey");
   await expect(page.locator(".habitat-page")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await expect(page.locator("html")).toHaveCSS("background-color", "rgb(255, 251, 239)");
 });
 
-test("Timey uses its whole preview as the Google connection step", async ({ page }) => {
-  const actions: string[] = [];
+test("Timey uses its whole preview for concise YouTube consent", async ({ page }) => {
   await page.route("**/api/timey/youtube?status=1", (route) =>
-    route.fulfill({ json: { connected: false, open: false } }),
+    route.fulfill({ json: { connected: false, configured: true } }),
   );
-  await page.route("**/api/timey/youtube?view=1", (route) => {
-    if (route.request().method() === "POST")
-      actions.push((route.request().postDataJSON() as { kind: string }).kind);
-    return route.fulfill({
-      json: {
-        mode: "window",
-        image: pixel.toString("base64"),
-        host: "accounts.google.com",
-        title: "Google sign-in",
-        text: "",
-        width: 760,
-        height: 480,
-        controls: [],
-      },
-    });
-  });
   await page.goto("/?mini=timey");
-  const preview = page.getByRole("region", { name: "Connect Google" });
+  const preview = page.getByRole("region", { name: "Connect YouTube" });
   await expect(preview).toBeVisible();
   await expect(preview).toHaveClass(/timer-canvas/);
   const reveal = preview.locator(".timer-google-reveal"),
@@ -291,7 +274,12 @@ test("Timey uses its whole preview as the Google connection step", async ({ page
   await expect(panel).toBeVisible();
   await expect(panel).toHaveCSS("mask-image", /panel\.svg/);
   await expect(panel).toHaveCSS("mask-image", /feather\.svg/);
-  await expect(preview.getByRole("button", { name: "Connect Google" })).toBeVisible();
+  await expect(preview.getByRole("heading", { name: "Connect YouTube" })).toBeVisible();
+  await expect(preview.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  await expect(
+    preview.getByText("Allow Timey to upload videos you choose. Your password stays private"),
+  ).toBeVisible();
+  await expect(preview.getByText("Connect Google")).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Background preview" })).toHaveCount(0);
   await expect(page.locator(".timer-connect-step")).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -301,20 +289,7 @@ test("Timey uses its whole preview as the Google connection step", async ({ page
   expect(paperBox).not.toBeNull();
   expect(paperBox!.width).toBeLessThan(previewBox!.width * 0.94);
   expect(paperBox!.height).toBeLessThan(previewBox!.height * 0.86);
-  await preview.getByRole("button", { name: "Connect Google" }).click();
-  const window = panel.locator(".portal-window");
-  await expect(window).toBeVisible();
-  await expect(page.locator("dialog")).toHaveCount(0);
-  await expect(window.getByText(/^Up$|^Down$/)).toHaveCount(0);
-  await expect(window.locator(".portal-screen > img")).toHaveAttribute(
-    "src",
-    /^data:image\/png;base64,/,
-  );
-  await window.locator(".portal-screen").dispatchEvent("wheel", { deltaY: 360 });
-  await expect.poll(() => actions).toContain("scroll");
-  await expect(page.getByText("Sign in with Google to search and use YouTube videos")).toHaveCount(
-    0,
-  );
+  await expect(panel.locator(".portal-window")).toHaveCount(0);
 });
 
 test("Timey keeps Google failures inside its connection panel", async ({ page }) => {
@@ -328,7 +303,7 @@ test("Timey keeps Google failures inside its connection panel", async ({ page })
   const panel = page.locator(".timer-google-panel"),
     popup = panel.locator(".timer-google-error"),
     alert = popup.getByRole("alert");
-  await expect(alert).toContainText("Google didn’t connect");
+  await expect(alert).toContainText("YouTube didn’t connect");
   await expect(alert).toContainText("Your timer is safe");
   await expect(page.getByText(/invalid_grant|upstream trace/i)).toHaveCount(0);
   await expect(popup).toHaveCSS("position", "absolute");

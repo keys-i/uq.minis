@@ -344,71 +344,46 @@ test("quality changes rebuild the watched video and preserve its draft", async (
   expect(screen.getByLabelText("Cached backdrop preview")).toHaveAttribute("src", "/download/new");
 });
 
-test("YouTube uses the real provider window, saves once and closes its connection", async () => {
+test("YouTube opens Google's real consent page and closes after the backend saves it", async () => {
   const { Connection } = await import("../src/timey/connect.tsx");
   const user = userEvent.setup(),
     ready = vi.fn();
-  const actions: string[] = [];
-  let filled = false;
-  const frame = {
-    mode: "window",
-    image: "eA==",
-    host: "accounts.google.com",
-    title: "Google sign-in",
-    text: "",
-    width: 760,
-    height: 760,
-    controls: [
-      {
-        id: "email",
-        type: "email",
-        label: "Google email",
-        x: 10,
-        y: 10,
-        width: 200,
-        height: 44,
-        disabled: false,
-        checked: false,
-        options: [],
-      },
-    ],
+  let checks = 0;
+  const popup = {
+    closed: false,
+    location: { href: "" },
+    close() {
+      this.closed = true;
+    },
   };
+  vi.spyOn(window, "open").mockReturnValue(popup as unknown as Window);
   vi.spyOn(globalThis, "fetch").mockImplementation(async (_path, init) => {
-    if (!init?.body && String(_path).includes("status=1"))
-      return json({ connected: false, open: false });
-    const kind = init?.body ? JSON.parse(String(init.body)).kind : "view";
-    actions.push(kind);
-    if (kind === "fill") filled = true;
-    return json(
-      kind === "view" && filled
-        ? { connected: true }
-        : kind === "cancel"
-          ? { connected: true, open: false }
-          : frame,
-    );
+    const path = String(_path);
+    if (path.endsWith("/start"))
+      return json({
+        url: "https://accounts.google.com/o/oauth2/v2/auth?state=test-only",
+      });
+    if (!init?.body && path.includes("status=1"))
+      return json({ connected: checks++ > 0, configured: true });
+    throw new Error(`Unexpected request: ${path}`);
   });
   render(
     <Connection ready={ready}>
       <p>Timer ready</p>
     </Connection>,
   );
-  const gate = await screen.findByRole("region", { name: "Connect Google" });
+  const gate = await screen.findByRole("region", { name: "Connect YouTube" });
   expect(gate).toBeVisible();
   expect(screen.queryByText("Timer ready")).not.toBeInTheDocument();
-  await user.click(await screen.findByRole("button", { name: "Connect Google" }));
-  expect(document.querySelector(".timer-google-panel .portal-window")).not.toBeNull();
-  await screen.findByLabelText("Google email");
-  expect(document.querySelector(".portal-screen > img")).toHaveAttribute(
-    "src",
-    "data:image/png;base64,eA==",
-  );
-  await user.type(screen.getByLabelText("Google email"), "test-only@example.invalid");
+  expect(screen.getByRole("heading", { name: "Connect YouTube" })).toBeVisible();
+  expect(screen.getAllByText(/Google/)).toHaveLength(1);
+  await user.click(await screen.findByRole("button", { name: "Continue with Google" }));
   await waitFor(() => expect(ready).toHaveBeenCalledOnce(), { timeout: 3000 });
+  expect(popup.location.href).toMatch(/^https:\/\/accounts\.google\.com\//);
+  expect(popup.closed).toBe(true);
   expect(screen.getByText("Timer ready")).toBeVisible();
-  expect(screen.queryByRole("region", { name: "Connect Google" })).not.toBeInTheDocument();
-  expect(actions.filter((kind) => kind === "open")).toHaveLength(1);
-  expect(actions).not.toContain("finish");
-  expect(actions).toContain("cancel");
+  expect(screen.queryByRole("region", { name: "Connect YouTube" })).not.toBeInTheDocument();
+  expect(document.querySelector(".portal-window")).toBeNull();
   expect(document.querySelector("dialog")).toBeNull();
 });
 
@@ -428,9 +403,9 @@ test("Google connection failures open as friendly recovery inside the panel", as
   );
   const alert = await screen.findByRole("alert");
   expect(alert.closest(".timer-google-panel")).not.toBeNull();
-  expect(alert).toHaveTextContent("Google didn’t connect");
+  expect(alert).toHaveTextContent("YouTube didn’t connect");
   expect(alert).toHaveTextContent(
-    "Google couldn’t connect just now. Your timer is safe, so you can try again",
+    "YouTube couldn’t connect just now. Your timer is safe, so you can try again",
   );
   expect(screen.queryByText(/invalid_grant|upstream trace/i)).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();

@@ -223,7 +223,7 @@ test("Planny starts with course selection and keeps only assessment views", () =
   assert.doesNotMatch(html, /Weeky|Gantty|Buzzy|Clubby/);
 });
 
-test("Eventy keeps its UQ gate while Timey starts with Google in the preview", () => {
+test("Eventy keeps its UQ gate while Timey starts with YouTube consent in the preview", () => {
   const event = renderToStaticMarkup(React.createElement(eventPage.Eventy));
   assert.match(event, /Prepare event/);
   assert.match(event, /Booking &amp; replies/);
@@ -231,7 +231,7 @@ test("Eventy keeps its UQ gate while Timey starts with Google in the preview", (
   assert.match(html, /aria-label="Timer studio"/);
   assert.match(
     html,
-    /timer-stage[^]*timer-google-gate[^]*timer-google-reveal[^]*timer-google-paper[^]*timer-google-panel[^]*Checking Google/,
+    /timer-stage[^]*timer-google-gate[^]*timer-google-reveal[^]*timer-google-paper[^]*timer-google-panel[^]*Opening YouTube/,
   );
   assert.doesNotMatch(
     html,
