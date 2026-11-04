@@ -21,7 +21,7 @@ const fields: Field[] = [
   { name: "weight", label: "Weight", min: 0, max: 100 },
   { name: "course", label: "Course", options: [["course", "CSSE1001"]] },
 ];
-const now = new Date(2026, 9, 23, 10);
+const now = new Date("2026-10-23T00:00:00Z");
 
 test("a brief proposes fields and follow-ups retain unrelated edits", () => {
   const draft = interpret("CSSE1001 essay worth 30% due next Friday at 5pm", fields, {}, now);

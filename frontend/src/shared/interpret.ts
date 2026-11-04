@@ -25,7 +25,11 @@ export function interpret(
     }
     values[name] = value;
   };
-  const dates = GB.parse(text.slice(0, 2000), now, { forwardDate: true });
+  const dates = GB.parse(
+    text.slice(0, 2000),
+    { instant: now, timezone: 600 },
+    { forwardDate: true },
+  );
   const parsed =
     dates.find((item) => item.start.isCertain("day") || item.start.isCertain("weekday")) ||
     dates.find((item) => item.start.isCertain("hour"));
@@ -39,15 +43,16 @@ export function interpret(
       if (parsed.end?.isCertain("hour"))
         put("schedule.event_end", localInput(parsed.end.date().toISOString()).slice(11, 16));
     } else if (fields.some((field) => field.name === "due")) {
-      const previous = current.due ? new Date(current.due) : undefined;
-      const hasPrevious = previous && Number.isFinite(previous.getTime());
-      if (!dated && hasPrevious)
-        date.setFullYear(previous.getFullYear(), previous.getMonth(), previous.getDate());
-      if (!parsed.start.isCertain("hour") && hasPrevious)
-        date.setHours(previous.getHours(), previous.getMinutes(), 0, 0);
-      if ((dated && parsed.start.isCertain("hour")) || hasPrevious)
-        put("due", localInput(date.toISOString()));
-      else notes.push(dated ? "Add a deadline time below" : "Add a deadline date below");
+      const prior = current.due || "";
+      const hasPrevious =
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(prior) &&
+        Number.isFinite(Date.parse(`${prior}:00+10:00`));
+      if ((dated && parsed.start.isCertain("hour")) || hasPrevious) {
+        let due = localInput(date.toISOString());
+        if (!dated) due = `${prior.slice(0, 10)}${due.slice(10)}`;
+        if (!parsed.start.isCertain("hour")) due = `${due.slice(0, 11)}${prior.slice(11)}`;
+        put("due", due);
+      } else notes.push(dated ? "Add a deadline time below" : "Add a deadline date below");
     }
   }
   const weight = text.match(
