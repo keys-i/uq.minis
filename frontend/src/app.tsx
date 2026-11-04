@@ -96,11 +96,9 @@ export default function App() {
     useStudy
       .getState()
       .catalogue(controller.signal)
-      .catch((error) => {
-        if (error.name !== "AbortError") report(error.message, true);
-      });
+      .catch(() => undefined);
     return () => controller.abort();
-  }, [report]);
+  }, []);
   useEffect(() => {
     if (!access || !studying) return;
     const controller = new AbortController();

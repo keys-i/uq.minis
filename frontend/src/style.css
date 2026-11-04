@@ -2835,6 +2835,7 @@ select:-webkit-autofill {
 }
 .language-trigger,
 .theme-toggle,
+.theme-options,
 .picker-trigger {
   display: inline-flex;
   align-items: center;
@@ -2862,29 +2863,53 @@ select:-webkit-autofill {
   width: 12px;
   height: 12px;
 }
-.theme-toggle {
-  padding: 5px 12px 5px 6px;
-  border-radius: 24px;
-  gap: 8px;
+.theme-picker {
+  display: inline-flex;
+  position: relative;
+  anchor-name: --theme-pocket;
+}
+.theme-toggle,
+.theme-options {
   min-height: 46px;
 }
-.theme-toggle select {
-  min-height: 34px;
-  padding: 4px 20px 4px 2px;
-  border: 0;
-  border-radius: 0;
-  appearance: none;
-  color: inherit;
-  background: transparent;
-  box-shadow: none;
+.theme-toggle {
+  gap: 8px;
+  padding: 5px 12px 5px 6px;
+  border-radius: 24px 8px 8px 24px;
   font-weight: 800;
-  cursor: pointer;
 }
-.theme-toggle > .menu-chevron {
+.theme-options {
+  min-width: 44px;
+  margin-left: 4px;
+  padding: 0;
+  border-radius: 8px 18px 18px 8px;
+}
+.theme-options .icon {
   width: 12px;
   height: 12px;
-  margin-left: -21px;
-  pointer-events: none;
+}
+.theme-menu {
+  position: fixed;
+  inset: 76px 18px auto auto;
+  z-index: 10;
+  margin: 0;
+  padding: 7px;
+  border: 1.5px solid var(--edge);
+  border-radius: 14px 6px 14px 14px;
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: 0 12px 30px var(--shadow);
+}
+.theme-menu button {
+  display: grid;
+  min-width: 176px;
+  grid-template-columns: 20px 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+  text-align: left;
+}
+.theme-menu button > span {
+  color: var(--accent);
 }
 .theme-window {
   display: block;
@@ -2910,14 +2935,14 @@ select:-webkit-autofill {
     translate 350ms cubic-bezier(0.16, 1, 0.3, 1),
     opacity 200ms;
 }
-.theme-toggle[data-dark="true"] .theme-window {
+.theme-picker[data-dark="true"] .theme-window {
   background: #35465c;
 }
-.theme-toggle[data-dark="true"] .theme-sun {
+.theme-picker[data-dark="true"] .theme-sun {
   translate: -30px 12px;
   opacity: 0;
 }
-.theme-toggle[data-dark="true"] .theme-moon {
+.theme-picker[data-dark="true"] .theme-moon {
   translate: -10px 0;
   opacity: 1;
 }
@@ -3153,6 +3178,16 @@ select:-webkit-autofill {
     position-try-fallbacks: flip-inline, flip-block;
   }
 }
+@supports (position-anchor: --theme-pocket) {
+  .theme-menu {
+    position: absolute;
+    position-anchor: --theme-pocket;
+    inset: auto;
+    top: calc(anchor(bottom) + 8px);
+    right: anchor(right);
+    position-try-fallbacks: flip-inline, flip-block;
+  }
+}
 @supports (position-anchor: --picker) {
   .picker-menu {
     position: absolute;
@@ -3165,6 +3200,7 @@ select:-webkit-autofill {
 @media (hover: hover) {
   .language-trigger:hover,
   .theme-toggle:hover,
+  .theme-options:hover,
   .picker-trigger:hover,
   .popover-close:hover,
   .language-option:hover,
@@ -3313,6 +3349,7 @@ select:-webkit-autofill {
 }
 @media (max-width: 700px) {
   .language-menu,
+  .theme-menu,
   .picker-menu {
     inset: 86px 16px auto auto;
     max-height: calc(100dvh - 110px);
@@ -3331,6 +3368,7 @@ select:-webkit-autofill {
   .theme-sun,
   .theme-moon,
   .theme-toggle,
+  .theme-options,
   .theme-window {
     transition: none;
   }

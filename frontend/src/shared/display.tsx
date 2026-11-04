@@ -189,23 +189,48 @@ export function ThemePicker() {
   const { scheme = "light", preferences, change } = useContext(Motion),
     dark = scheme === "dark";
   return (
-    <label className="theme-toggle" data-dark={dark}>
-      <span className="theme-window">
-        <img className="theme-sun" src={vector("icons/sun")} alt="" />
-        <img className="theme-moon" src={vector("icons/moon")} alt="" />
-      </span>
-      <select
-        aria-label="App theme"
-        value={preferences.theme}
-        onChange={(event) =>
-          change({ theme: preferencesSchema.shape.theme.parse(event.target.value) })
-        }
+    <div className="theme-picker" data-dark={dark}>
+      <button
+        type="button"
+        className="theme-toggle"
+        aria-label="Night mode"
+        aria-pressed={dark}
+        onClick={() => change({ theme: dark ? "light" : "dark" })}
       >
-        <option value="system">System</option>
-        <option value="light">Day</option>
-        <option value="dark">Night</option>
-      </select>
-      <Icon name="chevron" className="menu-chevron" />
-    </label>
+        <span className="theme-window" aria-hidden="true">
+          <img className="theme-sun" src={vector("icons/sun")} alt="" />
+          <img className="theme-moon" src={vector("icons/moon")} alt="" />
+        </span>
+        <span>{dark ? "Night" : "Day"}</span>
+      </button>
+      <button
+        type="button"
+        className="theme-options"
+        aria-label="Theme options"
+        aria-haspopup="dialog"
+        popoverTarget="theme-menu"
+      >
+        <Icon name="chevron" />
+      </button>
+      <section
+        id="theme-menu"
+        popover="auto"
+        role="dialog"
+        aria-label="Theme options"
+        className="theme-menu"
+      >
+        <button
+          type="button"
+          className="quiet"
+          aria-pressed={preferences.theme === "system"}
+          popoverTarget="theme-menu"
+          popoverTargetAction="hide"
+          onClick={() => change({ theme: "system" })}
+        >
+          <span aria-hidden="true">{preferences.theme === "system" ? "✓" : ""}</span>
+          Sync to system
+        </button>
+      </section>
+    </div>
   );
 }

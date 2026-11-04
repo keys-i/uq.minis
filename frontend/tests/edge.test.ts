@@ -46,7 +46,10 @@ test("the UQ Worker keeps backend failures explicit and private", async () => {
   });
   assert.equal(response.status, 503);
   assert.equal(response.headers.get("Cache-Control"), "no-store");
-  assert.equal((await response.json()).status, "degraded");
+  assert.deepEqual(await response.json(), {
+    error: "This workspace can't open right now. Try again shortly",
+    status: "degraded",
+  });
   expect(binding.fetch).not.toHaveBeenCalled();
 
   const redirect = await worker.fetch(new Request("https://uni.keysi.dev/mini"), {

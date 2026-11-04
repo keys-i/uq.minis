@@ -548,10 +548,10 @@ test("changing videos keeps a decoded backdrop and a legible themed picker", asy
   expect(pixel[2]).toBeGreaterThan(150);
   await picker.hover();
   await page.screenshot({ path: test.info().outputPath("backdrop-light.png"), fullPage: true });
-  const theme = page.getByRole("combobox", { name: "App theme" });
+  const theme = page.getByRole("button", { name: "Night mode" });
   await theme.focus();
   await expect(theme).not.toHaveAttribute("title");
-  await theme.selectOption("dark");
+  await theme.click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByRole("group", { name: "Background preview", exact: true }).hover();
   await picker.hover();
@@ -776,7 +776,7 @@ test("home artwork loads and theme changes leave habitat clocks alone", async ({
   const lights = await page
     .locator(".habitat")
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-light")));
-  await page.getByRole("combobox", { name: "App theme" }).selectOption("dark");
+  await page.getByRole("button", { name: "Night mode" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   expect(
     await page

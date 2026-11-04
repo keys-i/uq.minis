@@ -540,11 +540,11 @@ test("pocket filters retain native selection and named popover controls", () => 
   assert.match(html, /type="radio"[^>]+checked=""[^>]+value="science"/);
   assert.match(html, /aria-label="Close faculty choices"/);
   const theme = renderToStaticMarkup(React.createElement(display.ThemePicker));
-  assert.match(theme, /class="theme-toggle"/);
-  assert.match(theme, /aria-label="App theme"/);
-  assert.match(theme, /<option value="system" selected="">System<\/option>/);
-  assert.match(theme, /<option value="light">Day<\/option>/);
-  assert.match(theme, /<option value="dark">Night<\/option>/);
+  assert.match(theme, /class="theme-toggle" aria-label="Night mode" aria-pressed="false"/);
+  assert.match(theme, /aria-label="Theme options" aria-haspopup="dialog"/);
+  assert.match(theme, /popover="auto" role="dialog" aria-label="Theme options"/);
+  assert.match(theme, /aria-pressed="true"[^>]*><span aria-hidden="true">✓<\/span>Sync to system/);
+  assert.doesNotMatch(theme, /<select/);
 });
 
 test("club cards keep useful descriptions, named social icons and local profile controls", () => {

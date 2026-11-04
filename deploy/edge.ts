@@ -32,8 +32,7 @@ function unavailable(): Response {
   return secured(
     Response.json(
       {
-        error:
-          "The Minis interface is online, but its private workspace service isn't available yet",
+        error: "This workspace can't open right now. Try again shortly",
         status: "degraded",
       },
       { status: 503 },
