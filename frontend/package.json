@@ -25,7 +25,7 @@
     "assets": "uv run --directory ../backend --locked --no-default-groups --group art --inexact python ../tools/scripts/atlas.py"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.104.5",
+    "@tanstack/react-query": "^5.105.0",
     "chrono-node": "^2.10.3",
     "pixi.js": "^8.22.0",
     "react": "^19.2.0",
