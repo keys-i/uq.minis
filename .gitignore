@@ -24,11 +24,21 @@ out/
 .cache/
 .config/
 .impeccable/
+.taste-skill/
+playwright-report/
+test-results/
+*.log
+*.tsbuildinfo
 
 # == Secrets ==
 .env*
 !.env.example
+.dev.vars*
 client_secret*.json
+*.key
+*.p12
+*.pfx
+*.pem
 .timey/
 .minis/
 
@@ -43,3 +53,4 @@ Desktop.ini
 
 # == Frontend dependencies ==
 node_modules/
+.wrangler/
