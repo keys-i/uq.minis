@@ -1,0 +1,24 @@
+name = "keysi-minis"
+main = "edge.ts"
+account_id = "c713c05bacbb3d526a4f5bc6589f06d6"
+compatibility_date = "2026-10-20"
+workers_dev = false
+routes = [
+  { pattern = "uni.keysi.dev/mini", zone_name = "keysi.dev" },
+  { pattern = "uni.keysi.dev/mini/*", zone_name = "keysi.dev" },
+  { pattern = "uni.keysi.dev/api/*", zone_name = "keysi.dev" },
+  { pattern = "uni.keysi.dev/download", zone_name = "keysi.dev" },
+  { pattern = "uni.keysi.dev/download/*", zone_name = "keysi.dev" },
+  { pattern = "uni.keysi.dev/calendar.ics", zone_name = "keysi.dev" },
+]
+
+[assets]
+directory = "../out/artifacts/frontend"
+binding = "ASSETS"
+html_handling = "none"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "uq-minis"
+database_id = "eafd1ad0-bcbd-4c25-8430-408de77799ee"

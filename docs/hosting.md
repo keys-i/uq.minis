@@ -26,7 +26,7 @@ Saved workspace files remain outside releases, and each account's Timey draft re
 No Git commit or push is performed by this command
 
 Use the installed compatible Chromium through `MINIS_BROWSER` if the frontend test runner's default browser is unavailable
-The existing Wrangler CLI and [deployment configuration](../deploy/wrangler.jsonc) update the Cloudflare Worker when path routing changes
+The existing Wrangler CLI and [deployment configuration](../deploy/wrangler.toml) update the Cloudflare Worker when path routing changes
 Ordinary frontend and backend changes only need the deployment command above
 
 ## Account and filesystem boundaries
