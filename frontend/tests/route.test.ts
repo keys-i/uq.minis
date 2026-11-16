@@ -14,11 +14,14 @@ test.each(["/", "/mini/"])("builds canonical mini links with base %s", (base) =>
   expect(miniHref("home")).toBe(base);
 });
 
-test.each(["buzzy", "agent"])("reads the direct %s path before legacy query routes", (name) => {
-  vi.stubEnv("BASE_URL", "/");
-  history.replaceState(null, "", `/mini/${name}?m=timey`);
-  expect(requestedMini()).toBe(name);
-});
+test.each(["buzzy", "agent", "scrappy"])(
+  "reads the direct %s path before legacy query routes",
+  (name) => {
+    vi.stubEnv("BASE_URL", "/");
+    history.replaceState(null, "", `/mini/${name}?m=timey`);
+    expect(requestedMini()).toBe(name);
+  },
+);
 
 test.each(["?m=timey", "?mini=scrappy"])("keeps the legacy %s route readable", (query) => {
   vi.stubEnv("BASE_URL", "/");

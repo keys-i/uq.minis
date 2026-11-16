@@ -136,7 +136,6 @@ def publish(root: Path, host: str) -> None:
                 "run",
                 "build",
                 "--",
-                "--base=/mini/",
                 "--outDir",
                 str(output / "frontend"),
             ],

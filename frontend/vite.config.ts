@@ -8,4 +8,8 @@ const settings = JSON.parse(
   readFileSync(new URL("../out/tools/vite.json", import.meta.url), "utf8"),
 ) as UserConfig;
 
-export default defineConfig({ ...settings, plugins: [react()] });
+export default defineConfig(({ command }) => ({
+  ...settings,
+  base: command === "build" ? "/mini/" : settings.base,
+  plugins: [react()],
+}));
